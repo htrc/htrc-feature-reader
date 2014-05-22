@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 from htrc_features.page import Page, Section
+from six import iteritems
 import logging
 
 class Volume(object):
@@ -12,9 +13,12 @@ class Volume(object):
             'the supported version (%s)' % (obj['features']['schemaVersion'],
                                             self.SUPPORTED_SCHEMA) )
         self.id = obj['id']
-        self._metadata = obj['metadata']
         self._pages = obj['features']['pages']
         self.pageCount = obj['features']['pageCount']
+
+        # Expand metadata to attributes
+        for (key, value) in obj['metadata'].iteritems():
+            setattr(self, key, value)
         self.pageindex = 0
     
     def __iter__(self):
