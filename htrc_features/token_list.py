@@ -4,10 +4,9 @@ from six import iteritems
 import htrc_features.utils as utils
 
 class TokenList(object):
-    _rawtokens = defaultdict(lambda: defaultdict(int))
 
     def __init__(self, tokendict={}):
-        #self._rawtokens = tokenarr
+        self._rawtokens = defaultdict(lambda: defaultdict(int))
 
         for (t, poscounts) in iteritems(tokendict):
             self.add(t, poscounts)

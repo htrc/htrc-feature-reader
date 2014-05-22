@@ -85,6 +85,7 @@ class Section:
         self.tokenlist.add_TokenList(section.tokenlist)
     
     def total_tokens(self):
+        tc = self.tokenlist.token_counts(pos=False)
         return sum(self.tokenlist.token_counts(pos=False).values())
 
     def __str__(self):
