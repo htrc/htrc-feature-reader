@@ -1,6 +1,7 @@
+from __future__ import unicode_literals
 import glob
 from htrc_features import FeatureReader
-from six import next, iteritems
+from six import iteritems, PY2, PY3 
 import logging
 import time
 import bz2
@@ -19,7 +20,7 @@ def printIdByPath(args):
 def main():
     batch_size = 1000;
     paths = glob.glob('data/*.json.bz2')
-    print(paths)
+    paths = paths[0:10]
     logging.basicConfig(filename='features.log',
             format='%(asctime)s:%(levelname)s:%(message)s',
             level=logging.DEBUG)
@@ -38,10 +39,12 @@ def main():
         results = feature_reader.multiprocessing(printIdByPath)
         
         for vol,result in results:
-            meta_s = "\t".join(str(v) for v in vol)
-            for tc in iteritems(result):
-                data_s = "\t".join(str(v) for v in tc)
-                f.write(bytes("{0}\t{1}\n".format(meta_s, data_s), 'UTF-8'))
+            for t,c in iteritems(result):
+                s = "{0}\t{1}\t{2}\t{3}\n".format(vol[0], vol[1],t,c)
+                if PY2:
+                    f.write(s.encode('UTF-8'))
+                if PY3:
+                    f.write(str(s).encode('UTF-8'))
 
         logging.info("Batch of {0} volumes finished in in {1}s".format(
             batch_size, time.time() - start 
