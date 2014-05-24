@@ -31,6 +31,11 @@ class Volume(object):
     def __next__(self):
         for page in self.pages():
             yield page
+    
+    @property
+    def year(self):
+        ''' A friendlier name wrapping Volume.pubDate '''
+        return self.pubDate
 
     def _parseFeatures(self, featobj):
         rawpages = featobj['pages']
@@ -75,6 +80,7 @@ class Volume(object):
                 else:
                     ti[token][index] = count
         return ti
+    
 
     def __str__(self):
         return "<HTRC Volume: %s>" % self.id
