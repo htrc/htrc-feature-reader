@@ -20,6 +20,10 @@ class Volume(object):
         # Expand metadata to attributes
         for (key, value) in obj['metadata'].items():
             setattr(self, key, value)
+        
+        if hasattr(self, 'genre'):
+            self.genre = self.genre.split(", ") 
+
         self.pageindex = 0
     
     def __iter__(self):
@@ -44,27 +48,42 @@ class Volume(object):
         for page in pagesJSON:
             yield Page(page, self)
         
-    def pages(self):
+    def pages(self, **kwargs):
         for page in self._pages:
-            yield Page(page, self)
+            yield Page(page, self, **kwargs)
 
-    def tokens_per_page(self):
+    def tokens_per_page(self, **kwargs):
         l = [0] * self.pageCount
-        for (index, page) in enumerate(self.pages()):
+        for (index, page) in enumerate(self.pages(**kwargs)):
             try:
                 l[index] = page.total_tokens()
             except:
                 logging.error("Seq and pageCount don't match in %s" % self.id)
         return l
 
-    def term_page_freqs(self, page_freq=True, case=False):
+    def term_page_freqs(self, page_freq=True, case=True):
         return self._frequencies(page_freq, case)
 
-    def term_volume_freqs(self, page_freq=True, case=False):
+    def term_volume_freqs(self, page_freq=True, case=True):
         tp = self._frequencies(page_freq, case)
         for (token, l) in iteritems(tp):
             tp[token] = sum(l)
         return tp
+
+    def end_line_chars(self, **args):
+        return self._line_chars('endLineChars')
+
+    def begin_line_chars(self, **args):
+        return self._line_chars('beginLineChars')
+
+    def _line_chars(self, attr, sec='body'):
+        '''attr=[endLineChars|startLineChars]'''
+        cp = TermIndex(self.pageCount)
+        for (index, page) in enumerate(self.pages()):
+            section =getattr(page, sec)
+            for (char, count) in iteritems(getattr(section, attr)):
+                cp[char][index] = count
+        return cp
 
     def _frequencies(self, page_freq=True, case=False):
         ''' Build term-page frequency list.

@@ -12,7 +12,7 @@ class TokenList(object):
             self.add(t, poscounts)
 
     def token_counts(self, case=True, pos=True):
-        tc = [tc for tc in self._token_counts(case=case, pos=pos)]
+        tc = self._token_counts(case=case, pos=pos)
         # Since _token_counts is a toekn specific iterator, any casefold needs
         # to be done here
         if case is True:

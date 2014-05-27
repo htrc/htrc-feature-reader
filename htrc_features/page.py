@@ -25,6 +25,7 @@ def make_blank_page():
 
 def make_blank_section():
     sec = Section(name="", data={}, page=None)
+
 class Page:
     def __init__(self, pageobj, volume, default_section='body'):
         self.volume = volume
@@ -108,8 +109,9 @@ class Section:
         self.tokenlist.add_TokenList(section.tokenlist)
     
     def total_tokens(self):
-        tc = self.tokenlist.token_counts(pos=False)
-        return sum(self.tokenlist.token_counts(pos=False).values())
+        return self.tokenCount
+        #tc = self.tokenlist.token_counts(pos=False)
+        #return sum(self.tokenlist.token_counts(pos=False).values())
 
     def __str__(self):
         if self.page.volume:
