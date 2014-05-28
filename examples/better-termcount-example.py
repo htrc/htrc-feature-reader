@@ -31,7 +31,7 @@ def main():
     logging.basicConfig(#filename='features.log',
             format='%(asctime)s:%(levelname)s:%(message)s',
             level=logging.DEBUG)
-    generic_processor(get_term_volume_counts, process_results, 'term-volume-counts.txt.bz2', paths)
+    generic_processor(get_term_volume_counts, process_results, paths, 'term-volume-counts.txt.bz2')
 
 
 if __name__ == '__main__':

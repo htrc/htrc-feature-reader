@@ -8,9 +8,13 @@ import bz2
 import math
 import logging
 import os
+import sys
 
-def generic_processor(map_func, result_func, outpath, paths, batch_size=1000):
-    f = bz2.BZ2File(outpath, "w")
+def generic_processor(map_func, result_func, paths, outpath=None, batch_size=1000):
+    if outpath:
+        f = bz2.BZ2File(outpath, "w")
+    else:
+        f = sys.stdout
     n = 0 
     m = math.ceil(float(len(paths))/batch_size)
 
@@ -29,9 +33,11 @@ def generic_processor(map_func, result_func, outpath, paths, batch_size=1000):
         logging.info("Batch of {0} volumes finished in in {1}s".format(
             len(batch), time.time() - start 
             ))
-        logging.debug("Output filesize is currently: {0}Gb".format(
-            os.stat(outpath).st_size/(1024**3)
-            ))
+
+        if outpath:
+            logging.debug("Output filesize is currently: {0}Gb".format(
+                os.stat(outpath).st_size/(1024**3)
+                ))
 
         if len(paths) == 0:
             break
