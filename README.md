@@ -129,7 +129,7 @@ For faster processing, you can write a mapping function for acting on volumes, t
 This sends out the function to a different process per volume, spawning (CPU_CORES-1) processes at a time.
 The map function receives the feature_reader and a volume path, and needs to initialize the volume.
 
-Here's a simple example that returns the term counts for each volume (take note of the first two lines of the functionr):
+Here's a simple example that returns the term counts for each volume (take note of the first two lines of the functions):
 
     def printTermCounts(args):
 	fr, path = args
@@ -145,7 +145,7 @@ Here's a simple example that returns the term counts for each volume (take note 
             print("%s: %d" % (term, count))
 
 
-Some rules: results must be serializable, and the map_func must be accessible from __main__ (basically: no dynamic functions: they should be written plainly in your script).
+Some rules: results must be serializeable, and the map_func must be accessible from __main__ (basically: no dynamic functions: they should be written plainly in your script).
 
 The results are collected and returned together, so you don't want a feature reader with all 250k files, because the results will be too much memory (depending on how big your result is).
 Instead, it easier to initialize feature readers for smaller batches.
