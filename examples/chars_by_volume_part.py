@@ -12,9 +12,11 @@ def char_counts_by_tenth(args):
         # Initialize volume
         fr, path = args
         vol = fr.create_volume(path)
+        if not vol:
+            return
 
         if vol.pageCount < 10:
-            logging.debug("Returning fale due to short volume %s" % vol.id)
+            logging.debug("Returning false due to short volume %s" % vol.id)
             return
         # Determine ranges of pages for spliting into tenths of a page
         size = float(vol.pageCount) // 10

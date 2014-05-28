@@ -42,21 +42,32 @@ class FeatureReader(object):
 
     def _volume(self, path, compressed=True):
         ''' Read a path into a volume.'''
-        if compressed:
-            f = bz2.BZ2File(path)
-        else:
-            f = open(path, 'r+')
-        rawjson = f.readline()
-        
-        f.close()
-        # For Python3 compatibility, decode to str object
-        if type(rawjson) != str:
-            rawjson = rawjson.decode()
-        volumejson = json.loads(rawjson)
+        try:
+            if compressed:
+                f = bz2.BZ2File(path)
+            else:
+                f = open(path, 'r+')
+            rawjson = f.readline()
+            f.close()
+        except:
+            logging.error("Can't open %s", path)
+            return
+         
+        try:
+            # For Python3 compatibility, decode to str object
+            if type(rawjson) != str:
+                rawjson = rawjson.decode()
+            volumejson = json.loads(rawjson)
+        except:
+            logging.error("Problem reading JSON for %s", path)
+            return
         return Volume(volumejson)
     
     def _wrap_func(self, func):
-        ''' Convert a volume path to a volume and run func(vol). For multiprocessing'''
+        '''
+        Convert a volume path to a volume and run func(vol). For multiprocessing
+        TODO: Closures won't work, this is a useless function. Remove this after consideration...
+        '''
         def new_func(path):
             vol = self._volume(path)
             func(vol)
