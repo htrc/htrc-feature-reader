@@ -8,6 +8,7 @@ import bz2
 import math
 import logging
 import os
+import csv
 import sys
 
 def generic_processor(map_func, result_func, paths, outpath=None, batch_size=1000):
@@ -15,6 +16,7 @@ def generic_processor(map_func, result_func, paths, outpath=None, batch_size=100
         f = bz2.BZ2File(outpath, "w")
     else:
         f = sys.stdout
+    csvf = csv.writer(f)
     n = 0 
     m = math.ceil(float(len(paths))/batch_size)
 
@@ -28,7 +30,7 @@ def generic_processor(map_func, result_func, paths, outpath=None, batch_size=100
         feature_reader = FeatureReader(batch)
 
         results = feature_reader.multiprocessing(map_func)
-        result_func(results, f)
+        result_func(results, csvf)
 
         logging.info("Batch of {0} volumes finished in in {1}s".format(
             len(batch), time.time() - start 
