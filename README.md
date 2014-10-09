@@ -9,6 +9,7 @@ Tools for working with HTRC Feature Extraction files
 To install,
 
     git clone https://github.com/organisciak/htrc-feature-reader.git
+    cd htrc-feature-reader
     python setup.py install
 
 That's it! This library is written for Python 2.7 and 3.0+.
