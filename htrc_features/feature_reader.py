@@ -8,12 +8,15 @@ import logging
 
 class FeatureReader(object):
     def __init__(self, paths):
-        if type(paths) is str:
+        if type(paths) is str or type(paths) is unicode:
             # Assume only one path was provided, wrap in list
             paths = [paths]
-
-        self.paths = paths
-        self.index = 0
+        
+        if type(paths) is list:
+            self.paths = paths
+            self.index = 0
+        else:
+            logging.error("Bad input type for feature reader: {}".format(type(paths)))
 
     def __iter__(self):
         return self

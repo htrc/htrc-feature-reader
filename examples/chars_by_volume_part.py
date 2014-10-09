@@ -4,7 +4,8 @@ from __future__ import unicode_literals
 import glob
 from htrc_features import FeatureReader
 from generic_processor import generic_processor 
-from six import iteritems, PY2, PY3 
+from six import iteritems, PY2, PY3
+from six.moves import map
 import logging
 import bz2
 
@@ -27,30 +28,31 @@ def char_counts_by_tenth(args):
         # Get each chars occurrance at start and end of line by page and
         # sum pages within the ranges
         result_list = []
+
+        sum_ranges = lambda x, y : sum(counts[x:y])
         for (char, counts) in iteritems(vol.begin_line_chars()):
-            tenth_counts = map(lambda(x,y):sum(counts[x:y]), ranges)
+            tenth_counts = map(sum_ranges, ranges)
             result_list += [('begin', char, tenth_counts)]
-
+        
         for (char, counts) in iteritems(vol.end_line_chars()):
-            tenth_counts = map(lambda(x,y):sum(counts[x:y]), ranges)
+            tenth_counts = map(sum_ranges, ranges)
             result_list += [('end', char, tenth_counts)]
-
         return (vol.id, result_list)
 
 
-def process_results(results, file):
+def process_results(results, csvwriter):
         for result in results:
             if not result:
                 continue
             vol, result_list = result
             for place, char, counts in result_list:
                 assert(len(counts)==10)
-                c = "\t".join([str(n) for n in counts]) 
-                s = "{0}\t{1}\t{2}\t{3}\n".format(vol, place, char, c)
+                l = [vol, place, char] + counts
                 if PY2:
-                    file.write(s.encode('UTF-8'))
+                #    file.write(s.encode('UTF-8'))
+                    csvwriter.writerow([s.encode('UTF-8') for s in l])
                 if PY3:
-                    file.write(str(s).encode('UTF-8'))
+                    csvwriter.writerow([str(s).encode('UTF-8') for s in l])
 
 
 def main():
