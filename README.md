@@ -20,11 +20,13 @@ That's it! This library is written for Python 2.7 and 3.0+.
 
 The easiest way to start using this library is to use the `FeatureReader`, which takes a list of paths on 
 
-    import glob
-    paths = glob.glob('data/*.json.bz2')
-    feature_reader = FeatureReader(paths)
-    for vol in feature_reader:
-	print("%s - %s" % (vol.id, vol.title))
+```python
+import glob
+paths = glob.glob('data/*.json.bz2')
+feature_reader = FeatureReader(paths)
+for vol in feature_reader:
+    print("%s - %s" % (vol.id, vol.title))
+```
 
 Iterating on the feature reader returns `Volume` objects.
 Wherever possible, this library tries not to hold things in memory, so most of the time you want to iterate rather than casting to a list.
