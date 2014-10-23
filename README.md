@@ -94,7 +94,7 @@ A page has a default section, where some features -- such as accessing a token l
 
 Token lists are contained in Section.tokenlist.
 
-```
+```python
 tl = page.body.tokenlist
 for token, data in tl.items():
     for part_of_speech, count in data.items():
