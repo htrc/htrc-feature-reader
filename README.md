@@ -60,6 +60,18 @@ Like with the feature_reader, it doubles as a generator for pages, and again, it
 This is just a pleasant way to access `vol.pages()`.
 If you want to pass arguments to page initialization, such as changing the pages default section from body to 'fullpage', it can be done with `for page in vol.pages(default_section='fullpage')`. 
 
+Finally, if the minimal metadata included with the extracted feature files is insufficient, you can fetch the HTRC's metadata record with `vol.metadata`.
+Remember that this calls the HTRC servers for each volume, so can add considerable overhead.
+
+    >>> fr = FeatureReader(paths[0:5])
+    >>> for vol in fr:
+    >>>    print(vol.metadata['published'][0])
+    Cincinnati, The Standard publishing company, c1917
+    London, New York [etc.,] Hodder and Stoughton, 1915
+    Washington, D.C., 1856
+
+_At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one-by-one._
+
 ## Pages and Sections
 
 A page contains the meat of the HTRC's extracted features.

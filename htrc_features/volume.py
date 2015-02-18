@@ -3,9 +3,11 @@ from htrc_features.page import Page, Section
 from htrc_features.term_index import TermIndex
 from six import iteritems
 import logging
+import pysolr
 
 class Volume(object):
     SUPPORTED_SCHEMA = '1.0'
+    _metadata = None
 
     def __init__(self, obj):
         # Verify schema version
@@ -40,6 +42,19 @@ class Volume(object):
     def year(self):
         ''' A friendlier name wrapping Volume.pubDate '''
         return self.pubDate
+
+    @property
+    def metadata(self):
+        if not self._metadata:
+            logging.debug("Looking up full metadata for {0}".format(self.id))
+            solr = pysolr.Solr('http://sandbox.htrc.illinois.edu/solr/meta', timeout=10)
+            results = solr.search('id:"{0}"'.format(self.id))
+            if len(results) != 1:
+                logging.error("Unexpected: there were {0} results for {1} instead of 1.".format(len(results), self.id))
+            result = list(results)[0]
+            self._metadata = result
+        return self._metadata
+
 
     def _parseFeatures(self, featobj):
         rawpages = featobj['pages']
