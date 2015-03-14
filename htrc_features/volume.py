@@ -3,7 +3,10 @@ from htrc_features.page import Page, Section
 from htrc_features.term_index import TermIndex
 from six import iteritems
 import logging
-import pysolr
+try:
+    import pysolr
+except ImportError:
+    logging.info("Pysolr not installed.")
 
 class Volume(object):
     SUPPORTED_SCHEMA = '1.0'
@@ -45,6 +48,8 @@ class Volume(object):
 
     @property
     def metadata(self):
+        if not pysolr:
+            logging.error("Cannot retrieve metadata. Pysolr not installed.")
         if not self._metadata:
             logging.debug("Looking up full metadata for {0}".format(self.id))
             solr = pysolr.Solr('http://sandbox.htrc.illinois.edu/solr/meta', timeout=10)

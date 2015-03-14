@@ -14,6 +14,10 @@ To install,
 
 That's it! This library is written for Python 2.7 and 3.0+.
 
+Two optional modules improve the HTRC-Feature-Reader: pysolr allows fetching of metadata, and ujson speeds up loading by about 0.4s per file. To install:
+
+    pip install pysolr ujson
+
 ## Usage
 
 ### Reading feature files

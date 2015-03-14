@@ -1,6 +1,9 @@
 from __future__ import unicode_literals
 import bz2
-import json
+try:
+    import ujson as json
+except ImportError:
+    import json
 from htrc_features.volume import Volume
 from multiprocessing import Pool
 import time
