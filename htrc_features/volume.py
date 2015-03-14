@@ -33,13 +33,12 @@ class Volume(object):
     
     def __iter__(self):
         return self
-
+    
     def next(self):
         return self.__next__()
 
     def __next__(self):
-        for page in self.pages():
-            yield page
+        return next(self.pages())
     
     @property
     def year(self):
@@ -64,10 +63,6 @@ class Volume(object):
     def _parseFeatures(self, featobj):
         rawpages = featobj['pages']
 
-    def _parsePages(self, pagesJSON):
-        for page in pagesJSON:
-            yield Page(page, self)
-        
     def pages(self, **kwargs):
         for page in self._pages:
             yield Page(page, self, **kwargs)
