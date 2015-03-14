@@ -8,10 +8,11 @@ from htrc_features.volume import Volume
 from multiprocessing import Pool
 import time
 import logging
+import six
 
 class FeatureReader(object):
     def __init__(self, paths):
-        if type(paths) is str or type(paths) is unicode:
+        if isinstance(paths, six.text_type): # Check for str type in 3.x, unicode type in 2.x 
             # Assume only one path was provided, wrap in list
             paths = [paths]
         
