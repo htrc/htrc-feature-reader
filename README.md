@@ -1,3 +1,4 @@
+
 HTRC-Features
 =============
 
@@ -14,7 +15,7 @@ To install,
 
 That's it! This library is written for Python 2.7 and 3.0+.
 
-Two optional modules improve the HTRC-Feature-Reader: pysolr allows fetching of metadata, and ujson speeds up loading by about 0.4s per file. To install:
+Two optional modules improve the HTRC-Feature-Reader: `pysolr` allows fetching of metadata, and `ujson` speeds up loading by about 0.4s per file. To install:
 
     pip install pysolr ujson
 
@@ -24,6 +25,7 @@ Two optional modules improve the HTRC-Feature-Reader: pysolr allows fetching of 
 
 The easiest way to start using this library is to use the `FeatureReader`, which takes a list of paths on 
 
+
 ```python
 import glob
 from htrc-features import FeatureReader
@@ -32,6 +34,14 @@ feature_reader = FeatureReader(paths)
 for vol in feature_reader:
     print("%s - %s" % (vol.id, vol.title))
 ```
+
+
+      File "<ipython-input-2-038187d90509>", line 2
+        from htrc-features import FeatureReader
+                 ^
+    SyntaxError: invalid syntax
+
+
 
 Iterating on the feature reader returns `Volume` objects.
 Wherever possible, this library tries not to hold things in memory, so most of the time you want to iterate rather than casting to a list.
@@ -194,3 +204,4 @@ Some rules: results must be serializeable, and the map_func must be accessible f
 
 The results are collected and returned together, so you don't want a feature reader with all 250k files, because the results will be too much memory (depending on how big your result is).
 Instead, it easier to initialize feature readers for smaller batches.
+
