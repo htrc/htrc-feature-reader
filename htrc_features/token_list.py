@@ -50,9 +50,10 @@ class TokenList(object):
     def add_TokenList(self, tokenlist):
         ''' Concatenate a second tokenlist '''
 
-        new_df = pd.concat([self._df, tokenlist.token_counts()])\
-                   .drop('lowercase', 1).groupby(['token', 'POS']).sum()\
-                   .reset_index()
+        new_df = pd.concat([self._df, tokenlist.token_counts()])
+        if 'lowercase' in tokenlist.token_counts().columns:
+            new_df = new_df.drop('lowercase', axis=1)
+        new_df = new_df.groupby(['token', 'POS']).sum().reset_index()
         self._df = new_df
 
     @property
