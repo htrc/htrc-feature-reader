@@ -45,7 +45,7 @@ class Volume(object):
             logging.error("Cannot retrieve metadata. Pysolr not installed.")
         if not self._metadata:
             logging.debug("Looking up full metadata for {0}".format(self.id))
-            solr = pysolr.Solr('http://sandbox.htrc.illinois.edu/solr/meta', timeout=10)
+            solr = pysolr.Solr('http://chinkapin.pti.indiana.edu:9994/solr/meta', timeout=10)
             results = solr.search('id:"{0}"'.format(self.id))
             if len(results) != 1:
                 logging.error("Unexpected: there were {0} results for {1} instead of 1.".format(len(results), self.id))
