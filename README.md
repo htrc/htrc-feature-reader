@@ -1,8 +1,9 @@
 HTRC-Features
 =============
 
-Tools for working with HTRC Feature Extraction files
+Tools for working with HTRC Extracted Features files
 
+_This toolset is undergoing a large overhaul. If you want to try it before the upcoming release, use the experimental branch. To get the newest updates when using the experimental branch, install with `python setup.py develop` so that `git pull` updates will also update your install._
 
 ## Installation
 
