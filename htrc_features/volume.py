@@ -90,7 +90,7 @@ class Volume(object):
         df = self._frequencies(page_freq, pos, case)
         groups = ['token'] if not pos else ['token', 'POS']
         return df.drop(['page'], axis=1).groupby(groups).sum().reset_index()\
-                 .sort('count', ascending=False)
+                 .sort_values(by='count', ascending=False)
 
     def end_line_chars(self, **args):
         return self._line_chars('endLineChars')
