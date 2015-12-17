@@ -1,9 +1,11 @@
 from __future__ import unicode_literals
-from htrc_features.page import Page, Section
+from htrc_features.page import Page
 from htrc_features.term_index import TermIndex
 from six import iteritems
 import pandas as pd
 import logging
+import time
+
 try:
     import pysolr
 except ImportError:
@@ -11,12 +13,13 @@ except ImportError:
 
 
 class Volume(object):
-    SUPPORTED_SCHEMA = '1.0'
+    SUPPORTED_SCHEMA = ['1.0', '2.0']
     _metadata = None
 
-    def __init__(self, obj):
+    def __init__(self, obj, advanced=False):
         # Verify schema version
-        if obj['features']['schemaVersion'] != self.SUPPORTED_SCHEMA:
+        self._schema = obj['features']['schemaVersion']
+        if self._schema not in self.SUPPORTED_SCHEMA:
             logging.warn('Schema version of imported (%s) file does not match '
                          'the supported version (%s)' %
                          (obj['features']['schemaVersion'],
@@ -28,11 +31,38 @@ class Volume(object):
         # Expand metadata to attributes
         for (key, value) in obj['metadata'].items():
             setattr(self, key, value)
- 
+
         if hasattr(self, 'genre'):
             self.genre = self.genre.split(", ")
 
         self.pageindex = 0
+        self._has_advanced = False
+
+        if advanced:
+            start = time.time()
+            apages = advanced['pages']
+            if self._schema != '2.0':
+                logging.warn("Only schema 2.0 supports advanced files."
+                             "Ignoring")
+            else:
+                # Merge Advanced features into pages JSON
+                for i in range(0, len(self._pages)):
+                    if self._pages[i]['seq'] != apages[i]['seq']:
+                        logging.warn('Sequence does not match between basic '
+                                     'and advanced pages. Skipping for this '
+                                     'volume.')
+                        logging.debug("Due to limited advanced feature "
+                                      "support, this code assumes that basic "
+                                      "and advanced features line up. If the "
+                                      "seq doesn't match up, it doesn't search"
+                                      "for the correct page")
+                    else:
+                        for sec in ['header', 'body', 'footer']:
+                            for key in apages[i][sec].keys():
+                                self._pages[i][sec][key] = apages[i][sec][key]
+                self._has_advanced = True
+                logging.debug("Advanced merge took {}s".format(
+                              (time.time()-start)/1000))
 
     def __iter__(self):
         return self.pages()
@@ -60,8 +90,8 @@ class Volume(object):
             self._metadata = result
         return self._metadata
 
-    def _parseFeatures(self, featobj):
-        rawpages = featobj['pages']
+    # def _parseFeatures(self, featobj):
+    #    rawpages = featobj['pages']
 
     def pages(self, **kwargs):
         for page in self._pages:
@@ -100,6 +130,10 @@ class Volume(object):
 
     def _line_chars(self, attr, sec='body'):
         '''attr=[endLineChars|startLineChars]'''
+        if self._schema == '2.0' and not self._has_advanced:
+            logging.error("For schema version 2.0, you need load the "
+                          "'advanced' file for start/endLineChars")
+            return
         cp = TermIndex(self.pageCount)
         for (index, page) in enumerate(self.pages()):
             section = getattr(page, sec)

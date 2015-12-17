@@ -29,25 +29,25 @@ The easiest way to start using this library is to use the `FeatureReader`, which
 ```python
 import glob
 from htrc_features import FeatureReader
-paths = glob.glob('data/*.json.bz2')
+paths = glob.glob('data/PZ-volumes/*basic.json.bz2')
 # Here we're loading five paths, for brevity
 feature_reader = FeatureReader(paths[:5])
 i = 0
-for vol in feature_reader:
+for vol in feature_reader.volumes():
     print("%s - %s" % (vol.id, vol.title))
 ```
 
-    loc.ark:/13960/t19k51c6v - Think peace, by Abe Cory.
-    loc.ark:/13960/t24b3wp3b - Seeing it through. How Britain answered the call. By A. St. John Adcock.
-    loc.ark:/13960/t33208m70 - Admission of Kansas.
-    loc.ark:/13960/t3gx4xs5p - The streets of New York; a drama in five acts,
-    loc.ark:/13960/t3qv43m8f - The courtship of Miles Standish, and other poems / by Henry Wadsworth Longfellow.
+    hvd.32044010273894 - The ballet dancer, and On guard,
+    hvd.hwquxe - The man from Glengarry : a tale of the Ottawa / by Ralph Connor.
+    hvd.hwrevu - The lady with the dog, and other stories,
+    hvd.hwrqs8 - Mr. Rutherford's children. By the authors of "The wide, wide world," "Queechy,", "Dollars and cents," etc., etc.
+    mdp.39015028036104 - Russian short stories, ed. for school use,
 
 
-Iterating on the feature reader returns `Volume` objects.
+Iterating on `FeatureReader.volumes()` returns `Volume` objects.
 Wherever possible, this library tries not to hold things in memory, so most of the time you want to iterate rather than casting to a list.
 In addition to memory issues, since each volume needs to be read from a file and initialized, it will be slow. 
-_Woe to whomever tries `list(feature_reader)`_.
+_Woe to whomever tries `list(FeatureReader.volumes())`_.
 
 The method for creating a path list with 'glob' is just one way to do so.
 For large sets, it's better to just have a text file of your paths, and read it line by line.
@@ -69,7 +69,7 @@ All the metadata fields from the HTRC JSON file are accessible as properties of 
 
 
 
-    u'Volume loc.ark:/13960/t3qv43m8f has 242 pages in eng'
+    'Volume mdp.39015028036104 has 460 pages in eng'
 
 
 
@@ -83,7 +83,7 @@ As a convenience, Volume.year returns Volume.pubDate:
 
 
 
-    '1859 == 1859'
+    '1919 == 1919'
 
 
 
@@ -91,31 +91,17 @@ Like with the feature_reader, it doubles as a generator for pages, and again, it
 
 
 ```python
+# Let's skip ahead some pages
 i = 0
 for page in vol:
     i += 1
-    print(page)
-    # You get the idea, let's stop on the 16th page
-    if i == 16:
+    if i >= 16:
         break
+        
+print(page)
 ```
 
-    <page 1 of volume loc.ark:/13960/t3qv43m8f>
-    <page 2 of volume loc.ark:/13960/t3qv43m8f>
-    <page 3 of volume loc.ark:/13960/t3qv43m8f>
-    <page 4 of volume loc.ark:/13960/t3qv43m8f>
-    <page 5 of volume loc.ark:/13960/t3qv43m8f>
-    <page 6 of volume loc.ark:/13960/t3qv43m8f>
-    <page 7 of volume loc.ark:/13960/t3qv43m8f>
-    <page 8 of volume loc.ark:/13960/t3qv43m8f>
-    <page 9 of volume loc.ark:/13960/t3qv43m8f>
-    <page 10 of volume loc.ark:/13960/t3qv43m8f>
-    <page 11 of volume loc.ark:/13960/t3qv43m8f>
-    <page 12 of volume loc.ark:/13960/t3qv43m8f>
-    <page 13 of volume loc.ark:/13960/t3qv43m8f>
-    <page 14 of volume loc.ark:/13960/t3qv43m8f>
-    <page 15 of volume loc.ark:/13960/t3qv43m8f>
-    <page 16 of volume loc.ark:/13960/t3qv43m8f>
+    <page 00000016 of volume mdp.39015028036104>
 
 
 This is just a pleasant way to access `vol.pages()`.
@@ -127,15 +113,15 @@ Remember that this calls the HTRC servers for each volume, so can add considerab
 
 ```python
 fr = FeatureReader(paths[0:5])
-for vol in fr:
+for vol in fr.volumes():
     print(vol.metadata['published'][0])
 ```
 
-    Cincinnati, The Standard publishing company, c1917
-    London, New York [etc.,] Hodder and Stoughton, 1915
-    Washington, D.C., 1856
-    Chicago, The Dramatic publishing company [188-?]
-    Boston : Ticknor and Fields, 1859
+    New York, and London, Harper & brothers, 1901
+    Chicago, New York [etc.] F. H. Revell company, 1901
+    New York, The Macmillan company, 1917
+    New York, : G. P. Putnam & co., 1853-55
+    Chicago, New York, Scott, Foresman and company [c1919]
 
 
 
@@ -143,7 +129,7 @@ for vol in fr:
 print("METADATA FIELDS: " + ", ".join(vol.metadata.keys()))
 ```
 
-    METADATA FIELDS: mainauthor, htrc_genderMale, htrc_gender, htrc_charCount, htrc_pageCount, title_a, title_c, topic, htrc_volumeWordCountBin, authorSort, author2, id, author, sdrnum, topicStr, format, country_of_pub, title_top, topic_subject, _version_, publishDateRange, fullrecord, htrc_wordCount, author_only, topic_name, callnosort, author_top, publishDate, genre, htrc_volumePageCountBin, publisher, ht_id, htsource, language, lccn, title, callnumber, title_ab, era, published, publication_place
+    METADATA FIELDS: topic_subject, publishDate, publication_place, htrc_gender, topicStr, format, callnosort, htrc_wordCount, htrc_volumeWordCountBin, oclc, htrc_pageCount, language, title_top, sdrnum, htrc_genderMale, publishDateRange, htsource, lccn, callnumber, authorSort, author, title_a, title_ab, topic, genre, id, publisher, htrc_charCount, mainauthor, htrc_volumePageCountBin, ht_id, published, fullrecord, author_top, country_of_pub, author_only, title, _version_, geographic
 
 
 _At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one-by-one._
@@ -159,7 +145,7 @@ Since the HTRC provides information by header/body/footer, these are accessed as
 print("The body has %s lines and %s sentences" % (page.body.lineCount, page.body.sentenceCount))
 ```
 
-    The body has 32 lines and 6 sentences
+    The body has 34 lines and 15 sentences
 
 
 There is also `Page.fullpage`, which is a section combining the header, footer, and body.
@@ -191,57 +177,15 @@ A `tokenlist` returns a [Pandas](http://pandas.pydata.org/) DataFrame through `t
 
 ```python
 df = tl.token_counts()
-df.sort('count', ascending=False)[:5]
+print(df.sort_values(by='count', ascending=False)[:5])
 ```
 
-
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>token</th>
-      <th>POS</th>
-      <th>count</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>2</th>
-      <td>,</td>
-      <td>,</td>
-      <td>23</td>
-    </tr>
-    <tr>
-      <th>527</th>
-      <td>the</td>
-      <td>DT</td>
-      <td>14</td>
-    </tr>
-    <tr>
-      <th>298</th>
-      <td>and</td>
-      <td>CC</td>
-      <td>6</td>
-    </tr>
-    <tr>
-      <th>599</th>
-      <td>of</td>
-      <td>IN</td>
-      <td>5</td>
-    </tr>
-    <tr>
-      <th>93</th>
-      <td>.</td>
-      <td>.</td>
-      <td>4</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
+         token POS  count
+    1144   the  DT     26
+    0        ,   ,     24
+    1487    of  IN     16
+    196      .   .     13
+    3883    to  TO     11
 
 
 These can be manipulated in various ways. You can case-fold, for example:
@@ -249,57 +193,15 @@ These can be manipulated in various ways. You can case-fold, for example:
 
 ```python
 df = tl.token_counts(case=False)
-df.sort('count', ascending=False)[:5]
+print(df.sort_values(by='count', ascending=False)[:5])
 ```
 
-
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>token</th>
-      <th>POS</th>
-      <th>count</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>2</th>
-      <td>,</td>
-      <td>,</td>
-      <td>23</td>
-    </tr>
-    <tr>
-      <th>73</th>
-      <td>the</td>
-      <td>DT</td>
-      <td>15</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>and</td>
-      <td>CC</td>
-      <td>6</td>
-    </tr>
-    <tr>
-      <th>49</th>
-      <td>of</td>
-      <td>IN</td>
-      <td>6</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>.</td>
-      <td>.</td>
-      <td>4</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
+        token POS  count
+    167   the  DT     35
+    0       ,   ,     24
+    120    of  IN     16
+    1       .   .     13
+    83     in  IN     12
 
 
 Or, you can combine part of speech counts into a single integer.
@@ -307,41 +209,13 @@ Or, you can combine part of speech counts into a single integer.
 
 ```python
 df = tl.token_counts(pos=False)
-df.sort('count', ascending=False)[:3]
+print(df.sort_values(by='count', ascending=False)[:3])
 ```
 
-
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>token</th>
-      <th>count</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>2</th>
-      <td>,</td>
-      <td>23</td>
-    </tr>
-    <tr>
-      <th>77</th>
-      <td>the</td>
-      <td>14</td>
-    </tr>
-    <tr>
-      <th>28</th>
-      <td>and</td>
-      <td>6</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
+        token  count
+    169   the     26
+    0       ,     24
+    122    of     16
 
 
 To get just the unique tokens, `TokenList.tokens` provides them, though it is just an easy way to get `TokenList.token_counts().keys()`
@@ -354,7 +228,7 @@ tl.tokens[:10]
 
 
 
-    [u',', u'!', u'.', u'STANDISH.', u';', u'and', u'or', u'12', u'THE', u'a']
+    [',', '.', ';', './and', '.or', 'and', 'but', 'or', 'one', 'three']
 
 
 
@@ -374,17 +248,8 @@ tokens[:15]
 
 
 
-    [11, 15, 0, 0, 21, 50, 96, 99, 5, 0, 77, 137, 145, 146, 149]
+    [0, 20, 3, 0, 0, 1, 13, 0, 38, 9, 309, 115, 285, 356, 377]
 
-
-
-
-```python
-end_line_chars = vol.end_line_chars()
-print(end_line_chars['!'])[:15]
-```
-
-    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
 
 
 
@@ -394,122 +259,30 @@ a = vol.term_page_freqs()
 
 
 ```python
-a.iloc[1:3, 4:14]
+print(a.iloc[1:3, 4:14])
 ```
 
-
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th>token</th>
-      <th>%</th>
-      <th>&amp;</th>
-      <th>&amp;c</th>
-      <th>&amp;e</th>
-      <th>'</th>
-      <th>''</th>
-      <th>'133</th>
-      <th>'S</th>
-      <th>'er</th>
-      <th>'erhead</th>
-    </tr>
-    <tr>
-      <th>page</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>2</th>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
+    token     !—It  !—its  !—yes  "  "'And  "'Astafi  "'Give  "'God  "'Tell  \
+    page                                                                      
+    00000003     0      0      0  0      0         0       0      0       0   
+    00000006     0      0      0  0      0         0       0      0       0   
+    
+    token     "'That  
+    page              
+    00000003       0  
+    00000006       0  
 
 
 
 ```python
-vol.term_volume_freqs()[:4]
+print(vol.term_volume_freqs()[:4])
 ```
 
-
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>token</th>
-      <th>POS</th>
-      <th>count</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>42</th>
-      <td>,</td>
-      <td>,</td>
-      <td>223</td>
-    </tr>
-    <tr>
-      <th>5637</th>
-      <td>the</td>
-      <td>DT</td>
-      <td>218</td>
-    </tr>
-    <tr>
-      <th>45</th>
-      <td>.</td>
-      <td>.</td>
-      <td>218</td>
-    </tr>
-    <tr>
-      <th>4552</th>
-      <td>of</td>
-      <td>IN</td>
-      <td>213</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
+          token POS  count
+    289       ,   ,    449
+    352       .   .    448
+    13399   the  DT    447
+    2905    and  CC    446
 
 
 Volume.term_page_freqs provides a wide DataFrame resembling a matrix, where terms are listed as columns, pages are listed as rows, and the values correspond to the term frequency (or page page frequency with `page_freq=true`).
@@ -543,3 +316,48 @@ Some rules: results must be serializeable, and the map_func must be accessible f
 The results are collected and returned together, so you don't want a feature reader with all 250k files, because the results will be too much memory (depending on how big your result is).
 Instead, it easier to initialize feature readers for smaller batches.
 
+
+## Advanced Files
+
+In the beta Extracted Features release, schema 2.0, a few features were separated out to an advanced files. If you try to access those features, like `endLineChars`, you'll get a error:
+
+
+```python
+end_line_chars = vol.end_line_chars()
+```
+
+    ERROR:root:For schema version 2.0, you need load the 'advanced' file for start/endLineChars
+
+
+It is possible to load the advanced file alongside the basic files by passing in a `(basic, advanced)` tuple of filepaths where you would normally pass in a single path. For example,
+
+
+```python
+newpaths = [(x,x.replace('basic', 'advanced')) for x in paths]
+newpaths[:2]
+```
+
+
+
+
+    [('data/PZ-volumes/hvd.32044010273894.basic.json.bz2',
+      'data/PZ-volumes/hvd.32044010273894.advanced.json.bz2'),
+     ('data/PZ-volumes/hvd.hwquxe.basic.json.bz2',
+      'data/PZ-volumes/hvd.hwquxe.advanced.json.bz2')]
+
+
+
+
+```python
+fr = FeatureReader(newpaths)
+vol = next(fr.volumes())
+end_line_chars = vol.end_line_chars()
+print(end_line_chars['!'][:15])
+```
+
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+
+
+Note that the advanced files are not fully supported, because the basic/advanced split will not continue for future releases.
+
+Loading and parsing the advanced feature files adds non negligible time (about `1.3` seconds on my computer), so only load them if you need them.

@@ -85,8 +85,11 @@ class Section:
     def __init__(self, name, data, page):
         self.name = name
         self.page = page
-        self.tokenlist = TokenList(data['tokens'])
-        
+        if self.page.volume._schema == '1.0':
+            self.tokenlist = TokenList(data['tokens'])
+        else:
+            self.tokenlist = TokenList(data['tokenPosCount'])
+ 
         for (key, value) in iteritems(data):
             if type(value) is int:
                 setattr(self, key, value)
@@ -102,9 +105,9 @@ class Section:
         self.sentenceCount += section.sentenceCount
 
         for key in ['endLineChars', 'beginLineChars']:
-            new = defaultdict(int)
-            for (char, count) in iteritems(getattr(section, key)):
-                getattr(self, key)[char] += count
+            if hasattr(self, key):
+                for (char, count) in iteritems(getattr(section, key)):
+                    getattr(self, key)[char] += count
 
         self.tokenlist.add_TokenList(section.tokenlist)
     
@@ -121,4 +124,3 @@ class Section:
             name="<%s section of volume-less page %s>" % (self.name,
                 self.page.seq)
         return name
-
