@@ -1,38 +1,46 @@
 from collections import defaultdict
+import logging
+import os
+
+try:
+    from pairtree import id2path, id_encode
+except:
+    logging.debug("Falling back on custom functions to replace pairtree.")
+
+    def id_encode(id):
+        return id.replace(":", "+").replace("/", "=").replace(".", ",")
+
+    def id2path(id):
+        clean_id = id_encode(id)
+        path = []
+        while len(clean_id) > 0:
+            val, clean_id = clean_id[:2], clean_id[2:]
+            path.append(val)
+        return '/'.join(path)
 
 
 def id_to_rsync(htid, kind='basic'):
     '''
     Take an HTRC id and convert it to an Rsync location for syncing Extracted
     Features
-    
+
     kind: [basic|advanced]
     '''
-    clean_htid = id_to_filename(htid)
-    institution = clean_htid.split('.')[0]
-    loc = clean_htid[len(institution)+1:]
-    
-    url = [institution, "pairtree_root"]
-    while len(loc) > 0:
-        val, loc = loc[:2], loc[2:]
-        url.append(val)
-    url += ["".join(url[2:]), clean_htid]
-    return "%s/%s.%s.json.bz2" % (kind, "/".join(url), kind)
+    libid, volid = htid.split('.', 1)
+    volid_clean = id_encode(volid)
+    filename = '.'.join([libid, volid_clean, kind, 'json.bz2'])
 
-
-def id_to_filename(id):
-    filename = id.replace(":", "+").replace("/", "=")
-    # Replace any periods after the first
-    b = filename.split('.')
-    filename = ".".join(b[:2]) + ",".join(['']+b[2:])
-    return filename
+    path = '/'.join([kind, libid, 'pairtree_root',
+                     id2path(volid).replace('\\', '/'), volid_clean, filename])
+    return path
 
 
 def merge_token_duplicates(tokens):
-    ''' fold a list of tokens when there are duplicates, such as when case-folding '''
+    ''' fold a list of tokens when there are duplicates, such as when
+    case-folding '''
     folded = defaultdict(lambda: defaultdict(int))
     for (token, c) in tokens:
-        assert(type(c)==dict)
+        assert(type(c) == dict)
         for (pos, poscount) in c.iteritems():
             folded[token][pos] += poscount
     return folded
