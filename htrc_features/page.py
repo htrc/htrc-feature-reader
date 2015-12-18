@@ -5,27 +5,6 @@ from htrc_features.token_list import TokenList
 import htrc_features.utils as utils
 from six import iteritems # Because python2's dict.iteritem is python3's dict.item
 
-def make_blank_page():
-    info = {
-            "seq":0,"tokenCount":0,"lineCount":0,"emptyLineCount":0,"sentenceCount":0,
-            "header":{
-                "tokenCount":0,"lineCount":0,"emptyLineCount":0,"sentenceCount":0,
-                "tokens":{},"beginLineChars":{},"endLineChars":{}
-                },
-            "body":{
-                "tokenCount":0,"lineCount":1,"emptyLineCount":1,"sentenceCount":0,
-                "tokens":{},"beginLineChars":{},"endLineChars":{}
-                },
-            "footer":{"tokenCount":0, "lineCount":0,"emptyLineCount":0,"sentenceCount":0,
-                "tokens":{},"beginLineChars":{},"endLineChars":{}
-                }
-    }
-    page = Page(info, volume=None)
-    return page
-
-def make_blank_section():
-    sec = Section(name="", data={}, page=None)
-
 class Page:
     def __init__(self, pageobj, volume, default_section='body'):
         self.volume = volume
