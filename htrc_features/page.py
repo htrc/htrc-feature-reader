@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 # Because python2's dict.iteritem is python3's dict.item
 from six import iteritems
 import pandas as pd
-import logging
+from htrc_features.utils import group_tokenlist
 
 
 class Page:
@@ -59,43 +59,8 @@ class Page:
             self._tokencounts = pd.DataFrame(tuples).transpose()
             self._tokencounts.index.names = ['page', 'section', 'token', 'pos']
 
-        groups = ['page']
-        if section in ['all'] + self._secref:
-            groups.append('section')
-        groups.append('token' if case else 'lowercase')
-        if pos:
-            groups.append('pos')
-
-        if section in ['all', 'group']:
-            df = self._tokencounts
-        elif section in self._secref:
-            idx = pd.IndexSlice
-            try:
-                df = self._tokencounts.loc[idx[:, section, :, :], ]
-            except KeyError:
-                logging.debug("Section {} not available".format(section))
-                df = pd.DataFrame([], columns=groups+['count'])\
-                       .set_index(groups)
-                return df
-        else:
-            logging.error("Invalid section argument: {}".format(section))
-            return
-
-        # Add lowercase column. Previously, this was saved internally. However,
-        # DataFrame.str.lower() is reasonably fast and the need to call it
-        # repeatedly is low, so it is no longer saved.
-        if not case:
-            logging.debug('Adding lowercase column')
-            df = df.reset_index()
-            df['lowercase'] = df['token'].str.lower()
-            df.set_index(['page', 'section', 'lowercase', 'token', 'pos'],
-                         inplace=True)
-
-        # Check if we need to group anything
-        if groups == ['page', 'section', 'token', 'pos']:
-            return df
-        else:
-            return df.reset_index().groupby(groups).sum()
+        return group_tokenlist(self._tokencounts, pages=True, section=section,
+                               case=case, pos=pos)
 
     def endLineChars(self, section='default'):
         return self.lineChars(section=section, place='end')
