@@ -18,7 +18,7 @@ except:
             path.append(val)
         return '/'.join(path)
 
-_secref = ['header', 'body', 'footer']
+SECREF = ['header', 'body', 'footer']
 
 
 def id_to_rsync(htid, kind='basic'):
@@ -48,7 +48,8 @@ def merge_token_duplicates(tokens):
     return folded
 
 
-def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True):
+def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
+                    page_freq=False):
     '''
         Return a token count dataframe with requested folding.
 
@@ -58,11 +59,13 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True):
             all sections info.
         case[bool]: If true, return case-sensitive token counts.
         pos[bool]: If true, return tokens facets by part-of-speech.
+        page_freq[bool]: If true, will simply count whether or not a token is
+        on a page. Defaults to false.
     '''
     groups = []
     if pages:
         groups.append('page')
-    if section in ['all'] + _secref:
+    if section in ['all'] + SECREF:
         groups.append('section')
     groups.append('token' if case else 'lowercase')
     if pos:
@@ -70,7 +73,7 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True):
 
     if section in ['all', 'group']:
         df = in_df
-    elif section in _secref:
+    elif section in SECREF:
         idx = pd.IndexSlice
         try:
             df = in_df.loc[idx[:, section, :, :], ]
@@ -95,6 +98,21 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True):
 
     # Check if we need to group anything
     if groups == ['page', 'section', 'token', 'pos']:
+        if page_freq:
+            df['count'] = 1
         return df
     else:
-        return df.reset_index().groupby(groups).sum()
+        if not page_freq:
+            return df.reset_index().groupby(groups).sum()[['count']]
+        elif page_freq and 'page' in groups:
+            df = df.reset_index().groupby(groups).sum()[['count']]
+            df['count'] = 1
+            return df
+        elif page_freq and 'page' not in groups:
+            # We'll have to group page-level, then group again
+            def set_to_one(x):
+                x['count'] = 1
+                return x
+            return df.reset_index().groupby(['page']+groups).apply(set_to_one)\
+                     .groupby(groups).sum()[['count']]
+
