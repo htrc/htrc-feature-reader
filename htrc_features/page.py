@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 # Because python2's dict.iteritem is python3's dict.item
 from six import iteritems
 import pandas as pd
-from htrc_features.utils import group_tokenlist, SECREF
+from htrc_features.utils import group_tokenlist, group_linechars, SECREF
 import logging
 
 
@@ -52,6 +52,7 @@ class Page:
             emptycols.append('token' if case else 'lowercase')
             if pos:
                 emptycols.append('pos')
+            emptycols.append('count')
             return pd.DataFrame([], columns=emptycols)
         # If there's a volume-level representation, simply pull from that
         elif not self.volume._tokencounts.empty:
@@ -92,7 +93,26 @@ class Page:
         '''
         section = self.default_section if section == 'default' else section
 
-        if self._lineChars.empty:
+        # If there are no tokens, return an empty dataframe
+        if self.tokenCount == 0:
+            emptycols = ['page']
+            if section in SECREF + ['all']:
+                emptycols.append('section')
+            if place in ['begin', 'end', 'all']:
+                emptycols.append('place')
+            emptycols.append('character')
+            emptycols.append('count')
+            return pd.DataFrame([], columns=emptycols)
+        # If there's a volume-level representation, simply pull from that
+        elif not self.volume._lineChars.empty:
+            try:
+                df = self.volume._lineChars.loc[([int(self.seq)]), ]
+            except:
+                logging.error("Error subsetting volume DF for seq:{}".format(
+                              self.seq))
+                return
+        # Create the internal representation if it does not already exist
+        elif self._lineChars.empty:
             lineChars = {(int(self.seq), sec, place, char): {'count': value}
                          for sec in SECREF
                          for place in ['begin', 'end']
@@ -105,34 +125,7 @@ class Page:
 
         df = self._lineChars
 
-        # Set up grouping
-        groups = ['page']
-        if section in SECREF + ['all']:
-            groups.append('section')
-        if place in ['begin', 'end', 'all']:
-            groups.append('place')
-        groups.append('character')
-
-        # Set up slicing
-        slices = [slice(None)]
-        if section in ['all', 'group']:
-            slices.append(slice(None))
-        elif section in SECREF:
-            slices.append([section])
-        if place in ['begin', 'end', 'all']:
-            slices.append([place])
-        elif place == 'group':
-            # It's hard to imagine a use for place='group', but adding for
-            # completion
-            slices.append(slice(None))
-
-        if slices != [slice(None)] * 3:
-                df = df.loc[tuple(slices), ]
-
-        if groups == ['page', 'section', 'place', 'character']:
-            return df
-        else:
-            return df.groupby(groups).sum()
+        return group_linechars(df, section=section, place=place)
 
     def token_count(self, section):
         ''' Count total tokens on the page '''

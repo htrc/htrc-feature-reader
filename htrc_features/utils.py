@@ -119,3 +119,34 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
             return df.reset_index().groupby(['page']+groups).apply(set_to_one)\
                      .groupby(groups).sum()[['count']]
 
+
+def group_linechars(df, section='all', place='all'):
+
+    # Set up grouping
+    groups = ['page']
+    if section in SECREF + ['all']:
+        groups.append('section')
+    if place in ['begin', 'end', 'all']:
+        groups.append('place')
+    groups.append('character')
+
+    # Set up slicing
+    slices = [slice(None)]
+    if section in ['all', 'group']:
+        slices.append(slice(None))
+    elif section in SECREF:
+        slices.append([section])
+    if place in ['begin', 'end', 'all']:
+        slices.append([place])
+    elif place == 'group':
+        # It's hard to imagine a use for place='group', but adding for
+        # completion
+        slices.append(slice(None))
+
+    if slices != [slice(None)] * 3:
+            df = df.loc[tuple(slices), ]
+
+    if groups == ['page', 'section', 'place', 'character']:
+        return df
+    else:
+        return df.groupby(groups).sum()
