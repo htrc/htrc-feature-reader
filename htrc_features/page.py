@@ -2,21 +2,21 @@ from __future__ import unicode_literals
 # Because python2's dict.iteritem is python3's dict.item
 from six import iteritems
 import pandas as pd
-from htrc_features.utils import group_tokenlist
+from htrc_features.utils import group_tokenlist, SECREF
+import logging
 
 
 class Page:
 
     _tokencounts = pd.DataFrame()
     _lineChars = pd.DataFrame()
-    _secref = ['header', 'body', 'footer']
 
     def __init__(self, pageobj, volume, default_section='body'):
         self.volume = volume
         self.default_section = default_section
         self._json = pageobj
 
-        assert(self.default_section in self._secref + ['all', 'group'])
+        assert(self.default_section in SECREF + ['all', 'group'])
 
         for (key, item) in iteritems(pageobj):
             # Only add attributes to this object if it's not overwriting
@@ -44,23 +44,41 @@ class Page:
         '''
         section = self.default_section if section == 'default' else section
 
+        # If there are no tokens, return an empty dataframe
+        if self.tokenCount == 0:
+            emptycols = ['page']
+            if section in SECREF + ['all']:
+                emptycols.append('section')
+            emptycols.append('token' if case else 'lowercase')
+            if pos:
+                emptycols.append('pos')
+            return pd.DataFrame([], columns=emptycols)
+        # If there's a volume-level representation, simply pull from that
+        elif not self.volume._tokencounts.empty:
+            try:
+                df = self.volume._tokencounts.loc[([int(self.seq)]), ]
+            except:
+                logging.error("Error subsetting volume DF for seq:{}".format(
+                              self.seq))
+                return
         # Create the internal representation if it does not already
-        # exist. This will only need to exist once
-        if self._tokencounts.empty:
+        # This will only need to be created once
+        elif self._tokencounts.empty:
             if self.volume._schema == '1.0':
                 tname = 'tokens'
             else:
                 tname = 'tokenPosCount'
             tuples = {(int(self.seq), sec, token, pos): {'count': value}
-                      for sec in self._secref
+                      for sec in SECREF
                       for token, posvals in iteritems(self._json[sec][tname])
                       for pos, value in iteritems(posvals)
                       }
             self._tokencounts = pd.DataFrame(tuples).transpose()
             self._tokencounts.index.names = ['page', 'section', 'token', 'pos']
+            df = self._tokencounts
 
-        return group_tokenlist(self._tokencounts, pages=True, section=section,
-                               case=case, pos=pos)
+        return group_tokenlist(df, pages=True, section=section, case=case,
+                               pos=pos)
 
     def endLineChars(self, section='default'):
         return self.lineChars(section=section, place='end')
@@ -76,7 +94,7 @@ class Page:
 
         if self._lineChars.empty:
             lineChars = {(int(self.seq), sec, place, char): {'count': value}
-                         for sec in self._secref
+                         for sec in SECREF
                          for place in ['begin', 'end']
                          for char, value in iteritems(
                              self._json[sec][place+'LineChars'])
@@ -89,7 +107,7 @@ class Page:
 
         # Set up grouping
         groups = ['page']
-        if section in self._secref + ['all']:
+        if section in SECREF + ['all']:
             groups.append('section')
         if place in ['begin', 'end', 'all']:
             groups.append('place')
@@ -99,7 +117,7 @@ class Page:
         slices = [slice(None)]
         if section in ['all', 'group']:
             slices.append(slice(None))
-        elif section in self.secref:
+        elif section in SECREF:
             slices.append([section])
         if place in ['begin', 'end', 'all']:
             slices.append([place])
