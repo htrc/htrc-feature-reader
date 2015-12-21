@@ -71,6 +71,9 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
     if pos:
         groups.append('pos')
 
+    if in_df.empty:
+        return pd.DataFrame([], columns=groups)
+
     if section in ['all', 'group']:
         df = in_df
     elif section in SECREF:
