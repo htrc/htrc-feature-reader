@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 from htrc_features.page import Page
+from htrc_features.utils import group_tokenlist, SECREF
 from htrc_features.term_index import TermIndex
 from six import iteritems
 import pandas as pd
@@ -15,8 +16,9 @@ except ImportError:
 class Volume(object):
     SUPPORTED_SCHEMA = ['1.0', '2.0']
     _metadata = None
+    _tokencounts = pd.DataFrame()
 
-    def __init__(self, obj, advanced=False):
+    def __init__(self, obj, advanced=False, default_page_section='body'):
         # Verify schema version
         self._schema = obj['features']['schemaVersion']
         if self._schema not in self.SUPPORTED_SCHEMA:
@@ -27,6 +29,7 @@ class Volume(object):
         self.id = obj['id']
         self._pages = obj['features']['pages']
         self.pageCount = obj['features']['pageCount']
+        self.default_page_section = default_page_section
 
         # Expand metadata to attributes
         for (key, value) in obj['metadata'].items():
@@ -62,7 +65,7 @@ class Volume(object):
                                 self._pages[i][sec][key] = apages[i][sec][key]
                 self._has_advanced = True
                 logging.debug("Advanced merge took {}s".format(
-                              (time.time()-start)/1000))
+                              (time.time()-start)))
 
     def __iter__(self):
         return self.pages()
@@ -90,36 +93,75 @@ class Volume(object):
             self._metadata = result
         return self._metadata
 
-    # def _parseFeatures(self, featobj):
-    #    rawpages = featobj['pages']
-
     def pages(self, **kwargs):
         for page in self._pages:
             yield Page(page, self, **kwargs)
 
     def tokens_per_page(self, **kwargs):
-        l = [0] * self.pageCount
-        for (index, page) in enumerate(self.pages(**kwargs)):
-            try:
-                l[index] = page.total_tokens()
-            except:
-                logging.error("Seq and pageCount don't match in %s" % self.id)
-        return l
+        '''
+        Return a one dimension pd.Series of page lengths
+        '''
+        return self.tokenlist().reset_index().groupby(['page']).sum()
+
+    def tokenlist(self, pages=True, section='default', case=True, pos=True,
+                  page_freq=False):
+        ''' Get or set tokencounts DataFrame
+
+        pages[bool]: Keep page-level info if true, else fold.
+
+        section[string]: Which part of the page to return. In addition to
+            'header', 'body', and 'footer', 'all' will return a DataFrame with
+            all the sections, 'group' will sum all sections,
+            section in ['header', 'footer', 'body'] will return those fields
+            section == 'all' will group and sum all sections
+            section == 'default' falls back on what the page object has saved
+
+        case[bool] : Preserve case, or fold.
+
+        pos[bool] : Specify whether to return frequencies per part of speech,
+                    or simply by word
+        
+        page_freq[bool] : Whether to count page frequency (1 if it occurs on
+        the page, else 0) or a term frequency (counts for the term, per page)
+        '''
+        if section == 'default':
+            section = self.default_page_section
+
+        # Create the internal representation if it does not already
+        # exist. This will only need to exist once
+        if self._tokencounts.empty:
+            if self._schema == '1.0':
+                tname = 'tokens'
+            else:
+                tname = 'tokenPosCount'
+            tuples = {(int(page['seq']), sec, token, pos): {'count': value}
+                      for page in self._pages
+                      for sec in SECREF
+                      for token, posvals in iteritems(page[sec][tname])
+                      for pos, value in iteritems(posvals)
+                      }
+            self._tokencounts = pd.DataFrame(tuples).transpose()
+            self._tokencounts.index.names = ['page', 'section', 'token', 'pos']
+
+        return group_tokenlist(self._tokencounts, pages=pages, section=section,
+                               case=case, pos=pos, page_freq=page_freq)
 
     def term_page_freqs(self, page_freq=True, case=True):
         ''' Return a term frequency x page matrix, or optionally a
         page frequency x page matrix '''
-        all_page_dfs = self._frequencies(page_freq, case)
-        return all_page_dfs.groupby(['token', 'page']).sum().reset_index()\
+        all_page_dfs = self.tokenlist(page_freq=page_freq, case=case)
+        return all_page_dfs.reset_index()\
+                           .groupby(['token', 'page'], as_index=False).sum()\
                            .pivot(index='page', columns='token',
                                   values='count')\
                            .fillna(0)
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
-        df = self._frequencies(page_freq, pos, case)
-        groups = ['token'] if not pos else ['token', 'POS']
-        return df.drop(['page'], axis=1).groupby(groups).sum().reset_index()\
+        df = self.tokenlist(page_freq=page_freq, pos=pos, case=case)
+        groups = ['token'] if not pos else ['token', 'pos']
+        return df.reset_index().drop(['page'], axis=1)\
+                 .groupby(groups, as_index=False).sum()\
                  .sort_values(by='count', ascending=False)
 
     def end_line_chars(self, **args):
@@ -140,43 +182,6 @@ class Volume(object):
             for (char, count) in iteritems(getattr(section, attr)):
                 cp[char][index] = count
         return cp
-
-    def _frequencies(self, page_freq=True, pos=True, case=True):
-        ''' Build a long dataframe with rows for each token/POS/count/page.
-
-        page_freq[bool] : Whether to count page frequency (1 if it occurs on
-        the page, else 0) or a term frequency (counts for the term, per page)
-        '''
-        if not hasattr(self, '_all_pages_count'):
-            all_page_dfs = []
-            for page in self.pages():
-                tl = page.tokenlist.token_counts(pos=True, case=True)
-                tl['page'] = page.seq
-                all_page_dfs.append(tl)
-
-            self._all_page_counts = pd.concat(all_page_dfs)
-
-        # Only crunch lowercase when needed, but then keep it internally
-        if case and 'lowercase' not in self._all_page_counts.columns:
-            logging.debug('Adding lowercase column')
-            self._all_page_counts['lowercase'] =\
-                self._all_page_counts['token'].str.lower()
-
-        all_pages = self._all_page_counts
-        groups = ['page', ('token' if case else 'lowercase')]
-        if pos:
-            groups.append('POS')
-
-        # TOFIX: Using sum() is pointless if page_freq is True
-        all_pages = all_pages.groupby(groups).sum().reset_index()
-
-        if not case:
-            return all_pages.rename(columns={"lowercase": "token"})
-
-        if page_freq:
-            all_pages['count'] = 1
-
-        return all_pages
 
     def __str__(self):
         return "<HTRC Volume: %s>" % self.id
