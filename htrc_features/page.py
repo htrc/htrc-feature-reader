@@ -54,6 +54,7 @@ class Page:
                 emptycols.append('pos')
             emptycols.append('count')
             return pd.DataFrame([], columns=emptycols)
+
         # If there's a volume-level representation, simply pull from that
         elif not self.volume._tokencounts.empty:
             try:
@@ -62,20 +63,12 @@ class Page:
                 logging.error("Error subsetting volume DF for seq:{}".format(
                               self.seq))
                 return
+
         # Create the internal representation if it does not already
         # This will only need to be created once
         elif self._tokencounts.empty:
-            if self.volume._schema == '1.0':
-                tname = 'tokens'
-            else:
-                tname = 'tokenPosCount'
-            tuples = {(int(self.seq), sec, token, pos): {'count': value}
-                      for sec in SECREF
-                      for token, posvals in iteritems(self._json[sec][tname])
-                      for pos, value in iteritems(posvals)
-                      }
-            self._tokencounts = pd.DataFrame(tuples).transpose()
-            self._tokencounts.index.names = ['page', 'section', 'token', 'pos']
+            # Using the DF building method from Volume
+            self._tokencounts = self.volume._make_tokencount_df([self._json])
             df = self._tokencounts
 
         return group_tokenlist(df, pages=True, section=section, case=case,
@@ -103,6 +96,7 @@ class Page:
             emptycols.append('character')
             emptycols.append('count')
             return pd.DataFrame([], columns=emptycols)
+
         # If there's a volume-level representation, simply pull from that
         elif not self.volume._lineChars.empty:
             try:
@@ -112,6 +106,7 @@ class Page:
                 logging.error("Error subsetting volume DF for seq:{}".format(
                               self.seq))
                 return
+        
         # Create the internal representation if it does not already exist
         # Since the code is the same, we'll use the definition from Volume
         elif self._lineChars.empty:

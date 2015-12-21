@@ -1,11 +1,10 @@
 from __future__ import unicode_literals
 from htrc_features.page import Page
-from htrc_features.utils import group_tokenlist, group_linechars, SECREF
+from htrc_features.utils import group_tokenlist, group_linechars
 from six import iteritems
 import pandas as pd
 import numpy as np
 import logging
-import time
 
 try:
     import pysolr
@@ -43,7 +42,6 @@ class Volume(object):
         self._has_advanced = False
 
         if advanced:
-            start = time.time()
             if self._schema != '2.0':
                 logging.warn("Only schema 2.0 supports advanced files."
                              "Ignoring")
@@ -55,8 +53,6 @@ class Volume(object):
                 # Count up the capAlphaSeq (longest length of alphabetical
                 # sequence of capital letters starting a line
                 # TODO
-                logging.debug("Advanced merge took {}s".format(
-                              (time.time()-start)))
 
     def __iter__(self):
         return self.pages()
@@ -111,7 +107,7 @@ class Volume(object):
 
         pos[bool] : Specify whether to return frequencies per part of speech,
                     or simply by word
-        
+
         page_freq[bool] : Whether to count page frequency (1 if it occurs on
         the page, else 0) or a term frequency (counts for the term, per page)
         '''
@@ -121,18 +117,7 @@ class Volume(object):
         # Create the internal representation if it does not already
         # exist. This will only need to exist once
         if self._tokencounts.empty:
-            if self._schema == '1.0':
-                tname = 'tokens'
-            else:
-                tname = 'tokenPosCount'
-            tuples = {(int(page['seq']), sec, token, pos): {'count': value}
-                      for page in self._pages
-                      for sec in SECREF
-                      for token, posvals in iteritems(page[sec][tname])
-                      for pos, value in iteritems(posvals)
-                      }
-            self._tokencounts = pd.DataFrame(tuples).transpose()
-            self._tokencounts.index.names = ['page', 'section', 'token', 'pos']
+            self._tokencounts = self._make_tokencount_df(self._pages)
 
         return group_tokenlist(self._tokencounts, pages=pages, section=section,
                                case=case, pos=pos, page_freq=page_freq)
@@ -189,6 +174,46 @@ class Volume(object):
         df = self._lineChars
         return group_linechars(df, section=section, place=place)
 
+    def _make_tokencount_df(self, pages):
+        '''
+        Returns a Pandas dataframe of:
+            page / section / place(i.e. begin/end) / char / count
+
+        Provide an array of pages that hold beginLineChars and endLineChars.
+        '''
+        if self._schema == '1.0':
+            tname = 'tokens'
+        else:
+            tname = 'tokenPosCount'
+
+        # Make structured numpy array
+        # Because it is typed, this approach is ~40x faster than earlier
+        # methods
+        m = len(pages) * 2000  # Pages * oversized estimate for tokens/page
+        arr = np.zeros(m, dtype=[(str('page'), str('u8')),
+                                 (str('section'), str('U6')),
+                                 (str('token'), str('U64')),
+                                 (str('pos'), str('U6')),
+                                 (str('count'), str('u4'))])
+        i = 0
+        for page in pages:
+            for sec in ['header', 'body', 'footer']:
+                for token, posvalues in iteritems(page[sec][tname]):
+                    for pos, value in iteritems(posvalues):
+                        arr[i] = (page['seq'], sec, token, pos, value)
+                        i += 1
+                        if (i > m+1):
+                            logging.error("This volume has more token info "
+                                          "the internal representation allows."
+                                          " Email organisciak@gmail.com to let"
+                                          " the library author know!")
+
+        # Create a DataFrame
+        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
+                                              'token', 'pos'])
+        df.sortlevel(inplace=True)
+        return df
+
     def _make_line_char_df(self, pages):
         '''
         Returns a Pandas dataframe of:
@@ -206,7 +231,7 @@ class Volume(object):
                                           (str('section'), str('U6')),
                                           (str('place'), str('U5')),
                                           (str('char'), str('U1')),
-                                          (str('value'), str('u8'))])
+                                          (str('count'), str('u8'))])
         i = 0
         for page in pages:
             for sec in ['header', 'body', 'footer']:

@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='HTRC Feature Reader',
-      version='1.0',
+      version='1.1',
       description='Library for working with the HTRC Extracted Features dataset',
       classifiers=[
           'Development Status :: 4 - Beta',
@@ -17,7 +17,7 @@ setup(name='HTRC Feature Reader',
       author_email='organisciak@gmail.com',
       license='NCSA',
       packages=['htrc_features'],
-      install_requires=['six', 'pandas'],
+      install_requires=['six', 'pandas', 'numpy'],
       test_suite='nose.collector',
       tests_require=['nose'],
       zip_safe=False)

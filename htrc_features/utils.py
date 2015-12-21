@@ -94,10 +94,8 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
     # repeatedly is low, so it is no longer saved.
     if not case:
         logging.debug('Adding lowercase column')
-        df = df.reset_index()
-        df['lowercase'] = df['token'].str.lower()
-        df.set_index(['page', 'section', 'lowercase', 'token', 'pos'],
-                     inplace=True)
+        df.insert(len(df.columns), 'lowercase',
+                  df.index.get_level_values('token').str.lower())
 
     # Check if we need to group anything
     if groups == ['page', 'section', 'token', 'pos']:
@@ -149,4 +147,4 @@ def group_linechars(df, section='all', place='all'):
     if groups == ['page', 'section', 'place', 'character']:
         return df
     else:
-        return df.groupby(groups).sum()
+        return df.groupby(groups).sum()[['count']]
