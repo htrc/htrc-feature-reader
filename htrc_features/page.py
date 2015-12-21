@@ -106,23 +106,17 @@ class Page:
         # If there's a volume-level representation, simply pull from that
         elif not self.volume._lineChars.empty:
             try:
-                df = self.volume._lineChars.loc[([int(self.seq)]), ]
+                self._lineChars = self.volume._lineChars\
+                                      .loc[([int(self.seq)]), ]
             except:
                 logging.error("Error subsetting volume DF for seq:{}".format(
                               self.seq))
                 return
         # Create the internal representation if it does not already exist
+        # Since the code is the same, we'll use the definition from Volume
         elif self._lineChars.empty:
-            lineChars = {(int(self.seq), sec, place, char): {'count': value}
-                         for sec in SECREF
-                         for place in ['begin', 'end']
-                         for char, value in iteritems(
-                             self._json[sec][place+'LineChars'])
-                         }
-            self._lineChars = pd.DataFrame(lineChars).transpose()
-            names = ['page', 'section', 'place', 'character']
-            self._lineChars.index.names = names
-
+            self._lineChars = self.volume._make_line_char_df(self,
+                                                             [self._json])
         df = self._lineChars
 
         return group_linechars(df, section=section, place=place)

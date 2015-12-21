@@ -1,9 +1,9 @@
 from __future__ import unicode_literals
 from htrc_features.page import Page
-from htrc_features.utils import group_tokenlist, SECREF
-from htrc_features.term_index import TermIndex
+from htrc_features.utils import group_tokenlist, group_linechars, SECREF
 from six import iteritems
 import pandas as pd
+import numpy as np
 import logging
 import time
 
@@ -17,6 +17,7 @@ class Volume(object):
     SUPPORTED_SCHEMA = ['1.0', '2.0']
     _metadata = None
     _tokencounts = pd.DataFrame()
+    _lineChars = pd.DataFrame()
 
     def __init__(self, obj, advanced=False, default_page_section='body'):
         # Verify schema version
@@ -43,27 +44,17 @@ class Volume(object):
 
         if advanced:
             start = time.time()
-            apages = advanced['pages']
             if self._schema != '2.0':
                 logging.warn("Only schema 2.0 supports advanced files."
                              "Ignoring")
             else:
-                # Merge Advanced features into pages JSON
-                for i in range(0, len(self._pages)):
-                    if self._pages[i]['seq'] != apages[i]['seq']:
-                        logging.warn('Sequence does not match between basic '
-                                     'and advanced pages. Skipping for this '
-                                     'volume.')
-                        logging.debug("Due to limited advanced feature "
-                                      "support, this code assumes that basic "
-                                      "and advanced features line up. If the "
-                                      "seq doesn't match up, it doesn't search"
-                                      "for the correct page")
-                    else:
-                        for sec in ['header', 'body', 'footer']:
-                            for key in apages[i][sec].keys():
-                                self._pages[i][sec][key] = apages[i][sec][key]
                 self._has_advanced = True
+                # Create an internal dataframe for lineChar counts
+                self._lineChars = self._make_line_char_df(advanced['pages'])
+
+                # Count up the capAlphaSeq (longest length of alphabetical
+                # sequence of capital letters starting a line
+                # TODO
                 logging.debug("Advanced merge took {}s".format(
                               (time.time()-start)))
 
@@ -165,23 +156,70 @@ class Volume(object):
                  .sort_values(by='count', ascending=False)
 
     def end_line_chars(self, **args):
-        return self._line_chars('endLineChars')
+        ''' The pythonic name for endLineChars '''
+        return self.endLineChars(self, **args)
+
+    def endLineChars(self, **args):
+        return self.line_chars(place='end', **args)
 
     def begin_line_chars(self, **args):
-        return self._line_chars('beginLineChars')
+        ''' The pythonic name for beginLineChars '''
+        return self.beginLineChars(self, **args)
 
-    def _line_chars(self, attr, sec='body'):
-        '''attr=[endLineChars|startLineChars]'''
+    def beginLineChars(self, **args):
+        return self.line_chars(place='begin')
+
+    def line_chars(self, section='default', place='all'):
+        '''attr=[endLineChars|beginLineChars]'''
         if self._schema == '2.0' and not self._has_advanced:
             logging.error("For schema version 2.0, you need load the "
-                          "'advanced' file for start/endLineChars")
+                          "'advanced' file for begin/endLineChars")
             return
-        cp = TermIndex(self.pageCount)
-        for (index, page) in enumerate(self.pages()):
-            section = getattr(page, sec)
-            for (char, count) in iteritems(getattr(section, attr)):
-                cp[char][index] = count
-        return cp
+
+        if section == 'default':
+            section = self.default_page_section
+
+        if self._lineChars.empty and self._has_advanced:
+            logging.error("Something went wrong. Expected Advanced features"
+                          " to already be processed")
+            return
+        elif self._lineChars.empty and not self._has_advanced:
+            self._lineChars = self._make_line_char_df(self._pages)
+
+        df = self._lineChars
+        return group_linechars(df, section=section, place=place)
+
+    def _make_line_char_df(self, pages):
+        '''
+        Returns a Pandas dataframe of:
+            page / section / place(i.e. begin/end) / char / count
+
+        Provide an array of pages that hold beginLineChars and endLineChars.
+        '''
+
+        # Make structured numpy array
+        # Because it is typed, this approach is ~40x faster than earlier
+        # methods
+        m = len(pages) * 3 * 2  # Pages * section types * places
+        print(np.__version__)
+        arr = np.zeros(int(m*100), dtype=[(str('page'), str('u8')),
+                                          (str('section'), str('U6')),
+                                          (str('place'), str('U5')),
+                                          (str('char'), str('U1')),
+                                          (str('value'), str('u8'))])
+        i = 0
+        for page in pages:
+            for sec in ['header', 'body', 'footer']:
+                for place in ['begin', 'end']:
+                    for char, value in iteritems(page[sec][place+'LineChars']):
+                        arr[i] = (page['seq'], sec, place, char, value)
+                        i += 1
+
+        # Create a DataFrame
+        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
+                                              'place', 'char'])
+        df.sortlevel(inplace=True)
+        return df
 
     def __str__(self):
         return "<HTRC Volume: %s>" % self.id

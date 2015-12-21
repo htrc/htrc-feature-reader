@@ -136,9 +136,9 @@ def group_linechars(df, section='all', place='all'):
         slices.append(slice(None))
     elif section in SECREF:
         slices.append([section])
-    if place in ['begin', 'end', 'all']:
+    if place in ['begin', 'end']:
         slices.append([place])
-    elif place == 'group':
+    elif place in ['group', 'all']:
         # It's hard to imagine a use for place='group', but adding for
         # completion
         slices.append(slice(None))
