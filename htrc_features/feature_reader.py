@@ -73,14 +73,18 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
     # Check if we need to group anything
     if groups == ['page', 'section', 'token', 'pos']:
         if page_freq:
+            pd.options.mode.chained_assignment = None
             df['count'] = 1
+            pd.options.mode.chained_assignment = 'warn'
         return df
     else:
         if not page_freq:
             return df.reset_index().groupby(groups).sum()[['count']]
         elif page_freq and 'page' in groups:
             df = df.reset_index().groupby(groups).sum()[['count']]
+            pd.options.mode.chained_assignment = None
             df['count'] = 1
+            pd.options.mode.chained_assignment = 'warn'
             return df
         elif page_freq and 'page' not in groups:
             # We'll have to group page-level, then group again
@@ -142,6 +146,9 @@ class FeatureReader(object):
     def __iter__(self):
         return self.volumes()
 
+    def __str__(self):
+        return "HTRC Feature Reader with %d paths load" % (len(self.paths))
+
     def volumes(self):
         ''' Generator for returning Volume objects '''
         for path in self.paths:
@@ -151,6 +158,43 @@ class FeatureReader(object):
                 yield self._volume(basic, advanced_path=advanced)
             else:
                 yield self._volume(path)
+
+    def create_volume(self, path, **kwargs):
+        return self._volume(path, **kwargs)
+
+    def multiprocessing(self, map_func, callback=None):
+        '''
+        Pass a function to perform on each volume of the feature reader, using
+        multiprocessing (map), then process the combined outputs (reduce).
+
+        map_func
+
+        Function to run on each individual volume. Takes as input a tuple
+        containing a feature_reader and volume path, from which a volume can be
+        created. Returns a (key, value) tuple.
+
+        def do_something_on_vol(args):
+            fr, path = args
+            vol = fr.create_volume(path)
+            # Do something with 'vol'
+            return (key, value)
+
+        '''
+        # Match process count to cpu count
+        p = Pool()
+        # f = self._wrap_func(func)
+        results = p.map(map_func, self._mp_paths(), chunksize=5)
+        # , callback=callback)
+        p.close()
+        p.join()
+        return results
+
+    def _mp_paths(self):
+        '''
+        Package self with paths, so subprocesses can access it
+        '''
+        for path in self.paths:
+            yield (self, path)
 
     def _volume(self, path, compressed=True, advanced_path=False):
         ''' Read a path into a volume.'''
@@ -210,52 +254,12 @@ class FeatureReader(object):
             func(vol)
         return new_func
 
-    def create_volume(self, path, **kwargs):
-        return self._volume(path, **kwargs)
-
-    def _mp_paths(self):
-        '''
-        Package self with paths, so subprocesses can access it
-        '''
-        for path in self.paths:
-            yield (self, path)
-
-    def multiprocessing(self, map_func, callback=None):
-        '''
-        Pass a function to perform on each volume of the feature reader, using
-        multiprocessing (map), then process the combined outputs (reduce).
-
-        map_func
-
-        Function to run on each individual volume. Takes as input a tuple
-        containing a feature_reader and volume path, from which a volume can be
-        created. Returns a (key, value) tuple.
-
-        def do_something_on_vol(args):
-            fr, path = args
-            vol = fr.create_volume(path)
-            # Do something with 'vol'
-            return (key, value)
-
-        '''
-        # Match process count to cpu count
-        p = Pool()
-        # f = self._wrap_func(func)
-        results = p.map(map_func, self._mp_paths(), chunksize=5)
-        # , callback=callback)
-        p.close()
-        p.join()
-        return results
-
-    def __str__(self):
-        return "HTRC Feature Reader with %d paths load" % (len(self.paths))
-
 
 class Volume(object):
     SUPPORTED_SCHEMA = ['1.0', '2.0']
-    METADATA_FIELDS = [('id', 'id'), ('schemaVersion', 'schema_version'),
+    METADATA_FIELDS = [('schemaVersion', 'schema_version'),
                        ('dateCreated', 'date_created'), ('title', 'title'),
-                       ('pubDate', 'pub_date'), ('pubDate', 'year'),
+                       ('pubDate', 'pub_date'),
                        ('language', 'language'), ('htBibUrl', 'ht_bib_url'),
                        ('handleUrl', 'handle_url'), ('oclc', 'oclc'),
                        ('imprint', 'imprint')]
@@ -284,9 +288,12 @@ class Volume(object):
         self.default_page_section = default_page_section
 
         # Expand basic values to properties
-        for key, pythonkey in self.METADATA_FIELDS + self.BASIC_FIELDS:
-            if hasattr(obj['metadata'], key):
+        for key, pythonkey in self.METADATA_FIELDS:
+            if key in obj['metadata']:
                 setattr(self, pythonkey, obj['metadata'][key])
+        for key, pythonkey in self.BASIC_FIELDS:
+            if key in obj['features']:
+                setattr(self, pythonkey, obj['features'][key])
 
         if hasattr(self, 'genre'):
             self.genre = self.genre.split(", ")
@@ -310,10 +317,13 @@ class Volume(object):
     def __iter__(self):
         return self.pages()
 
+    def __str__(self):
+        return "<HTRC Volume: %s>" % self.id
+
     @property
     def year(self):
         ''' A friendlier name wrapping Volume.pubDate '''
-        return self.pubDate
+        return self.pub_date
 
     @property
     def metadata(self):
@@ -332,6 +342,16 @@ class Volume(object):
             result = list(results)[0]
             self._metadata = result
         return self._metadata
+
+    @property
+    def tokens(self, section='default', case=True):
+        ''' Get unique tokens '''
+        tokens = self.tokenlist(section=section).index\
+                     .get_level_values('token').to_series()
+        if case:
+            return tokens.unique().tolist()
+        else:
+            return tokens.str.lower().unique().tolist()
 
     def pages(self, **kwargs):
         for page in self._pages:
@@ -500,15 +520,12 @@ class Volume(object):
         df.sortlevel(inplace=True)
         return df
 
-    def __str__(self):
-        return "<HTRC Volume: %s>" % self.id
-
 
 class Page:
 
     _tokencounts = pd.DataFrame()
     _line_chars = pd.DataFrame()
-    BASIC_FIELDS = [('tokenCount', '_token_count'),
+    BASIC_FIELDS = [('seq', 'seq'), ('tokenCount', '_token_count'),
                     ('languages', 'languages')]
     ''' List of fields which return primitive values in the schema, as tuples
     with (CamelCase, lower_with_under) mapping '''
@@ -523,11 +540,56 @@ class Page:
         assert(self.default_section in SECREF + ['all', 'group'])
 
         for key, pythonkey in self.BASIC_FIELDS:
-            if hasattr(pageobj, key):
+            if key in pageobj:
                 setattr(self, pythonkey, pageobj[key])
 
-    # def line_count
-    # def basic_count
+        arr = np.zeros((len(SECREF), len(self.SECTION_FIELDS)), dtype='u4')
+        for i, sec in enumerate(SECREF):
+                for j, stat in enumerate(self.SECTION_FIELDS):
+                            arr[i, j] = self._json[sec][stat]
+        self._basic_stats = pd.DataFrame(arr, columns=self.SECTION_FIELDS,
+                                         index=SECREF)
+
+    @property
+    def tokens(self, section='default', case=True):
+        ''' Get unique tokens '''
+        tokens = self.tokenlist(section=section).index\
+                     .get_level_values('token').to_series()
+        if case:
+            return tokens.unique().tolist()
+        else:
+            return tokens.str.lower().unique().tolist()
+
+    @property
+    def count(self):
+        return self._df['count'].astype(int).sum()
+
+    @property
+    def line_count(self, section='default'):
+        return self._get_basic_stat(section, 'lineCount')
+
+    @property
+    def empty_line_count(self, section='default'):
+        return self._get_basic_stat(section, 'emptyLineCount')
+
+    @property
+    def sentence_count(self, section='default'):
+        return self._get_basic_stat(section, 'sentenceCount')
+
+    def _get_basic_stat(self, section, stat):
+        if stat is 'all':
+            # Return all columns. No publicized currently
+            stat = slice(None)
+
+        if section == 'default':
+            section = self.default_section
+
+        if section in ['header', 'body', 'footer']:
+            return self._basic_stats.loc[section, stat]
+        elif section == 'all':
+            return self._basic_stats.loc[:, stat]
+        elif section == 'group':
+            return self._basic_stats.loc[:, stat].sum()
 
     def tokenlist(self, section='default', case=True, pos=True):
         ''' Get or set tokencounts DataFrame
@@ -550,7 +612,7 @@ class Page:
         section = self.default_section if section == 'default' else section
 
         # If there are no tokens, return an empty dataframe
-        if self.tokenCount == 0:
+        if self._token_count == 0:
             emptycols = ['page']
             if section in SECREF + ['all']:
                 emptycols.append('section')
@@ -594,7 +656,7 @@ class Page:
         section = self.default_section if section == 'default' else section
 
         # If there are no tokens, return an empty dataframe
-        if self.tokenCount == 0:
+        if self._token_count == 0:
             emptycols = ['page']
             if section in SECREF + ['all']:
                 emptycols.append('section')
@@ -633,17 +695,3 @@ class Page:
         else:
             name = "<page %s with no volume parent>" % (self.seq)
         return name
-
-    @property
-    def tokens(self, section='default', case=True):
-        ''' Get unique tokens '''
-        tokens = self.tokenlist(section=section).index\
-                     .get_level_values('token').to_series()
-        if case:
-            return tokens.unique().tolist()
-        else:
-            return tokens.str.lower().unique().tolist()
-
-    @property
-    def count(self):
-        return self._df['count'].astype(int).sum()
