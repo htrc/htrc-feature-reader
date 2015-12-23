@@ -1061,7 +1061,6 @@ table {
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.__init__">__init__</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.create_volume">create_volume</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.multiprocessing">multiprocessing</a></li>
-    <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.next">next</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.volumes">volumes</a></li>
   </ul>
 
@@ -1072,9 +1071,9 @@ table {
           
   <ul>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.__init__">__init__</a></li>
-    <li class="mono"><a href="#htrc_features.feature_reader.Page.beginLineChars">beginLineChars</a></li>
-    <li class="mono"><a href="#htrc_features.feature_reader.Page.endLineChars">endLineChars</a></li>
-    <li class="mono"><a href="#htrc_features.feature_reader.Page.lineChars">lineChars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.begin_line_chars">begin_line_chars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.end_line_chars">end_line_chars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.line_chars">line_chars</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.token_count">token_count</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.tokenlist">tokenlist</a></li>
   </ul>
@@ -1086,9 +1085,7 @@ table {
           
   <ul>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.__init__">__init__</a></li>
-    <li class="mono"><a href="#htrc_features.feature_reader.Volume.beginLineChars">beginLineChars</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.begin_line_chars">begin_line_chars</a></li>
-    <li class="mono"><a href="#htrc_features.feature_reader.Volume.endLineChars">endLineChars</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.end_line_chars">end_line_chars</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.line_chars">line_chars</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.pages">pages</a></li>
@@ -1120,7 +1117,6 @@ table {
   <div id="source-htrc_features.feature_reader" class="source">
     <div class="codehilite"><pre><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">unicode_literals</span>
 <span class="kn">import</span> <span class="nn">bz2</span>
-<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
 <span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Pool</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
@@ -1137,9 +1133,10 @@ table {
 <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Pysolr not installed.&quot;</span><span class="p">)</span>
 
-<span class="c">## UTILS</span>
+<span class="c"># UTILS</span>
 
 <span class="n">SECREF</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;header&#39;</span><span class="p">,</span> <span class="s">&#39;body&#39;</span><span class="p">,</span> <span class="s">&#39;footer&#39;</span><span class="p">]</span>
+
 
 <span class="k">def</span> <span class="nf">group_tokenlist</span><span class="p">(</span><span class="n">in_df</span><span class="p">,</span> <span class="n">pages</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
                     <span class="n">page_freq</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
@@ -1242,7 +1239,8 @@ table {
     <span class="k">else</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">groups</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()[[</span><span class="s">&#39;count&#39;</span><span class="p">]]</span>
 
-<span class="c">## CLASSES</span>
+<span class="c"># CLASSES</span>
+
 
 <span class="k">class</span> <span class="nc">FeatureReader</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">):</span>
@@ -1259,25 +1257,10 @@ table {
                 <span class="nb">type</span><span class="p">(</span><span class="n">paths</span><span class="p">)))</span>
 
     <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">volumes</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__next__</span><span class="p">()</span>
-
-    <span class="k">def</span> <span class="nf">__next__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39; Get the next item.</span>
-<span class="sd">        For iteration, and an easy way to get a volume object with only one</span>
-<span class="sd">        path</span>
-
-<span class="sd">        Note that just calling the volume initializes it.</span>
-<span class="sd">        &#39;&#39;&#39;</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;_volumes&#39;</span><span class="p">):</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;Iterating over the feature_reader is deprecated. Try&quot;</span>
-                         <span class="s">&quot; `for vol in feature_reader.volumes()` instead.&quot;</span><span class="p">)</span>
-            <span class="c"># Instantiate a generator</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_volumes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volumes</span><span class="p">()</span>
-        <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_volumes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&quot;HTRC Feature Reader with </span><span class="si">%d</span><span class="s"> paths load&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
 
     <span class="k">def</span> <span class="nf">volumes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Generator for returning Volume objects &#39;&#39;&#39;</span>
@@ -1288,6 +1271,43 @@ table {
                 <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">basic</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="n">advanced</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">create_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">multiprocessing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_func</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Pass a function to perform on each volume of the feature reader, using</span>
+<span class="sd">        multiprocessing (map), then process the combined outputs (reduce).</span>
+
+<span class="sd">        map_func</span>
+
+<span class="sd">        Function to run on each individual volume. Takes as input a tuple</span>
+<span class="sd">        containing a feature_reader and volume path, from which a volume can be</span>
+<span class="sd">        created. Returns a (key, value) tuple.</span>
+
+<span class="sd">        def do_something_on_vol(args):</span>
+<span class="sd">            fr, path = args</span>
+<span class="sd">            vol = fr.create_volume(path)</span>
+<span class="sd">            # Do something with &#39;vol&#39;</span>
+<span class="sd">            return (key, value)</span>
+
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="c"># Match process count to cpu count</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
+        <span class="c"># f = self._wrap_func(func)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">map_func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mp_paths</span><span class="p">(),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+        <span class="c"># , callback=callback)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">results</span>
+
+    <span class="k">def</span> <span class="nf">_mp_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Package self with paths, so subprocesses can access it</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Read a path into a volume.&#39;&#39;&#39;</span>
@@ -1347,52 +1367,25 @@ table {
             <span class="n">func</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">new_func</span>
 
-    <span class="k">def</span> <span class="nf">create_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">_mp_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        Package self with paths, so subprocesses can access it</span>
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
-            <span class="k">yield</span> <span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">multiprocessing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_func</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        Pass a function to perform on each volume of the feature reader, using</span>
-<span class="sd">        multiprocessing (map), then process the combined outputs (reduce).</span>
-
-<span class="sd">        map_func</span>
-
-<span class="sd">        Function to run on each individual volume. Takes as input a tuple</span>
-<span class="sd">        containing a feature_reader and volume path, from which a volume can be</span>
-<span class="sd">        created. Returns a (key, value) tuple.</span>
-
-<span class="sd">        def do_something_on_vol(args):</span>
-<span class="sd">            fr, path = args</span>
-<span class="sd">            vol = fr.create_volume(path)</span>
-<span class="sd">            # Do something with &#39;vol&#39;</span>
-<span class="sd">            return (key, value)</span>
-
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="c"># Match process count to cpu count</span>
-        <span class="n">p</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
-        <span class="c"># f = self._wrap_func(func)</span>
-        <span class="n">results</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">map_func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mp_paths</span><span class="p">(),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-        <span class="c"># , callback=callback)</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">results</span>
-
-    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s">&quot;HTRC Feature Reader with </span><span class="si">%d</span><span class="s"> paths load&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
-
 
 <span class="k">class</span> <span class="nc">Volume</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="n">SUPPORTED_SCHEMA</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;1.0&#39;</span><span class="p">,</span> <span class="s">&#39;2.0&#39;</span><span class="p">]</span>
+    <span class="n">METADATA_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">,</span> <span class="s">&#39;schema_version&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;dateCreated&#39;</span><span class="p">,</span> <span class="s">&#39;date_created&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;title&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;pubDate&#39;</span><span class="p">,</span> <span class="s">&#39;pub_date&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;language&#39;</span><span class="p">,</span> <span class="s">&#39;language&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;htBibUrl&#39;</span><span class="p">,</span> <span class="s">&#39;ht_bib_url&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;handleUrl&#39;</span><span class="p">,</span> <span class="s">&#39;handle_url&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;oclc&#39;</span><span class="p">,</span> <span class="s">&#39;oclc&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;imprint&#39;</span><span class="p">,</span> <span class="s">&#39;imprint&#39;</span><span class="p">)]</span>
+    <span class="sd">&#39;&#39;&#39; List of metadata fields, with their pythonic name mapping. &#39;&#39;&#39;</span>
+    <span class="n">BASIC_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">,</span> <span class="s">&#39;schema_version&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s">&#39;dateCreated&#39;</span><span class="p">,</span> <span class="s">&#39;date_created&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s">&#39;pageCount&#39;</span><span class="p">,</span> <span class="s">&#39;page_count&#39;</span><span class="p">)]</span>
+    <span class="sd">&#39;&#39;&#39; List of fields which return primitive values in the schema, as tuples</span>
+<span class="sd">    with (CamelCase, lower_with_under) mapping.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
     <span class="n">_metadata</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="n">_tokencounts</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
-    <span class="n">_lineChars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+    <span class="n">_line_chars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">advanced</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">default_page_section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
         <span class="c"># Verify schema version</span>
@@ -1407,9 +1400,13 @@ table {
         <span class="bp">self</span><span class="o">.</span><span class="n">pageCount</span> <span class="o">=</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="s">&#39;pageCount&#39;</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">default_page_section</span> <span class="o">=</span> <span class="n">default_page_section</span>
 
-        <span class="c"># Expand metadata to attributes</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="c"># Expand basic values to properties</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">METADATA_FIELDS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">]:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">BASIC_FIELDS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
 
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">genre</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">genre</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&quot;, &quot;</span><span class="p">)</span>
@@ -1424,7 +1421,7 @@ table {
             <span class="k">else</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span> <span class="o">=</span> <span class="bp">True</span>
                 <span class="c"># Create an internal dataframe for lineChar counts</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="n">advanced</span><span class="p">[</span><span class="s">&#39;pages&#39;</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="n">advanced</span><span class="p">[</span><span class="s">&#39;pages&#39;</span><span class="p">])</span>
 
                 <span class="c"># Count up the capAlphaSeq (longest length of alphabetical</span>
                 <span class="c"># sequence of capital letters starting a line</span>
@@ -1433,10 +1430,13 @@ table {
     <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()</span>
 
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&quot;&lt;HTRC Volume: </span><span class="si">%s</span><span class="s">&gt;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span>
+
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">year</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; A friendlier name wrapping Volume.pubDate &#39;&#39;&#39;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pubDate</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pub_date</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -1455,6 +1455,16 @@ table {
             <span class="n">result</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">results</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span> <span class="o">=</span> <span class="n">result</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
+                     <span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">pages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">:</span>
@@ -1518,24 +1528,22 @@ table {
 
     <span class="k">def</span> <span class="nf">end_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        The pythonic interface to `htrc_features.volume.Volume.endLineChars`</span>
+<span class="sd">        Get counts of characters at the end of lines, i.e. the characters on</span>
+<span class="sd">        the far right of the page.</span>
 <span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">begin_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        The pythonic interface to `htrc_features.volume.Volume.endLineChars`</span>
+<span class="sd">        Get counts of characters at the begin of lines, i.e. the characters on</span>
+<span class="sd">        the far left of the page.</span>
 <span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;attr=[endLineChars|beginLineChars]&#39;&#39;&#39;</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Interface for all begin/end of line character information.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span> <span class="o">==</span> <span class="s">&#39;2.0&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;For schema version 2.0, you need load the &quot;</span>
                           <span class="s">&quot;&#39;advanced&#39; file for begin/endLineChars&quot;</span><span class="p">)</span>
@@ -1544,14 +1552,14 @@ table {
         <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span><span class="p">:</span>
             <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_page_section</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Something went wrong. Expected Advanced features&quot;</span>
                           <span class="s">&quot; to already be processed&quot;</span><span class="p">)</span>
             <span class="k">return</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">)</span>
 
-        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span>
         <span class="k">return</span> <span class="n">group_linechars</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="n">place</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_make_tokencount_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pages</span><span class="p">):</span>
@@ -1625,14 +1633,17 @@ table {
         <span class="n">df</span><span class="o">.</span><span class="n">sortlevel</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">df</span>
 
-    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s">&quot;&lt;HTRC Volume: </span><span class="si">%s</span><span class="s">&gt;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span>
-
 
 <span class="k">class</span> <span class="nc">Page</span><span class="p">:</span>
 
     <span class="n">_tokencounts</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
-    <span class="n">_lineChars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+    <span class="n">_line_chars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+    <span class="n">BASIC_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;seq&#39;</span><span class="p">,</span> <span class="s">&#39;seq&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;tokenCount&#39;</span><span class="p">,</span> <span class="s">&#39;_token_count&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s">&#39;languages&#39;</span><span class="p">,</span> <span class="s">&#39;languages&#39;</span><span class="p">)]</span>
+    <span class="sd">&#39;&#39;&#39; List of fields which return primitive values in the schema, as tuples</span>
+<span class="sd">    with (CamelCase, lower_with_under) mapping &#39;&#39;&#39;</span>
+    <span class="n">SECTION_FIELDS</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;lineCount&#39;</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">]</span>
+    <span class="sd">&#39;&#39;&#39; Fields that are counted by section.&#39;&#39;&#39;</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">default_section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">volume</span> <span class="o">=</span> <span class="n">volume</span>
@@ -1641,11 +1652,57 @@ table {
 
         <span class="k">assert</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">,</span> <span class="s">&#39;group&#39;</span><span class="p">])</span>
 
-        <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">pageobj</span><span class="p">):</span>
-            <span class="c"># Only add attributes to this object if it&#39;s not overwriting</span>
-            <span class="c"># a definition</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
-                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">BASIC_FIELDS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">pageobj</span><span class="p">:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+
+        <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">SECREF</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;u4&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sec</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">SECREF</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">stat</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">):</span>
+                            <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">,</span>
+                                         <span class="n">index</span><span class="o">=</span><span class="n">SECREF</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
+                     <span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="p">[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;lineCount&#39;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">empty_line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">sentence_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_basic_stat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">stat</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">stat</span> <span class="ow">is</span> <span class="s">&#39;all&#39;</span><span class="p">:</span>
+            <span class="c"># Return all columns. No publicized currently</span>
+            <span class="n">stat</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span><span class="p">:</span>
+            <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span>
+
+        <span class="k">if</span> <span class="n">section</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;header&#39;</span><span class="p">,</span> <span class="s">&#39;body&#39;</span><span class="p">,</span> <span class="s">&#39;footer&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">section</span><span class="p">,</span> <span class="n">stat</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;all&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">stat</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;group&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">stat</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">tokenlist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Get or set tokencounts DataFrame</span>
@@ -1668,7 +1725,7 @@ table {
         <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span> <span class="k">else</span> <span class="n">section</span>
 
         <span class="c"># If there are no tokens, return an empty dataframe</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenCount</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">emptycols</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;page&#39;</span><span class="p">]</span>
             <span class="k">if</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">]:</span>
                 <span class="n">emptycols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;section&#39;</span><span class="p">)</span>
@@ -1693,24 +1750,26 @@ table {
             <span class="c"># Using the DF building method from Volume</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_tokencount_df</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
             <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span>
 
         <span class="k">return</span> <span class="n">group_tokenlist</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">pages</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="n">case</span><span class="p">,</span>
                                <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lineChars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">end_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lineChars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">begin_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">lineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">        Get a dataframe of character counts at the start and end of lines</span>
 <span class="sd">        &#39;&#39;&#39;</span>
         <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span> <span class="k">else</span> <span class="n">section</span>
 
         <span class="c"># If there are no tokens, return an empty dataframe</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenCount</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">emptycols</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;page&#39;</span><span class="p">]</span>
             <span class="k">if</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">]:</span>
                 <span class="n">emptycols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;section&#39;</span><span class="p">)</span>
@@ -1721,10 +1780,10 @@ table {
             <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([],</span> <span class="n">columns</span><span class="o">=</span><span class="n">emptycols</span><span class="p">)</span>
 
         <span class="c"># If there&#39;s a volume-level representation, simply pull from that</span>
-        <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_lineChars</span>\
-                                      <span class="o">.</span><span class="n">loc</span><span class="p">[([</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">)]),</span> <span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_line_chars</span>\
+                                       <span class="o">.</span><span class="n">loc</span><span class="p">[([</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">)]),</span> <span class="p">]</span>
             <span class="k">except</span><span class="p">:</span>
                 <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Error subsetting volume DF for seq:{}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                               <span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">))</span>
@@ -1732,14 +1791,14 @@ table {
 
         <span class="c"># Create the internal representation if it does not already exist</span>
         <span class="c"># Since the code is the same, we&#39;ll use the definition from Volume</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
-                                                             <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                                                              <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span>
 
         <span class="k">return</span> <span class="n">group_linechars</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="n">place</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">token_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">token_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Count total tokens on the page &#39;&#39;&#39;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 
@@ -1749,20 +1808,6 @@ table {
         <span class="k">else</span><span class="p">:</span>
             <span class="n">name</span> <span class="o">=</span> <span class="s">&quot;&lt;page </span><span class="si">%s</span><span class="s"> with no volume parent&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">name</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
-        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
-                     <span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="p">[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 </pre></div>
 
   </div>
@@ -1951,25 +1996,10 @@ on a page. Defaults to false.</p></div>
                 <span class="nb">type</span><span class="p">(</span><span class="n">paths</span><span class="p">)))</span>
 
     <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">volumes</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__next__</span><span class="p">()</span>
-
-    <span class="k">def</span> <span class="nf">__next__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39; Get the next item.</span>
-<span class="sd">        For iteration, and an easy way to get a volume object with only one</span>
-<span class="sd">        path</span>
-
-<span class="sd">        Note that just calling the volume initializes it.</span>
-<span class="sd">        &#39;&#39;&#39;</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;_volumes&#39;</span><span class="p">):</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;Iterating over the feature_reader is deprecated. Try&quot;</span>
-                         <span class="s">&quot; `for vol in feature_reader.volumes()` instead.&quot;</span><span class="p">)</span>
-            <span class="c"># Instantiate a generator</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_volumes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volumes</span><span class="p">()</span>
-        <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_volumes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&quot;HTRC Feature Reader with </span><span class="si">%d</span><span class="s"> paths load&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
 
     <span class="k">def</span> <span class="nf">volumes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Generator for returning Volume objects &#39;&#39;&#39;</span>
@@ -1980,6 +2010,43 @@ on a page. Defaults to false.</p></div>
                 <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">basic</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="n">advanced</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">create_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">multiprocessing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_func</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Pass a function to perform on each volume of the feature reader, using</span>
+<span class="sd">        multiprocessing (map), then process the combined outputs (reduce).</span>
+
+<span class="sd">        map_func</span>
+
+<span class="sd">        Function to run on each individual volume. Takes as input a tuple</span>
+<span class="sd">        containing a feature_reader and volume path, from which a volume can be</span>
+<span class="sd">        created. Returns a (key, value) tuple.</span>
+
+<span class="sd">        def do_something_on_vol(args):</span>
+<span class="sd">            fr, path = args</span>
+<span class="sd">            vol = fr.create_volume(path)</span>
+<span class="sd">            # Do something with &#39;vol&#39;</span>
+<span class="sd">            return (key, value)</span>
+
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="c"># Match process count to cpu count</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
+        <span class="c"># f = self._wrap_func(func)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">map_func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mp_paths</span><span class="p">(),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+        <span class="c"># , callback=callback)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">results</span>
+
+    <span class="k">def</span> <span class="nf">_mp_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Package self with paths, so subprocesses can access it</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Read a path into a volume.&#39;&#39;&#39;</span>
@@ -2038,46 +2105,6 @@ on a page. Defaults to false.</p></div>
             <span class="n">vol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
             <span class="n">func</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">new_func</span>
-
-    <span class="k">def</span> <span class="nf">create_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">_mp_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        Package self with paths, so subprocesses can access it</span>
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
-            <span class="k">yield</span> <span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">multiprocessing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_func</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        Pass a function to perform on each volume of the feature reader, using</span>
-<span class="sd">        multiprocessing (map), then process the combined outputs (reduce).</span>
-
-<span class="sd">        map_func</span>
-
-<span class="sd">        Function to run on each individual volume. Takes as input a tuple</span>
-<span class="sd">        containing a feature_reader and volume path, from which a volume can be</span>
-<span class="sd">        created. Returns a (key, value) tuple.</span>
-
-<span class="sd">        def do_something_on_vol(args):</span>
-<span class="sd">            fr, path = args</span>
-<span class="sd">            vol = fr.create_volume(path)</span>
-<span class="sd">            # Do something with &#39;vol&#39;</span>
-<span class="sd">            return (key, value)</span>
-
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="c"># Match process count to cpu count</span>
-        <span class="n">p</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
-        <span class="c"># f = self._wrap_func(func)</span>
-        <span class="n">results</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">map_func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mp_paths</span><span class="p">(),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-        <span class="c"># , callback=callback)</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">results</span>
-
-    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s">&quot;HTRC Feature Reader with </span><span class="si">%d</span><span class="s"> paths load&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
 </pre></div>
 
   </div>
@@ -2196,27 +2223,6 @@ created. Returns a (key, value) tuple.</p>
   
             
   <div class="item">
-    <div class="name def" id="htrc_features.feature_reader.FeatureReader.next">
-    <p>def <span class="ident">next</span>(</p><p>self)</p>
-    </div>
-    
-
-    
-  
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.FeatureReader.next', this);">Show source &equiv;</a></p>
-  <div id="source-htrc_features.feature_reader.FeatureReader.next" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__next__</span><span class="p">()</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
     <div class="name def" id="htrc_features.feature_reader.FeatureReader.volumes">
     <p>def <span class="ident">volumes</span>(</p><p>self)</p>
     </div>
@@ -2257,7 +2263,13 @@ created. Returns a (key, value) tuple.</p>
     <div class="codehilite"><pre><span class="k">class</span> <span class="nc">Page</span><span class="p">:</span>
 
     <span class="n">_tokencounts</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
-    <span class="n">_lineChars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+    <span class="n">_line_chars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+    <span class="n">BASIC_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;seq&#39;</span><span class="p">,</span> <span class="s">&#39;seq&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;tokenCount&#39;</span><span class="p">,</span> <span class="s">&#39;_token_count&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s">&#39;languages&#39;</span><span class="p">,</span> <span class="s">&#39;languages&#39;</span><span class="p">)]</span>
+    <span class="sd">&#39;&#39;&#39; List of fields which return primitive values in the schema, as tuples</span>
+<span class="sd">    with (CamelCase, lower_with_under) mapping &#39;&#39;&#39;</span>
+    <span class="n">SECTION_FIELDS</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;lineCount&#39;</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">]</span>
+    <span class="sd">&#39;&#39;&#39; Fields that are counted by section.&#39;&#39;&#39;</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">default_section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">volume</span> <span class="o">=</span> <span class="n">volume</span>
@@ -2266,11 +2278,57 @@ created. Returns a (key, value) tuple.</p>
 
         <span class="k">assert</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">,</span> <span class="s">&#39;group&#39;</span><span class="p">])</span>
 
-        <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">pageobj</span><span class="p">):</span>
-            <span class="c"># Only add attributes to this object if it&#39;s not overwriting</span>
-            <span class="c"># a definition</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
-                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">BASIC_FIELDS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">pageobj</span><span class="p">:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+
+        <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">SECREF</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;u4&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sec</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">SECREF</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">stat</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">):</span>
+                            <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">,</span>
+                                         <span class="n">index</span><span class="o">=</span><span class="n">SECREF</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
+                     <span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="p">[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;lineCount&#39;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">empty_line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">sentence_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_basic_stat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="n">stat</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">stat</span> <span class="ow">is</span> <span class="s">&#39;all&#39;</span><span class="p">:</span>
+            <span class="c"># Return all columns. No publicized currently</span>
+            <span class="n">stat</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span><span class="p">:</span>
+            <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span>
+
+        <span class="k">if</span> <span class="n">section</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;header&#39;</span><span class="p">,</span> <span class="s">&#39;body&#39;</span><span class="p">,</span> <span class="s">&#39;footer&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">section</span><span class="p">,</span> <span class="n">stat</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;all&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">stat</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;group&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">stat</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">tokenlist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Get or set tokencounts DataFrame</span>
@@ -2293,7 +2351,7 @@ created. Returns a (key, value) tuple.</p>
         <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span> <span class="k">else</span> <span class="n">section</span>
 
         <span class="c"># If there are no tokens, return an empty dataframe</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenCount</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">emptycols</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;page&#39;</span><span class="p">]</span>
             <span class="k">if</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">]:</span>
                 <span class="n">emptycols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;section&#39;</span><span class="p">)</span>
@@ -2318,24 +2376,26 @@ created. Returns a (key, value) tuple.</p>
             <span class="c"># Using the DF building method from Volume</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_tokencount_df</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
             <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span>
 
         <span class="k">return</span> <span class="n">group_tokenlist</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">pages</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="n">case</span><span class="p">,</span>
                                <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lineChars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">end_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lineChars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">begin_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">lineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">        Get a dataframe of character counts at the start and end of lines</span>
 <span class="sd">        &#39;&#39;&#39;</span>
         <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span> <span class="k">else</span> <span class="n">section</span>
 
         <span class="c"># If there are no tokens, return an empty dataframe</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenCount</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">emptycols</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;page&#39;</span><span class="p">]</span>
             <span class="k">if</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">]:</span>
                 <span class="n">emptycols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;section&#39;</span><span class="p">)</span>
@@ -2346,10 +2406,10 @@ created. Returns a (key, value) tuple.</p>
             <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([],</span> <span class="n">columns</span><span class="o">=</span><span class="n">emptycols</span><span class="p">)</span>
 
         <span class="c"># If there&#39;s a volume-level representation, simply pull from that</span>
-        <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_lineChars</span>\
-                                      <span class="o">.</span><span class="n">loc</span><span class="p">[([</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">)]),</span> <span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_line_chars</span>\
+                                       <span class="o">.</span><span class="n">loc</span><span class="p">[([</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">)]),</span> <span class="p">]</span>
             <span class="k">except</span><span class="p">:</span>
                 <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Error subsetting volume DF for seq:{}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                               <span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">))</span>
@@ -2357,14 +2417,14 @@ created. Returns a (key, value) tuple.</p>
 
         <span class="c"># Create the internal representation if it does not already exist</span>
         <span class="c"># Since the code is the same, we&#39;ll use the definition from Volume</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
-                                                             <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                                                              <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span>
 
         <span class="k">return</span> <span class="n">group_linechars</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="n">place</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">token_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">token_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Count total tokens on the page &#39;&#39;&#39;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 
@@ -2374,20 +2434,6 @@ created. Returns a (key, value) tuple.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">name</span> <span class="o">=</span> <span class="s">&quot;&lt;page </span><span class="si">%s</span><span class="s"> with no volume parent&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">name</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
-        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
-                     <span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="p">[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 </pre></div>
 
   </div>
@@ -2400,6 +2446,30 @@ created. Returns a (key, value) tuple.</p>
           <li><a href="#htrc_features.feature_reader.Page">Page</a></li>
           <li>builtins.object</li>
           </ul>
+          <h3>Class variables</h3>
+            <div class="item">
+            <p id="htrc_features.feature_reader.Page.BASIC_FIELDS" class="name">var <span class="ident">BASIC_FIELDS</span></p>
+            
+
+            
+  
+    <div class="desc"><p>List of fields which return primitive values in the schema, as tuples
+with (CamelCase, lower_with_under) mapping</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="htrc_features.feature_reader.Page.SECTION_FIELDS" class="name">var <span class="ident">SECTION_FIELDS</span></p>
+            
+
+            
+  
+    <div class="desc"><p>Fields that are counted by section.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
           <h3>Static methods</h3>
             
   <div class="item">
@@ -2418,11 +2488,15 @@ created. Returns a (key, value) tuple.</p>
     <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="o">=</span> <span class="n">default_section</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_json</span> <span class="o">=</span> <span class="n">pageobj</span>
     <span class="k">assert</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">,</span> <span class="s">&#39;group&#39;</span><span class="p">])</span>
-    <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">pageobj</span><span class="p">):</span>
-        <span class="c"># Only add attributes to this object if it&#39;s not overwriting</span>
-        <span class="c"># a definition</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
-            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">BASIC_FIELDS</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">pageobj</span><span class="p">:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+    <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">SECREF</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;u4&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sec</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">SECREF</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">stat</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">):</span>
+                        <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">,</span>
+                                     <span class="n">index</span><span class="o">=</span><span class="n">SECREF</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2432,18 +2506,18 @@ created. Returns a (key, value) tuple.</p>
   
             
   <div class="item">
-    <div class="name def" id="htrc_features.feature_reader.Page.beginLineChars">
-    <p>def <span class="ident">beginLineChars</span>(</p><p>self, section=&#39;default&#39;)</p>
+    <div class="name def" id="htrc_features.feature_reader.Page.begin_line_chars">
+    <p>def <span class="ident">begin_line_chars</span>(</p><p>self, section=&#39;default&#39;)</p>
     </div>
     
 
     
   
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.beginLineChars', this);">Show source &equiv;</a></p>
-  <div id="source-htrc_features.feature_reader.Page.beginLineChars" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lineChars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.begin_line_chars', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.begin_line_chars" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">begin_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2453,18 +2527,18 @@ created. Returns a (key, value) tuple.</p>
   
             
   <div class="item">
-    <div class="name def" id="htrc_features.feature_reader.Page.endLineChars">
-    <p>def <span class="ident">endLineChars</span>(</p><p>self, section=&#39;default&#39;)</p>
+    <div class="name def" id="htrc_features.feature_reader.Page.end_line_chars">
+    <p>def <span class="ident">end_line_chars</span>(</p><p>self, section=&#39;default&#39;)</p>
     </div>
     
 
     
   
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.endLineChars', this);">Show source &equiv;</a></p>
-  <div id="source-htrc_features.feature_reader.Page.endLineChars" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lineChars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">)</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.end_line_chars', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.end_line_chars" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">end_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2474,8 +2548,8 @@ created. Returns a (key, value) tuple.</p>
   
             
   <div class="item">
-    <div class="name def" id="htrc_features.feature_reader.Page.lineChars">
-    <p>def <span class="ident">lineChars</span>(</p><p>self, section=&#39;default&#39;, place=&#39;all&#39;)</p>
+    <div class="name def" id="htrc_features.feature_reader.Page.line_chars">
+    <p>def <span class="ident">line_chars</span>(</p><p>self, section=&#39;default&#39;, place=&#39;all&#39;)</p>
     </div>
     
 
@@ -2483,15 +2557,15 @@ created. Returns a (key, value) tuple.</p>
   
     <div class="desc"><p>Get a dataframe of character counts at the start and end of lines</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.lineChars', this);">Show source &equiv;</a></p>
-  <div id="source-htrc_features.feature_reader.Page.lineChars" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">lineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.line_chars', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.line_chars" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Get a dataframe of character counts at the start and end of lines</span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span> <span class="k">else</span> <span class="n">section</span>
     <span class="c"># If there are no tokens, return an empty dataframe</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenCount</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">emptycols</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;page&#39;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">]:</span>
             <span class="n">emptycols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;section&#39;</span><span class="p">)</span>
@@ -2501,20 +2575,20 @@ created. Returns a (key, value) tuple.</p>
         <span class="n">emptycols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;count&#39;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([],</span> <span class="n">columns</span><span class="o">=</span><span class="n">emptycols</span><span class="p">)</span>
     <span class="c"># If there&#39;s a volume-level representation, simply pull from that</span>
-    <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_lineChars</span>\
-                                  <span class="o">.</span><span class="n">loc</span><span class="p">[([</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">)]),</span> <span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_line_chars</span>\
+                                   <span class="o">.</span><span class="n">loc</span><span class="p">[([</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">)]),</span> <span class="p">]</span>
         <span class="k">except</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Error subsetting volume DF for seq:{}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                           <span class="bp">self</span><span class="o">.</span><span class="n">seq</span><span class="p">))</span>
             <span class="k">return</span>
     <span class="c"># Create the internal representation if it does not already exist</span>
     <span class="c"># Since the code is the same, we&#39;ll use the definition from Volume</span>
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
-                                                         <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                                                          <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span>
     <span class="k">return</span> <span class="n">group_linechars</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="n">place</span><span class="p">)</span>
 </pre></div>
 
@@ -2526,7 +2600,7 @@ created. Returns a (key, value) tuple.</p>
             
   <div class="item">
     <div class="name def" id="htrc_features.feature_reader.Page.token_count">
-    <p>def <span class="ident">token_count</span>(</p><p>self, section)</p>
+    <p>def <span class="ident">token_count</span>(</p><p>self, section=&#39;default&#39;)</p>
     </div>
     
 
@@ -2536,7 +2610,7 @@ created. Returns a (key, value) tuple.</p>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.token_count', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.feature_reader.Page.token_count" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">token_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">):</span>
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">token_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39; Count total tokens on the page &#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 </pre></div>
@@ -2588,7 +2662,7 @@ created. Returns a (key, value) tuple.</p>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_section</span> <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span> <span class="k">else</span> <span class="n">section</span>
     <span class="c"># If there are no tokens, return an empty dataframe</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenCount</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">emptycols</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;page&#39;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">SECREF</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;all&#39;</span><span class="p">]:</span>
             <span class="n">emptycols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;section&#39;</span><span class="p">)</span>
@@ -2610,6 +2684,8 @@ created. Returns a (key, value) tuple.</p>
     <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
         <span class="c"># Using the DF building method from Volume</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">_make_tokencount_df</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span>
+    <span class="k">else</span><span class="p">:</span>
         <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span>
     <span class="k">return</span> <span class="n">group_tokenlist</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">pages</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="n">case</span><span class="p">,</span>
                            <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">)</span>
@@ -2633,6 +2709,36 @@ created. Returns a (key, value) tuple.</p>
             </div>
             <div class="item">
             <p id="htrc_features.feature_reader.Page.default_section" class="name">var <span class="ident">default_section</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="htrc_features.feature_reader.Page.empty_line_count" class="name">var <span class="ident">empty_line_count</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="htrc_features.feature_reader.Page.line_count" class="name">var <span class="ident">line_count</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="htrc_features.feature_reader.Page.sentence_count" class="name">var <span class="ident">sentence_count</span></p>
             
 
             
@@ -2674,9 +2780,22 @@ created. Returns a (key, value) tuple.</p>
   <div id="source-htrc_features.feature_reader.Volume" class="source">
     <div class="codehilite"><pre><span class="k">class</span> <span class="nc">Volume</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="n">SUPPORTED_SCHEMA</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;1.0&#39;</span><span class="p">,</span> <span class="s">&#39;2.0&#39;</span><span class="p">]</span>
+    <span class="n">METADATA_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">,</span> <span class="s">&#39;schema_version&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;dateCreated&#39;</span><span class="p">,</span> <span class="s">&#39;date_created&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;title&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;pubDate&#39;</span><span class="p">,</span> <span class="s">&#39;pub_date&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;language&#39;</span><span class="p">,</span> <span class="s">&#39;language&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;htBibUrl&#39;</span><span class="p">,</span> <span class="s">&#39;ht_bib_url&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;handleUrl&#39;</span><span class="p">,</span> <span class="s">&#39;handle_url&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;oclc&#39;</span><span class="p">,</span> <span class="s">&#39;oclc&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;imprint&#39;</span><span class="p">,</span> <span class="s">&#39;imprint&#39;</span><span class="p">)]</span>
+    <span class="sd">&#39;&#39;&#39; List of metadata fields, with their pythonic name mapping. &#39;&#39;&#39;</span>
+    <span class="n">BASIC_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">,</span> <span class="s">&#39;schema_version&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s">&#39;dateCreated&#39;</span><span class="p">,</span> <span class="s">&#39;date_created&#39;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="s">&#39;pageCount&#39;</span><span class="p">,</span> <span class="s">&#39;page_count&#39;</span><span class="p">)]</span>
+    <span class="sd">&#39;&#39;&#39; List of fields which return primitive values in the schema, as tuples</span>
+<span class="sd">    with (CamelCase, lower_with_under) mapping.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
     <span class="n">_metadata</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="n">_tokencounts</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
-    <span class="n">_lineChars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+    <span class="n">_line_chars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">advanced</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">default_page_section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
         <span class="c"># Verify schema version</span>
@@ -2691,9 +2810,13 @@ created. Returns a (key, value) tuple.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">pageCount</span> <span class="o">=</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="s">&#39;pageCount&#39;</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">default_page_section</span> <span class="o">=</span> <span class="n">default_page_section</span>
 
-        <span class="c"># Expand metadata to attributes</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="c"># Expand basic values to properties</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">METADATA_FIELDS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">]:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">BASIC_FIELDS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]:</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
 
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">genre</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">genre</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&quot;, &quot;</span><span class="p">)</span>
@@ -2708,7 +2831,7 @@ created. Returns a (key, value) tuple.</p>
             <span class="k">else</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span> <span class="o">=</span> <span class="bp">True</span>
                 <span class="c"># Create an internal dataframe for lineChar counts</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="n">advanced</span><span class="p">[</span><span class="s">&#39;pages&#39;</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="n">advanced</span><span class="p">[</span><span class="s">&#39;pages&#39;</span><span class="p">])</span>
 
                 <span class="c"># Count up the capAlphaSeq (longest length of alphabetical</span>
                 <span class="c"># sequence of capital letters starting a line</span>
@@ -2717,10 +2840,13 @@ created. Returns a (key, value) tuple.</p>
     <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()</span>
 
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&quot;&lt;HTRC Volume: </span><span class="si">%s</span><span class="s">&gt;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span>
+
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">year</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; A friendlier name wrapping Volume.pubDate &#39;&#39;&#39;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pubDate</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pub_date</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -2739,6 +2865,16 @@ created. Returns a (key, value) tuple.</p>
             <span class="n">result</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">results</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span> <span class="o">=</span> <span class="n">result</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
+                     <span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">pages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">:</span>
@@ -2802,24 +2938,22 @@ created. Returns a (key, value) tuple.</p>
 
     <span class="k">def</span> <span class="nf">end_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        The pythonic interface to `htrc_features.volume.Volume.endLineChars`</span>
+<span class="sd">        Get counts of characters at the end of lines, i.e. the characters on</span>
+<span class="sd">        the far right of the page.</span>
 <span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">begin_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        The pythonic interface to `htrc_features.volume.Volume.endLineChars`</span>
+<span class="sd">        Get counts of characters at the begin of lines, i.e. the characters on</span>
+<span class="sd">        the far left of the page.</span>
 <span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;attr=[endLineChars|beginLineChars]&#39;&#39;&#39;</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Interface for all begin/end of line character information.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span> <span class="o">==</span> <span class="s">&#39;2.0&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;For schema version 2.0, you need load the &quot;</span>
                           <span class="s">&quot;&#39;advanced&#39; file for begin/endLineChars&quot;</span><span class="p">)</span>
@@ -2828,14 +2962,14 @@ created. Returns a (key, value) tuple.</p>
         <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span><span class="p">:</span>
             <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_page_section</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Something went wrong. Expected Advanced features&quot;</span>
                           <span class="s">&quot; to already be processed&quot;</span><span class="p">)</span>
             <span class="k">return</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">)</span>
 
-        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span>
         <span class="k">return</span> <span class="n">group_linechars</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="n">place</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_make_tokencount_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pages</span><span class="p">):</span>
@@ -2908,9 +3042,6 @@ created. Returns a (key, value) tuple.</p>
                                               <span class="s">&#39;place&#39;</span><span class="p">,</span> <span class="s">&#39;char&#39;</span><span class="p">])</span>
         <span class="n">df</span><span class="o">.</span><span class="n">sortlevel</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">df</span>
-
-    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s">&quot;&lt;HTRC Volume: </span><span class="si">%s</span><span class="s">&gt;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span>
 </pre></div>
 
   </div>
@@ -2924,6 +3055,29 @@ created. Returns a (key, value) tuple.</p>
           <li>builtins.object</li>
           </ul>
           <h3>Class variables</h3>
+            <div class="item">
+            <p id="htrc_features.feature_reader.Volume.BASIC_FIELDS" class="name">var <span class="ident">BASIC_FIELDS</span></p>
+            
+
+            
+  
+    <div class="desc"><p>List of fields which return primitive values in the schema, as tuples
+with (CamelCase, lower_with_under) mapping.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="htrc_features.feature_reader.Volume.METADATA_FIELDS" class="name">var <span class="ident">METADATA_FIELDS</span></p>
+            
+
+            
+  
+    <div class="desc"><p>List of metadata fields, with their pythonic name mapping.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
             <div class="item">
             <p id="htrc_features.feature_reader.Volume.SUPPORTED_SCHEMA" class="name">var <span class="ident">SUPPORTED_SCHEMA</span></p>
             
@@ -2959,9 +3113,13 @@ created. Returns a (key, value) tuple.</p>
     <span class="bp">self</span><span class="o">.</span><span class="n">_pages</span> <span class="o">=</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="s">&#39;pages&#39;</span><span class="p">]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">pageCount</span> <span class="o">=</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="s">&#39;pageCount&#39;</span><span class="p">]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">default_page_section</span> <span class="o">=</span> <span class="n">default_page_section</span>
-    <span class="c"># Expand metadata to attributes</span>
-    <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-        <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+    <span class="c"># Expand basic values to properties</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">METADATA_FIELDS</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">]:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">BASIC_FIELDS</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
     <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">genre</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">genre</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&quot;, &quot;</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">pageindex</span> <span class="o">=</span> <span class="mi">0</span>
@@ -2973,28 +3131,7 @@ created. Returns a (key, value) tuple.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span> <span class="o">=</span> <span class="bp">True</span>
             <span class="c"># Create an internal dataframe for lineChar counts</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="n">advanced</span><span class="p">[</span><span class="s">&#39;pages&#39;</span><span class="p">])</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="htrc_features.feature_reader.Volume.beginLineChars">
-    <p>def <span class="ident">beginLineChars</span>(</p><p>self, **args)</p>
-    </div>
-    
-
-    
-  
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.beginLineChars', this);">Show source &equiv;</a></p>
-  <div id="source-htrc_features.feature_reader.Volume.beginLineChars" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="n">advanced</span><span class="p">[</span><span class="s">&#39;pages&#39;</span><span class="p">])</span>
 </pre></div>
 
   </div>
@@ -3011,36 +3148,17 @@ created. Returns a (key, value) tuple.</p>
 
     
   
-    <div class="desc"><p>The pythonic interface to <code>htrc_features.volume.Volume.endLineChars</code></p></div>
+    <div class="desc"><p>Get counts of characters at the begin of lines, i.e. the characters on
+the far left of the page.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.begin_line_chars', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.feature_reader.Volume.begin_line_chars" class="source">
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">begin_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">    The pythonic interface to `htrc_features.volume.Volume.endLineChars`</span>
+<span class="sd">    Get counts of characters at the begin of lines, i.e. the characters on</span>
+<span class="sd">    the far left of the page.</span>
 <span class="sd">    &#39;&#39;&#39;</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">beginLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="htrc_features.feature_reader.Volume.endLineChars">
-    <p>def <span class="ident">endLineChars</span>(</p><p>self, **args)</p>
-    </div>
-    
-
-    
-  
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.endLineChars', this);">Show source &equiv;</a></p>
-  <div id="source-htrc_features.feature_reader.Volume.endLineChars" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -3057,15 +3175,17 @@ created. Returns a (key, value) tuple.</p>
 
     
   
-    <div class="desc"><p>The pythonic interface to <code>htrc_features.volume.Volume.endLineChars</code></p></div>
+    <div class="desc"><p>Get counts of characters at the end of lines, i.e. the characters on
+the far right of the page.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.end_line_chars', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.feature_reader.Volume.end_line_chars" class="source">
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">end_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">    The pythonic interface to `htrc_features.volume.Volume.endLineChars`</span>
+<span class="sd">    Get counts of characters at the end of lines, i.e. the characters on</span>
+<span class="sd">    the far right of the page.</span>
 <span class="sd">    &#39;&#39;&#39;</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">endLineChars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">place</span><span class="o">=</span><span class="s">&#39;end&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -3082,25 +3202,27 @@ created. Returns a (key, value) tuple.</p>
 
     
   
-    <div class="desc"><p>attr=[endLineChars|beginLineChars]</p></div>
+    <div class="desc"><p>Interface for all begin/end of line character information.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.line_chars', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.feature_reader.Volume.line_chars" class="source">
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;all&#39;</span><span class="p">):</span>
-    <span class="sd">&#39;&#39;&#39;attr=[endLineChars|beginLineChars]&#39;&#39;&#39;</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Interface for all begin/end of line character information.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span> <span class="o">==</span> <span class="s">&#39;2.0&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;For schema version 2.0, you need load the &quot;</span>
                       <span class="s">&quot;&#39;advanced&#39; file for begin/endLineChars&quot;</span><span class="p">)</span>
         <span class="k">return</span>
     <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;default&#39;</span><span class="p">:</span>
         <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_page_section</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Something went wrong. Expected Advanced features&quot;</span>
                       <span class="s">&quot; to already be processed&quot;</span><span class="p">)</span>
         <span class="k">return</span>
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">)</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lineChars</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span>
     <span class="k">return</span> <span class="n">group_linechars</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="n">place</span><span class="p">)</span>
 </pre></div>
 
@@ -3316,6 +3438,17 @@ the page, else 0) or a term frequency (counts for the term, per page)</p></div>
 
             
   
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="htrc_features.feature_reader.Volume.tokens" class="name">var <span class="ident">tokens</span></p>
+            
+
+            
+  
+    <div class="desc"><p>Get unique tokens</p></div>
   <div class="source_cont">
 </div>
 
