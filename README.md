@@ -397,30 +397,38 @@ Volume.term_volume_freqs() simply sums these.
 
 For faster processing, you can write a mapping function for acting on volumes, then pass it to `FeatureReader.multiprocessing`.
 This sends out the function to a different process per volume, spawning (CPU_CORES-1) processes at a time.
-The map function receives the feature_reader and a volume path, and needs to initialize the volume.
+The map function receives the feature_reader and a volume path as a tuple, and needs to initialize the volume.
 
 Here's a simple example that returns the term counts for each volume (take note of the first two lines of the functions):
 
 ```python
-def printTermCounts(args):
+def printBasicMetadata(args):
     fr, path = args
     vol = fr.create_volume(path)
-
     metadata = (vol.id, vol.year)
-    return (metadata, results)
+    return ('metadata', metadata)
 
-    results = feature_reader.multiprocessing(map_func)
-    for vol, result in results:
-		print("Results from %s (%d)" % vol)
-		for term, count in result.items():
-            print("%s: %d" % (term, count))
+feature_reader = FeatureReader(paths[:2])
+results = feature_reader.multiprocessing(printBasicMetadata)
+for vol, result in results:
+    print("Results from %s (%d)" % vol)
+    for id, year in result.items():
+        print("%s: %d" % (id, year))
 ```
 
 Some rules: results must be serializeable, and the map_func must be accessible from __main__ (basically: no dynamic functions: they should be written plainly in your script).
 
-The results are collected and returned together, so you don't want a feature reader with all 250k files, because the results will be too much memory (depending on how big your result is).
+The results are collected and returned together, so you don't want a feature reader with all 4.8k files, because the results will be too much memory (depending on how big your result is).
 Instead, it easier to initialize feature readers for smaller batches.
 
+#### GNU Parallel
+As an alternative to multiprocessing in Python, my preference is to have simpler Python scripts and to use GNU Parallel on the command line. To do this, you can set up your Python script to take variable length arguments of feature file paths, and to print to stdout.
+
+This psuedo-code shows how that you'd use parallel, where the number of parallel processes is 90% the number of cores, and 50 paths are sent to the script at a time (if you send too little at a time, the initialization time of the script can add up).
+
+```bash
+find feature-files/ -name '*json.bz2' | parallel --eta --jobs 90% -n 50 python your_script.py >output.txt
+```
 
 ## Additional Notes
 ### Advanced Files
