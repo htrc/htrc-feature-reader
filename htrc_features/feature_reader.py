@@ -1,6 +1,5 @@
 from __future__ import unicode_literals
 import bz2
-from collections import defaultdict
 from multiprocessing import Pool
 import logging
 import pandas as pd
@@ -17,9 +16,10 @@ try:
 except ImportError:
     logging.info("Pysolr not installed.")
 
-## UTILS
+# UTILS
 
 SECREF = ['header', 'body', 'footer']
+
 
 def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
                     page_freq=False):
@@ -122,7 +122,8 @@ def group_linechars(df, section='all', place='all'):
     else:
         return df.groupby(groups).sum()[['count']]
 
-## CLASSES
+# CLASSES
+
 
 class FeatureReader(object):
     def __init__(self, paths):
@@ -139,25 +140,7 @@ class FeatureReader(object):
                 type(paths)))
 
     def __iter__(self):
-        return self
-
-    def next(self):
-        return self.__next__()
-
-    def __next__(self):
-        ''' Get the next item.
-        For iteration, and an easy way to get a volume object with only one
-        path
-
-        Note that just calling the volume initializes it.
-        '''
-
-        if not hasattr(self, '_volumes'):
-            logging.warn("Iterating over the feature_reader is deprecated. Try"
-                         " `for vol in feature_reader.volumes()` instead.")
-            # Instantiate a generator
-            self._volumes = self.volumes()
-        return next(self._volumes)
+        return self.volumes()
 
     def volumes(self):
         ''' Generator for returning Volume objects '''
@@ -270,9 +253,22 @@ class FeatureReader(object):
 
 class Volume(object):
     SUPPORTED_SCHEMA = ['1.0', '2.0']
+    METADATA_FIELDS = [('id', 'id'), ('schemaVersion', 'schema_version'),
+                       ('dateCreated', 'date_created'), ('title', 'title'),
+                       ('pubDate', 'pub_date'), ('pubDate', 'year'),
+                       ('language', 'language'), ('htBibUrl', 'ht_bib_url'),
+                       ('handleUrl', 'handle_url'), ('oclc', 'oclc'),
+                       ('imprint', 'imprint')]
+    ''' List of metadata fields, with their pythonic name mapping. '''
+    BASIC_FIELDS = [('schemaVersion', 'schema_version'),
+                    ('dateCreated', 'date_created'),
+                    ('pageCount', 'page_count')]
+    ''' List of fields which return primitive values in the schema, as tuples
+    with (CamelCase, lower_with_under) mapping.
+    '''
     _metadata = None
     _tokencounts = pd.DataFrame()
-    _lineChars = pd.DataFrame()
+    _line_chars = pd.DataFrame()
 
     def __init__(self, obj, advanced=False, default_page_section='body'):
         # Verify schema version
@@ -287,9 +283,10 @@ class Volume(object):
         self.pageCount = obj['features']['pageCount']
         self.default_page_section = default_page_section
 
-        # Expand metadata to attributes
-        for (key, value) in obj['metadata'].items():
-            setattr(self, key, value)
+        # Expand basic values to properties
+        for key, pythonkey in self.METADATA_FIELDS + self.BASIC_FIELDS:
+            if hasattr(obj['metadata'], key):
+                setattr(self, pythonkey, obj['metadata'][key])
 
         if hasattr(self, 'genre'):
             self.genre = self.genre.split(", ")
@@ -304,7 +301,7 @@ class Volume(object):
             else:
                 self._has_advanced = True
                 # Create an internal dataframe for lineChar counts
-                self._lineChars = self._make_line_char_df(advanced['pages'])
+                self._line_chars = self._make_line_char_df(advanced['pages'])
 
                 # Count up the capAlphaSeq (longest length of alphabetical
                 # sequence of capital letters starting a line
@@ -398,24 +395,22 @@ class Volume(object):
 
     def end_line_chars(self, **args):
         '''
-        The pythonic interface to `htrc_features.volume.Volume.endLineChars`
+        Get counts of characters at the end of lines, i.e. the characters on
+        the far right of the page.
         '''
-        return self.endLineChars(self, **args)
-
-    def endLineChars(self, **args):
         return self.line_chars(place='end', **args)
 
     def begin_line_chars(self, **args):
         '''
-        The pythonic interface to `htrc_features.volume.Volume.endLineChars`
+        Get counts of characters at the begin of lines, i.e. the characters on
+        the far left of the page.
         '''
-        return self.beginLineChars(self, **args)
-
-    def beginLineChars(self, **args):
-        return self.line_chars(place='begin')
+        return self.line_chars(place='begin', **args)
 
     def line_chars(self, section='default', place='all'):
-        '''attr=[endLineChars|beginLineChars]'''
+        '''
+        Interface for all begin/end of line character information.
+        '''
         if self._schema == '2.0' and not self._has_advanced:
             logging.error("For schema version 2.0, you need load the "
                           "'advanced' file for begin/endLineChars")
@@ -424,14 +419,14 @@ class Volume(object):
         if section == 'default':
             section = self.default_page_section
 
-        if self._lineChars.empty and self._has_advanced:
+        if self._line_chars.empty and self._has_advanced:
             logging.error("Something went wrong. Expected Advanced features"
                           " to already be processed")
             return
-        elif self._lineChars.empty and not self._has_advanced:
-            self._lineChars = self._make_line_char_df(self._pages)
+        elif self._line_chars.empty and not self._has_advanced:
+            self._line_chars = self._make_line_char_df(self._pages)
 
-        df = self._lineChars
+        df = self._line_chars
         return group_linechars(df, section=section, place=place)
 
     def _make_tokencount_df(self, pages):
@@ -512,7 +507,13 @@ class Volume(object):
 class Page:
 
     _tokencounts = pd.DataFrame()
-    _lineChars = pd.DataFrame()
+    _line_chars = pd.DataFrame()
+    BASIC_FIELDS = [('tokenCount', '_token_count'),
+                    ('languages', 'languages')]
+    ''' List of fields which return primitive values in the schema, as tuples
+    with (CamelCase, lower_with_under) mapping '''
+    SECTION_FIELDS = ['lineCount', 'emptyLineCount', 'sentenceCount']
+    ''' Fields that are counted by section.'''
 
     def __init__(self, pageobj, volume, default_section='body'):
         self.volume = volume
@@ -521,11 +522,12 @@ class Page:
 
         assert(self.default_section in SECREF + ['all', 'group'])
 
-        for (key, item) in iteritems(pageobj):
-            # Only add attributes to this object if it's not overwriting
-            # a definition
-            if not hasattr(self, key):
-                setattr(self, key, pageobj[key])
+        for key, pythonkey in self.BASIC_FIELDS:
+            if hasattr(pageobj, key):
+                setattr(self, pythonkey, pageobj[key])
+
+    # def line_count
+    # def basic_count
 
     def tokenlist(self, section='default', case=True, pos=True):
         ''' Get or set tokencounts DataFrame
@@ -573,17 +575,19 @@ class Page:
             # Using the DF building method from Volume
             self._tokencounts = self.volume._make_tokencount_df([self._json])
             df = self._tokencounts
+        else:
+            df = self._tokencounts
 
         return group_tokenlist(df, pages=True, section=section, case=case,
                                pos=pos)
 
-    def endLineChars(self, section='default'):
-        return self.lineChars(section=section, place='end')
+    def end_line_chars(self, section='default'):
+        return self.line_chars(section=section, place='end')
 
-    def beginLineChars(self, section='default'):
-        return self.lineChars(section=section, place='begin')
+    def begin_line_chars(self, section='default'):
+        return self.line_chars(section=section, place='begin')
 
-    def lineChars(self, section='default', place='all'):
+    def line_chars(self, section='default', place='all'):
         '''
         Get a dataframe of character counts at the start and end of lines
         '''
@@ -601,10 +605,10 @@ class Page:
             return pd.DataFrame([], columns=emptycols)
 
         # If there's a volume-level representation, simply pull from that
-        elif not self.volume._lineChars.empty:
+        elif not self.volume._line_chars.empty:
             try:
-                self._lineChars = self.volume._lineChars\
-                                      .loc[([int(self.seq)]), ]
+                self._line_chars = self.volume._line_chars\
+                                       .loc[([int(self.seq)]), ]
             except:
                 logging.error("Error subsetting volume DF for seq:{}".format(
                               self.seq))
@@ -612,14 +616,14 @@ class Page:
 
         # Create the internal representation if it does not already exist
         # Since the code is the same, we'll use the definition from Volume
-        elif self._lineChars.empty:
-            self._lineChars = self.volume._make_line_char_df(self,
-                                                             [self._json])
-        df = self._lineChars
+        elif self._line_chars.empty:
+            self._line_chars = self.volume._make_line_char_df(self,
+                                                              [self._json])
+        df = self._line_chars
 
         return group_linechars(df, section=section, place=place)
 
-    def token_count(self, section):
+    def token_count(self, section='default'):
         ''' Count total tokens on the page '''
         return self.tokenlist(section=section)['count'].sum()
 
