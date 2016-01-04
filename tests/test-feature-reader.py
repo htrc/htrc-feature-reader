@@ -1,15 +1,24 @@
 import pytest
 from htrc_features import FeatureReader
 import htrc_features
+import os
 
 
 class TestFeatureReader():
-    PATHS = [('tests/data/green-gables-full-basic.json.bz2',
-             'tests/data/green-gables-full-advanced.json.bz2')]
-    TITLES = ['Anne of Green Gables / L.M. Montgomery.']
+    PATHS = [(os.path.join('tests', 'data',
+                           'green-gables-15pages-basic.json.bz2'),
+              os.path.join('tests', 'data',
+                           'green-gables-15pages-advanced.json.bz2')),
+             (os.path.join('tests', 'data',
+                           'frankenstein-15pages-basic.json.bz2'),
+              os.path.join('tests', 'data',
+                           'frankenstein-15pages-advanced.json.bz2'))]
+    TITLES = ['Anne of Green Gables / L.M. Montgomery.',
+              'Frankenstein : or, The modern Prometheus.']
 
     def test_single_path_load(self):
         path = self.PATHS[0][0]
+        print path
         feature_reader = FeatureReader(path)
         vol = next(feature_reader.volumes())
         assert type(vol) == htrc_features.feature_reader.Volume
