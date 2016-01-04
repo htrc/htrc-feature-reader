@@ -261,9 +261,8 @@ class Volume(object):
                        ('handleUrl', 'handle_url'), ('oclc', 'oclc'),
                        ('imprint', 'imprint')]
     ''' List of metadata fields, with their pythonic name mapping. '''
-    BASIC_FIELDS = [('schemaVersion', 'schema_version'),
-                    ('dateCreated', 'date_created'),
-                    ('pageCount', 'page_count')]
+
+    BASIC_FIELDS = [('pageCount', 'page_count')]
     ''' List of fields which return primitive values in the schema, as tuples
     with (CamelCase, lower_with_under) mapping.
     '''
@@ -281,7 +280,6 @@ class Volume(object):
                           self.SUPPORTED_SCHEMA))
         self.id = obj['id']
         self._pages = obj['features']['pages']
-        self.pageCount = obj['features']['pageCount']
         self.default_page_section = default_page_section
 
         # Expand basic values to properties
@@ -295,7 +293,6 @@ class Volume(object):
         if hasattr(self, 'genre'):
             self.genre = self.genre.split(", ")
 
-        self.pageindex = 0
         self._has_advanced = False
 
         if advanced:
