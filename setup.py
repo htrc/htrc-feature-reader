@@ -1,14 +1,16 @@
 from setuptools import setup
 
-setup(name='HTRC Feature Reader',
+setup(name='htrc-feature-reader',
       version='1.3',
       description='Library for working with the HTRC Extracted Features dataset',
       classifiers=[
           'Development Status :: 4 - Beta',
           'License :: OSI Approved :: University of Illinois/NCSA Open Source License',
           'Programming Language :: Python :: 2.7',
-          'Programming Language :: Python :: 3.0',
           'Programming Language :: Python :: 3.2',
+          'Programming Language :: Python :: 3.3',
+          'Programming Language :: Python :: 3.4',
+          'Programming Language :: Python :: 3.5',
           'Natural Language :: English',
       ],
       keywords='hathitrust text-mining text-analysis features',
@@ -18,6 +20,6 @@ setup(name='HTRC Feature Reader',
       license='NCSA',
       packages=['htrc_features'],
       install_requires=['six', 'pandas', 'numpy'],
-      test_suite='nose.collector',
-      tests_require=['nose'],
+      setup_requires=['pytest-runner'],
+      tests_require=['pytest'],
       zip_safe=False)
