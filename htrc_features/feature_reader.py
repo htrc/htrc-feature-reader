@@ -6,7 +6,6 @@ import pandas as pd
 import numpy as np
 # Because python2's dict.iteritem is python3's dict.item
 from six import iteritems
-import six
 try:
     import ujson as json
 except ImportError:
@@ -130,18 +129,13 @@ def group_linechars(df, section='all', place='all'):
 
 
 class FeatureReader(object):
-    def __init__(self, paths):
-        # Check for str type in 3.x, unicode type in 2.x
-        if isinstance(paths, six.text_type):
-            # Assume only one path was provided, wrap in list
-            paths = [paths]
-
+    def __init__(self, paths, compressed=True):
+        self.compressed = compressed
         if type(paths) is list:
             self.paths = paths
-            self.index = 0
         else:
-            logging.error("Bad input type for feature reader: {}".format(
-                type(paths)))
+            self.paths = [paths]
+        self.index = 0
 
     def __iter__(self):
         return self.volumes()
@@ -155,9 +149,10 @@ class FeatureReader(object):
             # If path is a tuple, assume that the advanced path was also given
             if type(path) == tuple:
                 basic, advanced = path
-                yield self._volume(basic, advanced_path=advanced)
+                yield self._volume(basic, advanced_path=advanced,
+                                   compressed=self.compressed)
             else:
-                yield self._volume(path)
+                yield self._volume(path, compressed=self.compressed)
 
     def create_volume(self, path, **kwargs):
         return self._volume(path, **kwargs)
@@ -206,8 +201,8 @@ class FeatureReader(object):
             rawjson = f.readline()
             f.close()
         except:
-            logging.error("Can't open %s", path)
-            return
+            logging.exception("Can't open %s", path)
+            raise
 
         # This is a bandaid for schema version 2.0, not over-engineered
         # since upcoming releases of the extracted features
@@ -219,8 +214,10 @@ class FeatureReader(object):
                 rawjson = rawjson.decode()
             volumejson = json.loads(rawjson)
         except:
-            logging.error("Problem reading JSON for %s", path)
-            return
+            logging.exception("Problem reading JSON for %s. One common reason"
+                              " for this error is an incorrect compressed= "
+                              "argument", path)
+            raise
 
         advanced = False
         if advanced_path:
@@ -228,7 +225,7 @@ class FeatureReader(object):
                 if compressed:
                     f = bz2.BZ2File(advanced_path)
                 else:
-                    f = open(path, 'r+')
+                    f = open(advanced_path, 'r+')
                 raw_advancedjson = f.readline()
                 f.close()
 
