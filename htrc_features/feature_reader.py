@@ -200,6 +200,10 @@ class FeatureReader(object):
                 f = open(path, 'r+')
             rawjson = f.readline()
             f.close()
+        except IOError:
+            logging.exception("Can't read %s. Did you pass the incorrect "
+                              "'compressed=' argument?", path)
+            raise
         except:
             logging.exception("Can't open %s", path)
             raise
