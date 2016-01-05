@@ -1,3 +1,4 @@
+
 HTRC-Features
 =============
 
@@ -28,7 +29,7 @@ Two optional modules improve the HTRC-Feature-Reader: `pysolr` allows fetching o
 The easiest way to start using this library is to use the [FeatureReader](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.FeatureReader) interface, which takes a list of paths.
 
 
-```python
+```
 import glob
 import pandas as pd
 from htrc_features import FeatureReader
@@ -63,7 +64,7 @@ This is an advanced feature, but extremely helpful for any large-scale processin
 Version 2.0 of the Extracted Features dataset adds an additional 'advanced' file for each volume ([More info](#Advanced-Files)). This library can support the advanced file if you read in `(basic, advanced)` tuples instead of single path strings. e.g.
 
 
-```python
+```
 newpaths = [(x,x.replace('basic', 'advanced')) for x in paths]
 newpaths[:2]
 ```
@@ -79,7 +80,7 @@ newpaths[:2]
 
 
 
-```python
+```
 feature_reader = FeatureReader(newpaths[:5])
 vol = next(feature_reader.volumes())
 ```
@@ -91,8 +92,8 @@ A [Volume](http://organisciak.github.io/htrc-feature-reader/htrc_features/featur
 All the metadata fields from the HTRC JSON file are accessible as properties of the volume object, including _title_, _language_, _imprint_, _oclc_, _pubDate_, and _genre_. The main identifier _id_ and _pageCount_ are also accessible.
 
 
-```python
-"Volume %s has %s pages in %s" % (vol.id, vol.pageCount, vol.language)
+```
+"Volume %s has %s pages in %s" % (vol.id, vol.page_count, vol.language)
 ```
 
 
@@ -105,7 +106,7 @@ All the metadata fields from the HTRC JSON file are accessible as properties of 
 As a convenience, `Volume.year` returns `Volume.pub_date`:
 
 
-```python
+```
 "%s == %s" % (vol.pub_date, vol.year)
 ```
 
@@ -121,7 +122,7 @@ As a convenience, `Volume.year` returns `Volume.pub_date`:
 Like with the `FeatureReader`, you can also access the page generator by iterating directly on the object (i.e. `for page in vol`). Python beginners may find that using `vol.pages()` is more clear as to what is happening.
 
 
-```python
+```
 # Let's skip ahead some pages
 i = 0
 for page in vol:
@@ -141,7 +142,7 @@ Finally, if the minimal metadata included with the extracted feature files is in
 Remember that this calls the HTRC servers for each volume, so can add considerable overhead.
 
 
-```python
+```
 fr = FeatureReader(paths[0:5])
 for vol in fr.volumes():
     print(vol.metadata['published'][0])
@@ -155,11 +156,11 @@ for vol in fr.volumes():
 
 
 
-```python
+```
 print("METADATA FIELDS: " + ", ".join(vol.metadata.keys()))
 ```
 
-    METADATA FIELDS: htrc_volumeWordCountBin, title_a, title_ab, htrc_charCount, sdrnum, topicStr, format, author_only, country_of_pub, title_top, publishDateRange, publishDate, htrc_wordCount, callnumber, topic_subject, publication_place, genre, publisher, language, callnosort, author, htrc_pageCount, htsource, published, topic, htrc_volumePageCountBin, _version_, lccn, title, author_top, geographic, htrc_gender, authorSort, oclc, ht_id, id, fullrecord, mainauthor, htrc_genderMale
+    METADATA FIELDS: htsource, authorSort, callnumber, mainauthor, htrc_genderMale, author_top, htrc_gender, author, oclc, publication_place, author_only, lccn, title, sdrnum, htrc_volumeWordCountBin, genre, country_of_pub, fullrecord, htrc_volumePageCountBin, publishDate, title_top, format, topicStr, callnosort, ht_id, publisher, geographic, _version_, title_ab, htrc_wordCount, language, htrc_pageCount, published, title_a, topic, topic_subject, publishDateRange, htrc_charCount, id
 
 
 _At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one volume at a time. Read about the [HTRC Solr Proxy](https://wiki.htrc.illinois.edu/display/COM/Solr+Proxy+API+User+Guide)._
@@ -176,7 +177,7 @@ A page contains the meat of the HTRC's extracted features, including information
 - And more, seen in the docs for [Page](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Page)
 
 
-```python
+```
 print("The body has %s lines, %s empty lines, and %s sentences" % (page.line_count, page.empty_line_count, page.sentence_count))
 ```
 
@@ -186,7 +187,7 @@ print("The body has %s lines, %s empty lines, and %s sentences" % (page.line_cou
 Since the HTRC provides information by header/body/footer, most methods take a `section=` argument. If not specified, this defaults to `"body"`, or whatever argument is supplied to `Page.default_section`.
 
 
-```python
+```
 print("%s tokens in the default section, %s" % (page.token_count(), page.default_section))
 print("%s tokens in the header" % (page.token_count(section='header')))
 print("%s tokens in the footer" % (page.token_count(section='footer')))
@@ -200,7 +201,7 @@ print("%s tokens in the footer" % (page.token_count(section='footer')))
 There are also two special arguments that can be given to `section`: `"all"` and "`group`". 'all' returns information for each section separately, when appropriate, while 'group' returns information for all header, body, and footer combined.
 
 
-```python
+```
 print("%s tokens on the full page" % (page.token_count(section='group')))
 assert(page.token_count(section='group') == (page.token_count(section='header') +
                                              page.token_count(section='body') + 
@@ -219,7 +220,7 @@ Token counts are returned by `Page.tokenlist()`. By default, part-of-speech tagg
 The token count information is returned as a DataFrame with a MultiIndex (page, section, token, and part of speech) and one column (count).
 
 
-```python
+```
 print(page.tokenlist()[:3])
 ```
 
@@ -233,7 +234,7 @@ print(page.tokenlist()[:3])
 `Page.tokenlist()` can be manipulated in various ways. You can case-fold, for example:
 
 
-```python
+```
 df = page.tokenlist(case=False)
 print(df[15:18])
 ```
@@ -248,7 +249,7 @@ print(df[15:18])
 Or, you can combine part of speech counts into a single integer.
 
 
-```python
+```
 df = page.tokenlist(pos=False)
 print(df[15:18])
 ```
@@ -263,7 +264,7 @@ print(df[15:18])
 Section arguments are valid here: 'header', 'body', 'footer', 'all', and 'group'
 
 
-```python
+```
 df = page.tokenlist(section="header", case=False, pos=False)
 print(df)
 ```
@@ -278,7 +279,7 @@ print(df)
 The MultiIndex makes it easy to slice the results, and it is althogether more memory-efficient. If you are new to Pandas DataFrames, you might find it easier to learn by converting the index to columns.
 
 
-```python
+```
 df = page.tokenlist()
 # Slicing on Multiindex: get all Signular or Mass Nouns (NN)
 idx = pd.IndexSlice
@@ -302,7 +303,7 @@ print(nouns.reset_index()[:2])
 If you prefer not to use Pandas, you can always convert the object, with methods like `to_dict` and `to_csv`).
 
 
-```python
+```
 df[:3].to_dict()
 ```
 
@@ -318,7 +319,7 @@ df[:3].to_dict()
 To get just the unique tokens, `Page.tokens` provides them as a list.
 
 
-```python
+```
 page.tokens[:7]
 ```
 
@@ -338,7 +339,7 @@ The Volume object has a number of methods for collecting information from all it
 `Volume.tokenlist()` works identically the page tokenlist method, except it returns information for the full volume:
 
 
-```python
+```
 # Print case-insensitive occurrances of the word `she`
 all_vol_token_counts = vol.tokenlist(pos=False, case=False)
 print(all_vol_token_counts.loc[idx[:,'body', 'she'],][:3])
@@ -356,7 +357,7 @@ Note that a Volume-wide tokenlist is not crunched until you need it, then it wil
 `Volume.tokens()`, and `Volume.tokens_per_page()` give easy access to the full vocabulary of the volume, and the token counts per page.
 
 
-```python
+```
 vol.tokens[:10]
 ```
 
@@ -372,7 +373,7 @@ If you prefer a DataFrame structured like a term-document matrix (where pages ar
 By default, this returns a page-frequency rather than term-frequency, which is to say it counts `1` when a term occurs on a page, regardless of how much it occurs on that page. For a term frequency, pass `page_freq=False`.
 
 
-```python
+```
 a = vol.term_page_freqs()
 print(a.loc[10:11,['the','and','is','he', 'she']])
 a = vol.term_page_freqs(page_freq=False)
@@ -430,31 +431,91 @@ find feature-files/ -name '*json.bz2' | parallel --eta --jobs 90% -n 50 python y
 ```
 
 ## Additional Notes
+### Getting the Rsync URL
+
+If you have a HathiTrust Volume ID and want to be able to download the features for a specific book, `hrtc_features.utils` contains an [id_to_rsync](http://organisciak.github.io/htrc-feature-reader/htrc_features/utils.m.html#htrc_features.utils.id_to_rsync) function. This uses the [pairtree](http://pythonhosted.org/Pairtree/) library but has a fallback written with that library is not installed, since it isn't compatible with Python 3.
+
+
+```
+from htrc_features import utils
+utils.id_to_rsync('miun.adx6300.0001.001')
+```
+
+
+
+
+    'basic/miun/pairtree_root/ad/x6/30/0,/00/01/,0/01/adx6300,0001,001/miun.adx6300,0001,001.basic.json.bz2'
+
+
+
+
+```
+utils.id_to_rsync('miun.adx6300.0001.001', kind='advanced')
+```
+
+
+
+
+    'advanced/miun/pairtree_root/ad/x6/30/0,/00/01/,0/01/adx6300,0001,001/miun.adx6300,0001,001.advanced.json.bz2'
+
+
+
+See the [ID to Rsync notebook](examples/ID_to_Rsync_Link.ipynb) for more information on this format and on Rsyncing lists of urls.
+
 ### Advanced Files
 
 In the beta Extracted Features release, schema 2.0, a few features were separated out to an advanced files. If you try to access those features, like `endLineChars`, you'll get a error:
 
 
-```python
+```
 end_line_chars = vol.end_line_chars()
 ```
+
+    ERROR:root:For schema version 2.0, you need load the 'advanced' file for begin/endLineChars
+
 
 It is possible to load the advanced file alongside the basic files by passing in a `(basic, advanced)` tuple of filepaths where you would normally pass in a single path. For example,
 
 
-```python
+```
 newpaths = [(x,x.replace('basic', 'advanced')) for x in paths]
 newpaths[:2]
 ```
 
 
-```python
+
+
+    [('data/PZ-volumes/hvd.32044010273894.basic.json.bz2',
+      'data/PZ-volumes/hvd.32044010273894.advanced.json.bz2'),
+     ('data/PZ-volumes/hvd.hwquxe.basic.json.bz2',
+      'data/PZ-volumes/hvd.hwquxe.advanced.json.bz2')]
+
+
+
+
+```
 fr = FeatureReader(newpaths)
 vol = next(fr.volumes())
+idx = pd.IndexSlice
 end_line_chars = vol.end_line_chars()
-print(end_line_chars['!'][:15])
+print(end_line_chars.loc[idx[:,:,:,'!'],][:5])
 ```
 
-Note that the advanced files are not fully supported, because the basic/advanced split will not continue for future releases.
+                             count
+    page section place char       
+    14   body    end   !         1
+    17   body    end   !         1
+    20   body    end   !         2
+    34   body    end   !         1
+    40   body    end   !         1
 
-Loading and parsing the advanced feature files adds non-negligible time (about `1.3` seconds on my computer), so only load them if you need them.
+
+Note that the advanced files are not as carefully supported because the basic/advanced split will not continue for future releases.
+
+Remember that loading and parsing the advanced feature files adds non-negligible time (about `1.3` seconds on my computer) and often you won't need them.
+
+### Testing
+
+This library is meant to be compatible with Python 3.2+ and Python 2.7+. Tests are written for py.test and can be run with `setup.py test`, or directly with `python -m py.test -v`.
+
+If you find a bug, leave an issue on the issue tracker, or contact Peter Organisciak at `organisciak+htrc@gmail.com`.
