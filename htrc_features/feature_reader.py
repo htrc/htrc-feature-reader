@@ -64,7 +64,11 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
     # Add lowercase column. Previously, this was saved internally. However,
     # DataFrame.str.lower() is reasonably fast and the need to call it
     # repeatedly is low, so it is no longer saved.
+    # This makes the internal representation more predictable, hopefully
+    # avoiding unexpected bugs.
     if not case:
+        # Replace our df reference to a copy.
+        df = df.copy()
         logging.debug('Adding lowercase column')
         df.insert(len(df.columns), 'lowercase',
                   df.index.get_level_values('token').str.lower())
@@ -357,9 +361,13 @@ class Volume(object):
 
     def tokens_per_page(self, **kwargs):
         '''
-        Return a one dimension pd.Series of page lengths
+        Return a one dimension pd.DataFrame of page lengths
         '''
-        return self.tokenlist().reset_index().groupby(['page']).sum()
+        if 'section' in kwargs and kwargs['section'] == 'all':
+            groups = ['page', 'section']
+        else:
+            groups = ['page']
+        return self.tokenlist(**kwargs).reset_index().groupby(groups).sum()
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False):
@@ -477,9 +485,9 @@ class Volume(object):
                         i += 1
                         if (i > m+1):
                             logging.error("This volume has more token info "
-                                          "the internal representation allows."
-                                          " Email organisciak@gmail.com to let"
-                                          " the library author know!")
+                                          "than the internal representation "
+                                          "allows. Email organisciak@gmail.com"
+                                          "to let the library author know!")
 
         # Create a DataFrame
         df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
