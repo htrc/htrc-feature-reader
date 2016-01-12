@@ -14,7 +14,9 @@ To install,
 
     pip install htrc-feature-reader
 
-That's it! This library is written for Python 2.7 and 3.0+. Optional: [installing the development version](#Installing-the-development-version).
+That's it! This library is written for Python 2.7 and 3.0+. Optional: [installing the development version](#Installing-the-development-version). For Python beginners, you'll need [pip](https://pip.pypa.io/en/stable/installing/).
+
+Given the nature of data analysis, using iPython with Jupyter notebooks for preparing your scripts interactively is a recommended convenience. Most basically, it can be installed with `pip install ipython[notebook]` and run with `ipython notebook` from the command line, which starts a session that you can access through your browser. If this doesn't work, consult the [iPython documentation](http://ipython.readthedocs.org/).
 
 ## Usage
 
