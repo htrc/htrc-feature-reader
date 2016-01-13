@@ -8,6 +8,12 @@ This library provides a `FeatureReader` for parsing files, which are handled as 
 
 This library makes heavy use of [Pandas](pandas.pydata.org), returning many data representations as DataFrames. This is the leading way of dealing with structured data in Python, so this library doesn't try to reinvent the wheel. Since refactoring around Pandas, the primary benefit of using the HTRC Feature Reader is performance: reading the json structures and parsing them is generally faster than custom code. You also get convenient access to common information, such as case-folded token counts or part-of-page specific character counts. Details of the public methods provided by this library can be found in the [HTRC Feature Reader docs](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html).
 
+** Table of Contents**: [Installation](#Installation) | [Usage](#Usage) | 
+[Additional Notes](#Additional-Notes)
+
+**Links**: 
+[HTRC Feature Reader Documentation](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html) | [HTRC Extracted Features Dataset](https://sharc.hathitrust.org/features)
+
 ## Installation
 
 To install,
