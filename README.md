@@ -6,13 +6,13 @@ Tools for working with the [HTRC Extracted Features dataset](https://sharc.hathi
 
 This library provides a `FeatureReader` for parsing files, which are handled as `Volume` objects with collections of `Page` objects. Volumes provide access to metadata (e.g. language), volume-wide feature information (e.g. token counts), and access to Pages. Pages allow you to easily parse page-level features, particularly token lists.
 
-This library makes heavy use of [Pandas](pandas.pydata.org), returning many data representations as DataFrames. This is the leading way of dealing with structured data in Python, so this library doesn't try to reinvent the wheel. Since refactoring around Pandas, the primary benefit of using the HTRC Feature Reader is performance: reading the json structures and parsing them is generally faster than custom code. You also get convenient access to common information, such as case-folded token counts or part-of-page specific character counts. Details of the public methods provided by this library can be found in the [HTRC Feature Reader docs](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html).
+This library makes heavy use of [Pandas](pandas.pydata.org), returning many data representations as DataFrames. This is the leading way of dealing with structured data in Python, so this library doesn't try to reinvent the wheel. Since refactoring around Pandas, the primary benefit of using the HTRC Feature Reader is performance: reading the json structures and parsing them is generally faster than custom code. You also get convenient access to common information, such as case-folded token counts or part-of-page specific character counts. Details of the public methods provided by this library can be found in the [HTRC Feature Reader docs](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html).
 
-** Table of Contents**: [Installation](#Installation) | [Usage](#Usage) | 
+**Table of Contents**: [Installation](#Installation) | [Usage](#Usage) | 
 [Additional Notes](#Additional-Notes)
 
 **Links**: 
-[HTRC Feature Reader Documentation](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html) | [HTRC Extracted Features Dataset](https://sharc.hathitrust.org/features)
+[HTRC Feature Reader Documentation](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html) | [HTRC Extracted Features Dataset](https://sharc.hathitrust.org/features)
 
 ## Installation
 
@@ -28,7 +28,7 @@ Given the nature of data analysis, using iPython with Jupyter notebooks for prep
 
 ### Reading feature files
 
-The easiest way to start using this library is to use the [FeatureReader](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.FeatureReader) interface, which takes a list of paths.
+The easiest way to start using this library is to use the [FeatureReader](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.FeatureReader) interface, which takes a list of paths.
 
 
 ```python
@@ -89,7 +89,7 @@ vol = next(feature_reader.volumes())
 
 ### Volume
 
-A [Volume](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Volume) contains information about the current work and access to the pages of the work.
+A [Volume](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Volume) contains information about the current work and access to the pages of the work.
 
 All the metadata fields from the HTRC JSON file are accessible as properties of the volume object, including _title_, _language_, _imprint_, _oclc_, _pubDate_, and _genre_. The main identifier _id_ and _pageCount_ are also accessible.
 
@@ -167,7 +167,7 @@ print("METADATA FIELDS: " + ", ".join(vol.metadata.keys()))
 
 _At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one volume at a time. Read about the [HTRC Solr Proxy](https://wiki.htrc.illinois.edu/display/COM/Solr+Proxy+API+User+Guide)._
 
-Volumes also have direct access to volume-wide info of features stored in pages. For example, you can get a list of words per page through [Volume.tokens_per_page()](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Volume.tokens_per_page). We'll discuss these features [below](#Volume-stats-collecting), after looking first at Pages.
+Volumes also have direct access to volume-wide info of features stored in pages. For example, you can get a list of words per page through [Volume.tokens_per_page()](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Volume.tokens_per_page). We'll discuss these features [below](#Volume-stats-collecting), after looking first at Pages.
 
 ## Pages
 
@@ -176,7 +176,7 @@ A page contains the meat of the HTRC's extracted features, including information
 - Part of speech tagged token counts, through `Page.tokenlist()`
 - Counts of the characters occurred at the start and end of physical lines, though `Page.lineCounts()`
 - Sentence counts, line counts (referring to the physical line on the page)
-- And more, seen in the docs for [Page](http://organisciak.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Page)
+- And more, seen in the docs for [Page](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Page)
 
 
 ```python
@@ -436,13 +436,13 @@ find feature-files/ -name '*json.bz2' | parallel --eta --jobs 90% -n 50 python y
 
 ### Installing the development version
 
-    git clone https://github.com/organisciak/htrc-feature-reader.git
+    git clone https://github.com/htrc/htrc-feature-reader.git
     cd htrc-feature-reader
     python setup.py install
 
 ### Getting the Rsync URL
 
-If you have a HathiTrust Volume ID and want to be able to download the features for a specific book, `hrtc_features.utils` contains an [id_to_rsync](http://organisciak.github.io/htrc-feature-reader/htrc_features/utils.m.html#htrc_features.utils.id_to_rsync) function. This uses the [pairtree](http://pythonhosted.org/Pairtree/) library but has a fallback written with that library is not installed, since it isn't compatible with Python 3.
+If you have a HathiTrust Volume ID and want to be able to download the features for a specific book, `hrtc_features.utils` contains an [id_to_rsync](http://htrc.github.io/htrc-feature-reader/htrc_features/utils.m.html#htrc_features.utils.id_to_rsync) function. This uses the [pairtree](http://pythonhosted.org/Pairtree/) library but has a fallback written with that library is not installed, since it isn't compatible with Python 3.
 
 
 ```python
