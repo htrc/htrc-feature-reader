@@ -1,0 +1,7 @@
+These are the git hooks for development. Put them in .git/hooks.
+
+Post-commit checks if an iPython Readme notebook was committed, and if so, it
+generates a markdown version and appends it to the last commit.
+
+Pre-push starts a virtualenv environment, installs the Feature Reader for both
+Python2 and Python3, and runs tests.

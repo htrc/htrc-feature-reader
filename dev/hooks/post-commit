@@ -1,0 +1,17 @@
+READPY=$(git log --name-only HEAD^.. | grep "^README.ipynb$")
+READMD=$(git log --name-only HEAD^.. | grep "^README.md$")
+
+if [ -n "$READPY" ] && [ -z "$READMD" ]; then
+    echo "It looks like a new README was committed, appending a Markdown version"
+    jupyter nbconvert --to markdown README.ipynb
+    # While we're at it, convert to rst for the Pypi package. This file is ignored
+    # by the git repo.
+    jupyter nbconvert --to rst README.ipynb
+    
+    # Adding this file doesn't work in pre-commit hooks, which is
+    # why we're appending post-commit
+    git add README.md
+    
+    # We don't want to run this hook again after appending
+    git commit --amend -C HEAD --no-verify
+fi
