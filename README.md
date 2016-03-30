@@ -38,8 +38,7 @@ from htrc_features import FeatureReader
 paths = glob.glob('data/PZ-volumes/*basic.json.bz2')
 # Here we're loading five paths, for brevity
 feature_reader = FeatureReader(paths[:5])
-i = 0
-for vol in feature_reader:
+for vol in feature_reader.volumes():
     print("%s - %s" % (vol.id, vol.title))
 ```
 
@@ -74,17 +73,17 @@ newpaths[:2]
 
 
 
-    [('data/PZ-volumes/hvd.32044010273894.basic.json.bz2',
-      'data/PZ-volumes/hvd.32044010273894.advanced.json.bz2'),
-     ('data/PZ-volumes/hvd.hwquxe.basic.json.bz2',
-      'data/PZ-volumes/hvd.hwquxe.advanced.json.bz2')]
+    [('data/PZ-volumes\\hvd.32044010273894.basic.json.bz2',
+      'data/PZ-volumes\\hvd.32044010273894.advanced.json.bz2'),
+     ('data/PZ-volumes\\hvd.hwquxe.basic.json.bz2',
+      'data/PZ-volumes\\hvd.hwquxe.advanced.json.bz2')]
 
 
 
 
 ```python
 feature_reader = FeatureReader(newpaths[:5])
-vol = next(feature_reader.volumes())
+vol = feature_reader.first()
 ```
 
 ### Volume
@@ -162,7 +161,7 @@ for vol in fr.volumes():
 print("METADATA FIELDS: " + ", ".join(vol.metadata.keys()))
 ```
 
-    METADATA FIELDS: htsource, authorSort, callnumber, mainauthor, htrc_genderMale, author_top, htrc_gender, author, oclc, publication_place, author_only, lccn, title, sdrnum, htrc_volumeWordCountBin, genre, country_of_pub, fullrecord, htrc_volumePageCountBin, publishDate, title_top, format, topicStr, callnosort, ht_id, publisher, geographic, _version_, title_ab, htrc_wordCount, language, htrc_pageCount, published, title_a, topic, topic_subject, publishDateRange, htrc_charCount, id
+    METADATA FIELDS: htrc_genderMale, publishDate, lccn, country_of_pub, topicStr, htrc_volumeWordCountBin, topic, author_top, htrc_charCount, ht_id, id, title_a, author_only, htsource, title_ab, format, title, published, sdrnum, htrc_gender, htrc_pageCount, callnumber, fullrecord, callnosort, _version_, oclc, publisher, htrc_volumePageCountBin, author, genre, htrc_wordCount, title_top, publication_place, authorSort, language, geographic, mainauthor, topic_subject, publishDateRange
 
 
 _At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one volume at a time. Read about the [HTRC Solr Proxy](https://wiki.htrc.illinois.edu/display/COM/Solr+Proxy+API+User+Guide)._
@@ -493,10 +492,10 @@ newpaths[:2]
 
 
 
-    [('data/PZ-volumes/hvd.32044010273894.basic.json.bz2',
-      'data/PZ-volumes/hvd.32044010273894.advanced.json.bz2'),
-     ('data/PZ-volumes/hvd.hwquxe.basic.json.bz2',
-      'data/PZ-volumes/hvd.hwquxe.advanced.json.bz2')]
+    [('data/PZ-volumes\\hvd.32044010273894.basic.json.bz2',
+      'data/PZ-volumes\\hvd.32044010273894.advanced.json.bz2'),
+     ('data/PZ-volumes\\hvd.hwquxe.basic.json.bz2',
+      'data/PZ-volumes\\hvd.hwquxe.advanced.json.bz2')]
 
 
 
