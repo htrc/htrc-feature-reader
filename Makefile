@@ -1,6 +1,9 @@
 all cleancheck:
+	jupyter nbconvert --to rst README.ipynb
+	rm dist/*
 	python setup.py sdist
 	twine upload dist/*
+	rm README.rst
 
 cleancheck:
 	@status=$$(git status --porcelain); \
