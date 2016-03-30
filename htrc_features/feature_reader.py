@@ -158,6 +158,12 @@ class FeatureReader(object):
             else:
                 yield self._volume(path, compressed=self.compressed)
 
+    def first(self):
+        ''' Return first volume from Feature Reader. This is a convenience
+        feature for single volume imports or to quickly get a volume for
+        testing.'''
+        return next(self.volumes())
+
     def create_volume(self, path, **kwargs):
         return self._volume(path, **kwargs)
 

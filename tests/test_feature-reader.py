@@ -51,6 +51,12 @@ class TestFeatureReader():
         for vol in feature_reader.volumes():
             assert type(vol) == htrc_features.feature_reader.Volume
 
+    def test_first(self, paths):
+        feature_reader = FeatureReader(paths)
+        vol = feature_reader.first()
+        assert type(vol) == htrc_features.feature_reader.Volume
+        assert vol.title == self.TITLES[0]
+
     def test_uncompressed(self, paths):
         paths = [(basic.replace('.bz2', ''), advanced.replace('.bz2', ''))
                  for basic, advanced in paths]
