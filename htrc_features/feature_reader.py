@@ -369,11 +369,23 @@ class Volume(object):
         '''
         Return a one dimension pd.DataFrame of page lengths
         '''
-        if 'section' in kwargs and kwargs['section'] == 'all':
-            groups = ['page', 'section']
+        if 'section' not in kwargs or kwargs['section'] == 'default':
+            section = self.default_page_section
         else:
-            groups = ['page']
-        return self.tokenlist(**kwargs).reset_index().groupby(groups).sum()
+            section = kwargs['section']
+
+        d = [{'page': int(page['seq']), 'section': sec,
+              'count':page[sec]['tokenCount']}
+             for page in self._pages for sec in SECREF]
+        df = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
+
+        if section in SECREF:
+            return df.loc[(slice(None), section), ].reset_index('section',
+                                                                drop=True)
+        elif section == 'all':
+            return df
+        elif section == 'group':
+            return df.groupby(level='page').sum()
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False):

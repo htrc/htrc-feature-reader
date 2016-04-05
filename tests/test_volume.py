@@ -98,7 +98,7 @@ class TestVolume():
         import pandas
         # Test default settings
         tokencounts1 = volume.tokens_per_page()
-        counts1 = {'count': {3: 2, 4: 4, 5: 4, 6: 63, 51: 229, 52: 298,
+        counts1 = {'count': {2: 0, 3: 2, 4: 4, 5: 4, 6: 63, 51: 229, 52: 298,
                    53: 344, 54: 316, 55: 295, 56: 327, 57: 383, 58: 341,
                    59: 187, 60: 277, 61: 341}}
         assert type(tokencounts1) == pandas.core.frame.DataFrame
@@ -106,7 +106,7 @@ class TestVolume():
 
         # Changing sections involved in count
         tokencounts2 = volume.tokens_per_page(section='group')
-        counts2 = {'count': {3: 2, 4: 4, 5: 4, 6: 63, 51: 233, 52: 303,
+        counts2 = {'count': {2: 0, 3: 2, 4: 4, 5: 4, 6: 63, 51: 233, 52: 303,
                    53: 349, 54: 321, 55: 300, 56: 332, 57: 388, 58: 346,
                    59: 192, 60: 277, 61: 345}}
         assert type(tokencounts2) == pandas.core.frame.DataFrame
@@ -115,6 +115,7 @@ class TestVolume():
         # section='all' keeps section info
         tokencounts3 = volume.tokens_per_page(section='all')
         assert tokencounts3.loc[61].to_dict() == {'count': {'body': 341,
+                                                            'footer': 0,
                                                             'header': 4}}
 
     def test_tokenlist_folding(self, volume):
