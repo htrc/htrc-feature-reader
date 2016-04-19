@@ -438,6 +438,10 @@ find feature-files/ -name '*json.bz2' | parallel --eta --jobs 90% -n 50 python y
     cd htrc-feature-reader
     python setup.py install
 
+### Iterating through the JSON files
+
+If you need to do fast, highly customized processing without instantiating Volumes, FeatureReader has a convenient generator for getting the raw JSON as a Python dict: `fr.jsons()`. This simply does the file reading, optional decompression, and JSON parsing. Iterate through it as with `fr.volumes()`. If an advanced feature file is included, the dicts for the basic and advanced files are returned as a tuple.
+
 ### Getting the Rsync URL
 
 If you have a HathiTrust Volume ID and want to be able to download the features for a specific book, `hrtc_features.utils` contains an [id_to_rsync](http://htrc.github.io/htrc-feature-reader/htrc_features/utils.m.html#htrc_features.utils.id_to_rsync) function. This uses the [pairtree](http://pythonhosted.org/Pairtree/) library but has a fallback written with that library is not installed, since it isn't compatible with Python 3.
