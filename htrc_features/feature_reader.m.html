@@ -1061,6 +1061,7 @@ table {
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.__init__">__init__</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.create_volume">create_volume</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.first">first</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.jsons">jsons</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.multiprocessing">multiprocessing</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.volumes">volumes</a></li>
   </ul>
@@ -1276,6 +1277,20 @@ table {
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
 
+    <span class="k">def</span> <span class="nf">jsons</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Generator for returning decompressed, parsed json dictionaries</span>
+<span class="sd">        for volumes. Convenience function for when the FeatureReader objects</span>
+<span class="sd">        are not needed. &#39;&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
+            <span class="c"># If path is a tuple, assume that the advanced path was also given</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">:</span>
+                <span class="n">basic</span><span class="p">,</span> <span class="n">advanced</span> <span class="o">=</span> <span class="n">path</span>
+                <span class="n">basicjson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">basic</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
+                <span class="n">advjson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">advanced</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="n">basicjson</span><span class="p">,</span> <span class="n">advjson</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
+
     <span class="k">def</span> <span class="nf">first</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Return first volume from Feature Reader. This is a convenience</span>
 <span class="sd">        feature for single volume imports or to quickly get a volume for</span>
@@ -1319,8 +1334,8 @@ table {
         <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
             <span class="k">yield</span> <span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39; Read a path into a volume.&#39;&#39;&#39;</span>
+    <span class="k">def</span> <span class="nf">_read_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Load JSON for a path &#39;&#39;&#39;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">compressed</span><span class="p">:</span>
                 <span class="n">f</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">BZ2File</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
@@ -1350,25 +1365,16 @@ table {
                               <span class="s">&quot; for this error is an incorrect compressed= &quot;</span>
                               <span class="s">&quot;argument&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
             <span class="k">raise</span>
+        <span class="k">return</span> <span class="n">volumejson</span>
 
-        <span class="n">advanced</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="k">def</span> <span class="nf">_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Read a path into a volume.&#39;&#39;&#39;</span>
+        <span class="n">volumejson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">advanced_path</span><span class="p">:</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">compressed</span><span class="p">:</span>
-                    <span class="n">f</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">BZ2File</span><span class="p">(</span><span class="n">advanced_path</span><span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">advanced_path</span><span class="p">,</span> <span class="s">&#39;r+&#39;</span><span class="p">)</span>
-                <span class="n">raw_advancedjson</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
-                <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-
-                <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">raw_advancedjson</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">str</span><span class="p">:</span>
-                    <span class="n">raw_advancedjson</span> <span class="o">=</span> <span class="n">raw_advancedjson</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
-
-                <span class="n">advancedjson</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">raw_advancedjson</span><span class="p">)</span>
-                <span class="n">advanced</span> <span class="o">=</span> <span class="n">advancedjson</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]</span>
-            <span class="k">except</span><span class="p">:</span>
-                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Can&#39;t open </span><span class="si">%s</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">advanced_path</span><span class="p">)</span>
-
+            <span class="n">advanced</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">advanced_path</span><span class="p">,</span> <span class="n">compressed</span><span class="p">)</span>
+            <span class="n">advanced</span> <span class="o">=</span> <span class="n">advanced</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">advanced</span> <span class="o">=</span> <span class="bp">False</span>
         <span class="k">return</span> <span class="n">Volume</span><span class="p">(</span><span class="n">volumejson</span><span class="p">,</span> <span class="n">advanced</span><span class="o">=</span><span class="n">advanced</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_wrap_func</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
@@ -2044,6 +2050,20 @@ on a page. Defaults to false.</p></div>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
 
+    <span class="k">def</span> <span class="nf">jsons</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Generator for returning decompressed, parsed json dictionaries</span>
+<span class="sd">        for volumes. Convenience function for when the FeatureReader objects</span>
+<span class="sd">        are not needed. &#39;&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
+            <span class="c"># If path is a tuple, assume that the advanced path was also given</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">:</span>
+                <span class="n">basic</span><span class="p">,</span> <span class="n">advanced</span> <span class="o">=</span> <span class="n">path</span>
+                <span class="n">basicjson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">basic</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
+                <span class="n">advjson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">advanced</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="n">basicjson</span><span class="p">,</span> <span class="n">advjson</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
+
     <span class="k">def</span> <span class="nf">first</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Return first volume from Feature Reader. This is a convenience</span>
 <span class="sd">        feature for single volume imports or to quickly get a volume for</span>
@@ -2087,8 +2107,8 @@ on a page. Defaults to false.</p></div>
         <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
             <span class="k">yield</span> <span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39; Read a path into a volume.&#39;&#39;&#39;</span>
+    <span class="k">def</span> <span class="nf">_read_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Load JSON for a path &#39;&#39;&#39;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">compressed</span><span class="p">:</span>
                 <span class="n">f</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">BZ2File</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
@@ -2118,25 +2138,16 @@ on a page. Defaults to false.</p></div>
                               <span class="s">&quot; for this error is an incorrect compressed= &quot;</span>
                               <span class="s">&quot;argument&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
             <span class="k">raise</span>
+        <span class="k">return</span> <span class="n">volumejson</span>
 
-        <span class="n">advanced</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="k">def</span> <span class="nf">_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Read a path into a volume.&#39;&#39;&#39;</span>
+        <span class="n">volumejson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">advanced_path</span><span class="p">:</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">compressed</span><span class="p">:</span>
-                    <span class="n">f</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">BZ2File</span><span class="p">(</span><span class="n">advanced_path</span><span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">advanced_path</span><span class="p">,</span> <span class="s">&#39;r+&#39;</span><span class="p">)</span>
-                <span class="n">raw_advancedjson</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
-                <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-
-                <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">raw_advancedjson</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">str</span><span class="p">:</span>
-                    <span class="n">raw_advancedjson</span> <span class="o">=</span> <span class="n">raw_advancedjson</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
-
-                <span class="n">advancedjson</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">raw_advancedjson</span><span class="p">)</span>
-                <span class="n">advanced</span> <span class="o">=</span> <span class="n">advancedjson</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]</span>
-            <span class="k">except</span><span class="p">:</span>
-                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Can&#39;t open </span><span class="si">%s</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">advanced_path</span><span class="p">)</span>
-
+            <span class="n">advanced</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">advanced_path</span><span class="p">,</span> <span class="n">compressed</span><span class="p">)</span>
+            <span class="n">advanced</span> <span class="o">=</span> <span class="n">advanced</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">advanced</span> <span class="o">=</span> <span class="bp">False</span>
         <span class="k">return</span> <span class="n">Volume</span><span class="p">(</span><span class="n">volumejson</span><span class="p">,</span> <span class="n">advanced</span><span class="o">=</span><span class="n">advanced</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_wrap_func</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
@@ -2251,6 +2262,41 @@ testing.</p></div>
 <span class="sd">    feature for single volume imports or to quickly get a volume for</span>
 <span class="sd">    testing.&#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">volumes</span><span class="p">())</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.FeatureReader.jsons">
+    <p>def <span class="ident">jsons</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Generator for returning decompressed, parsed json dictionaries
+for volumes. Convenience function for when the FeatureReader objects
+are not needed.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.FeatureReader.jsons', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.FeatureReader.jsons" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">jsons</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Generator for returning decompressed, parsed json dictionaries</span>
+<span class="sd">    for volumes. Convenience function for when the FeatureReader objects</span>
+<span class="sd">    are not needed. &#39;&#39;&#39;</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
+        <span class="c"># If path is a tuple, assume that the advanced path was also given</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">:</span>
+            <span class="n">basic</span><span class="p">,</span> <span class="n">advanced</span> <span class="o">=</span> <span class="n">path</span>
+            <span class="n">basicjson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">basic</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
+            <span class="n">advjson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">advanced</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="p">(</span><span class="n">basicjson</span><span class="p">,</span> <span class="n">advjson</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
 </pre></div>
 
   </div>
