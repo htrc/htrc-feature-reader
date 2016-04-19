@@ -158,6 +158,20 @@ class FeatureReader(object):
             else:
                 yield self._volume(path, compressed=self.compressed)
 
+    def jsons(self):
+        ''' Generator for returning decompressed, parsed json dictionaries
+        for volumes. Convenience function for when the FeatureReader objects
+        are not needed. '''
+        for path in self.paths:
+            # If path is a tuple, assume that the advanced path was also given
+            if type(path) == tuple:
+                basic, advanced = path
+                basicjson = self._read_json(basic, compressed=self.compressed)
+                advjson = self._read_json(advanced, compressed=self.compressed)
+                yield (basicjson, advjson)
+            else:
+                yield self._read_json(path, compressed=self.compressed)
+
     def first(self):
         ''' Return first volume from Feature Reader. This is a convenience
         feature for single volume imports or to quickly get a volume for
@@ -201,8 +215,8 @@ class FeatureReader(object):
         for path in self.paths:
             yield (self, path)
 
-    def _volume(self, path, compressed=True, advanced_path=False):
-        ''' Read a path into a volume.'''
+    def _read_json(self, path, compressed=True, advanced_path=False):
+        ''' Load JSON for a path '''
         try:
             if compressed:
                 f = bz2.BZ2File(path)
@@ -232,25 +246,16 @@ class FeatureReader(object):
                               " for this error is an incorrect compressed= "
                               "argument", path)
             raise
+        return volumejson
 
-        advanced = False
+    def _volume(self, path, compressed=True, advanced_path=False):
+        ''' Read a path into a volume.'''
+        volumejson = self._read_json(path, compressed)
         if advanced_path:
-            try:
-                if compressed:
-                    f = bz2.BZ2File(advanced_path)
-                else:
-                    f = open(advanced_path, 'r+')
-                raw_advancedjson = f.readline()
-                f.close()
-
-                if type(raw_advancedjson) != str:
-                    raw_advancedjson = raw_advancedjson.decode()
-
-                advancedjson = json.loads(raw_advancedjson)
-                advanced = advancedjson['features']
-            except:
-                logging.error("Can't open %s", advanced_path)
-
+            advanced = self._read_json(advanced_path, compressed)
+            advanced = advanced['features']
+        else:
+            advanced = False
         return Volume(volumejson, advanced=advanced)
 
     def _wrap_func(self, func):

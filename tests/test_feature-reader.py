@@ -44,6 +44,15 @@ class TestFeatureReader():
             assert type(vol) == htrc_features.feature_reader.Volume
             assert vol.title == self.TITLES[i]
 
+    def test_json_only_load(self, paths):
+        path = paths[0]
+        feature_reader = FeatureReader(path)
+        basicjson, advjson = next(feature_reader.jsons())
+        assert type(basicjson) == dict
+        assert type(advjson) == dict
+        assert basicjson['features']['pages'][7]['header']['tokenCount'] == 5
+        assert advjson['features']['pages'][7]['body']['capAlphaSeq'] == 2
+
     def test_iteration(self, paths):
         feature_reader = FeatureReader(paths)
         for vol in feature_reader:
