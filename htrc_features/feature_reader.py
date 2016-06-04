@@ -356,7 +356,6 @@ class Volume(object):
             self._metadata = result
         return self._metadata
 
-    @property
     def tokens(self, section='default', case=True):
         ''' Get unique tokens '''
         tokens = self.tokenlist(section=section).index\
@@ -391,6 +390,18 @@ class Volume(object):
             return df
         elif section == 'group':
             return df.groupby(level='page').sum()
+
+    def line_counts(self, section='default'):
+        ''' Return a list of line counts, per page '''
+        return [page.line_count(section=section) for page in self.pages()]
+
+    def empty_line_counts(self, section='default'):
+        ''' Return a list of empty line counts, per page '''
+        return [page.empty_line_count(section=section) for page in self.pages()]
+
+    def sentence_counts(self, section='default'):
+        ''' Return a list of sentence counts, per page '''
+        return [page.sentence_count(section=section) for page in self.pages()]
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False):
@@ -579,7 +590,6 @@ class Page:
         self._basic_stats = pd.DataFrame(arr, columns=self.SECTION_FIELDS,
                                          index=SECREF)
 
-    @property
     def tokens(self, section='default', case=True):
         ''' Get unique tokens '''
         tokens = self.tokenlist(section=section).index\
@@ -589,19 +599,15 @@ class Page:
         else:
             return tokens.str.lower().unique().tolist()
 
-    @property
     def count(self):
         return self._df['count'].astype(int).sum()
 
-    @property
     def line_count(self, section='default'):
         return self._get_basic_stat(section, 'lineCount')
 
-    @property
     def empty_line_count(self, section='default'):
         return self._get_basic_stat(section, 'emptyLineCount')
 
-    @property
     def sentence_count(self, section='default'):
         return self._get_basic_stat(section, 'sentenceCount')
 

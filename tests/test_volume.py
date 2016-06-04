@@ -91,8 +91,14 @@ class TestVolume():
         assert type(metadata) == dict
 
     def test_token_stats(self, volume):
-        assert volume.tokens[:600:100] == ['/', 'her', 'but', "'re",
-                                           'announced', 'entirely']
+        assert volume.tokens()[:600:100] == ['/', 'her', 'but', "'re",
+                                             'announced', 'entirely']
+
+    def test_line_counting(self, volume):
+        print(volume.line_counts())
+        assert sum(volume.line_counts()) == 441
+        assert sum(volume.empty_line_counts()) == 92
+        assert sum(volume.sentence_counts()) == 191
 
     def test_token_per_page_counts(self, volume):
         import pandas

@@ -161,7 +161,7 @@ for vol in fr.volumes():
 print("METADATA FIELDS: " + ", ".join(vol.metadata.keys()))
 ```
 
-    METADATA FIELDS: htrc_genderMale, publishDate, lccn, country_of_pub, topicStr, htrc_volumeWordCountBin, topic, author_top, htrc_charCount, ht_id, id, title_a, author_only, htsource, title_ab, format, title, published, sdrnum, htrc_gender, htrc_pageCount, callnumber, fullrecord, callnosort, _version_, oclc, publisher, htrc_volumePageCountBin, author, genre, htrc_wordCount, title_top, publication_place, authorSort, language, geographic, mainauthor, topic_subject, publishDateRange
+    METADATA FIELDS: topic, id, htrc_genderMale, title_ab, fullrecord, title_a, format, callnumber, mainauthor, published, topic_subject, oclc, author_only, language, geographic, title, author_top, genre, _version_, publisher, publishDateRange, publishDate, sdrnum, authorSort, publication_place, htrc_wordCount, callnosort, country_of_pub, ht_id, author, htrc_volumePageCountBin, htrc_charCount, htrc_gender, lccn, topicStr, htrc_pageCount, title_top, htsource, htrc_volumeWordCountBin
 
 
 _At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one volume at a time. Read about the [HTRC Solr Proxy](https://wiki.htrc.illinois.edu/display/COM/Solr+Proxy+API+User+Guide)._
@@ -182,7 +182,7 @@ A page contains the meat of the HTRC's extracted features, including information
 print("The body has %s lines, %s empty lines, and %s sentences" % (page.line_count, page.empty_line_count, page.sentence_count))
 ```
 
-    The body has 30 lines, 0 empty lines, and 9 sentences
+    The body has <bound method Page.line_count of <htrc_features.feature_reader.Page object at 0x0000020B7D4C07F0>> lines, <bound method Page.empty_line_count of <htrc_features.feature_reader.Page object at 0x0000020B7D4C07F0>> empty lines, and <bound method Page.sentence_count of <htrc_features.feature_reader.Page object at 0x0000020B7D4C07F0>> sentences
 
 
 Since the HTRC provides information by header/body/footer, most methods take a `section=` argument. If not specified, this defaults to `"body"`, or whatever argument is supplied to `Page.default_section`.
@@ -321,7 +321,7 @@ To get just the unique tokens, `Page.tokens` provides them as a list.
 
 
 ```python
-page.tokens[:7]
+page.tokens()[:7]
 ```
 
 
@@ -359,7 +359,7 @@ Note that a Volume-wide tokenlist is not crunched until you need it, then it wil
 
 
 ```python
-vol.tokens[:10]
+vol.tokens()[:10]
 ```
 
 
@@ -381,14 +381,14 @@ a = vol.term_page_freqs(page_freq=False)
 print(a.loc[10:11,['the','and','is', 'he', 'she']])
 ```
 
-    token  the  and  is  he  she
-    page                        
-    10       0    1   0   0    0
-    11       1    1   1   0    0
-    token  the  and  is  he  she
-    page                        
-    10       0    1   0   0    0
-    11      22    7   4   0    0
+    token  the  and   is   he  she
+    page                          
+    10     0.0  1.0  0.0  0.0  0.0
+    11     1.0  1.0  1.0  0.0  0.0
+    token   the  and   is   he  she
+    page                           
+    10      0.0  1.0  0.0  0.0  0.0
+    11     22.0  7.0  4.0  0.0  0.0
 
 
 Volume.term_page_freqs provides a wide DataFrame resembling a matrix, where terms are listed as columns, pages are listed as rows, and the values correspond to the term frequency (or page page frequency with `page_freq=true`).
@@ -481,9 +481,6 @@ In the beta Extracted Features release, schema 2.0, a few features were separate
 ```python
 end_line_chars = vol.end_line_chars()
 ```
-
-    ERROR:root:For schema version 2.0, you need load the 'advanced' file for begin/endLineChars
-
 
 It is possible to load the advanced file alongside the basic files by passing in a `(basic, advanced)` tuple of filepaths where you would normally pass in a single path. For example,
 
