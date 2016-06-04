@@ -1074,10 +1074,15 @@ table {
   <ul>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.__init__">__init__</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.begin_line_chars">begin_line_chars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.count">count</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.empty_line_count">empty_line_count</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.end_line_chars">end_line_chars</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.line_chars">line_chars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.line_count">line_count</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.sentence_count">sentence_count</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.token_count">token_count</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.tokenlist">tokenlist</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.tokens">tokens</a></li>
   </ul>
 
         </li>
@@ -1088,12 +1093,16 @@ table {
   <ul>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.__init__">__init__</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.begin_line_chars">begin_line_chars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Volume.empty_line_counts">empty_line_counts</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.end_line_chars">end_line_chars</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.line_chars">line_chars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Volume.line_counts">line_counts</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.pages">pages</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Volume.sentence_counts">sentence_counts</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.term_page_freqs">term_page_freqs</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.term_volume_freqs">term_volume_freqs</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.tokenlist">tokenlist</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Volume.tokens">tokens</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.tokens_per_page">tokens_per_page</a></li>
   </ul>
 
@@ -1475,7 +1484,6 @@ table {
             <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span> <span class="o">=</span> <span class="n">result</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
         <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
@@ -1510,6 +1518,18 @@ table {
             <span class="k">return</span> <span class="n">df</span>
         <span class="k">elif</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;group&#39;</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s">&#39;page&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return a list of line counts, per page &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+
+    <span class="k">def</span> <span class="nf">empty_line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return a list of empty line counts, per page &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+
+    <span class="k">def</span> <span class="nf">sentence_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return a list of sentence counts, per page &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">sentence_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
 
     <span class="k">def</span> <span class="nf">tokenlist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pages</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
                   <span class="n">page_freq</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
@@ -1698,7 +1718,6 @@ table {
         <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">,</span>
                                          <span class="n">index</span><span class="o">=</span><span class="n">SECREF</span><span class="p">)</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
         <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
@@ -1708,19 +1727,15 @@ table {
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="p">[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;lineCount&#39;</span><span class="p">)</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">empty_line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">)</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">sentence_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">)</span>
 
@@ -2425,7 +2440,6 @@ created. Returns a (key, value) tuple.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">,</span>
                                          <span class="n">index</span><span class="o">=</span><span class="n">SECREF</span><span class="p">)</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
         <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
@@ -2435,19 +2449,15 @@ created. Returns a (key, value) tuple.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="p">[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;lineCount&#39;</span><span class="p">)</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">empty_line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">)</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">sentence_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">)</span>
 
@@ -2607,62 +2617,11 @@ with (CamelCase, lower_with_under) mapping</p></div>
             </div>
           <h3>Instance variables</h3>
             <div class="item">
-            <p id="htrc_features.feature_reader.Page.count" class="name">var <span class="ident">count</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
             <p id="htrc_features.feature_reader.Page.default_section" class="name">var <span class="ident">default_section</span></p>
             
 
             
   
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="htrc_features.feature_reader.Page.empty_line_count" class="name">var <span class="ident">empty_line_count</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="htrc_features.feature_reader.Page.line_count" class="name">var <span class="ident">line_count</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="htrc_features.feature_reader.Page.sentence_count" class="name">var <span class="ident">sentence_count</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="htrc_features.feature_reader.Page.tokens" class="name">var <span class="ident">tokens</span></p>
-            
-
-            
-  
-    <div class="desc"><p>Get unique tokens</p></div>
   <div class="source_cont">
 </div>
 
@@ -2725,6 +2684,48 @@ with (CamelCase, lower_with_under) mapping</p></div>
   <div id="source-htrc_features.feature_reader.Page.begin_line_chars" class="source">
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">begin_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Page.count">
+    <p>def <span class="ident">count</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.count', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.count" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="p">[</span><span class="s">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Page.empty_line_count">
+    <p>def <span class="ident">empty_line_count</span>(</p><p>self, section=u&#39;default&#39;)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.empty_line_count', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.empty_line_count" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">empty_line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2797,6 +2798,48 @@ with (CamelCase, lower_with_under) mapping</p></div>
                                                           <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">])</span>
     <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span>
     <span class="k">return</span> <span class="n">group_linechars</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="n">place</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Page.line_count">
+    <p>def <span class="ident">line_count</span>(</p><p>self, section=u&#39;default&#39;)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.line_count', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.line_count" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;lineCount&#39;</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Page.sentence_count">
+    <p>def <span class="ident">sentence_count</span>(</p><p>self, section=u&#39;default&#39;)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.sentence_count', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.sentence_count" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">sentence_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2903,6 +2946,34 @@ with (CamelCase, lower_with_under) mapping</p></div>
 
   </div>
   
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Page.tokens">
+    <p>def <span class="ident">tokens</span>(</p><p>self, section=u&#39;default&#39;, case=True)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Get unique tokens</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.tokens', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.tokens" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
+    <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
+                 <span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
       </div>
       </div>
       
@@ -2998,7 +3069,6 @@ with (CamelCase, lower_with_under) mapping</p></div>
             <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span> <span class="o">=</span> <span class="n">result</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_metadata</span>
 
-    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
         <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
@@ -3033,6 +3103,18 @@ with (CamelCase, lower_with_under) mapping</p></div>
             <span class="k">return</span> <span class="n">df</span>
         <span class="k">elif</span> <span class="n">section</span> <span class="o">==</span> <span class="s">&#39;group&#39;</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s">&#39;page&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return a list of line counts, per page &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+
+    <span class="k">def</span> <span class="nf">empty_line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return a list of empty line counts, per page &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+
+    <span class="k">def</span> <span class="nf">sentence_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return a list of sentence counts, per page &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">sentence_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
 
     <span class="k">def</span> <span class="nf">tokenlist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pages</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
                   <span class="n">page_freq</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
@@ -3268,17 +3350,6 @@ with (CamelCase, lower_with_under) mapping.</p></div>
 
             </div>
             <div class="item">
-            <p id="htrc_features.feature_reader.Volume.tokens" class="name">var <span class="ident">tokens</span></p>
-            
-
-            
-  
-    <div class="desc"><p>Get unique tokens</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
             <p id="htrc_features.feature_reader.Volume.year" class="name">var <span class="ident">year</span></p>
             
 
@@ -3367,6 +3438,29 @@ the far left of the page.</p></div>
   
             
   <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Volume.empty_line_counts">
+    <p>def <span class="ident">empty_line_counts</span>(</p><p>self, section=u&#39;default&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of empty line counts, per page</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.empty_line_counts', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Volume.empty_line_counts" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">empty_line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Return a list of empty line counts, per page &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
     <div class="name def" id="htrc_features.feature_reader.Volume.end_line_chars">
     <p>def <span class="ident">end_line_chars</span>(</p><p>self, **args)</p>
     </div>
@@ -3432,6 +3526,29 @@ the far right of the page.</p></div>
   
             
   <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Volume.line_counts">
+    <p>def <span class="ident">line_counts</span>(</p><p>self, section=u&#39;default&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of line counts, per page</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.line_counts', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Volume.line_counts" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Return a list of line counts, per page &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
     <div class="name def" id="htrc_features.feature_reader.Volume.pages">
     <p>def <span class="ident">pages</span>(</p><p>self, **kwargs)</p>
     </div>
@@ -3445,6 +3562,29 @@ the far right of the page.</p></div>
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">pages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">:</span>
         <span class="k">yield</span> <span class="n">Page</span><span class="p">(</span><span class="n">page</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Volume.sentence_counts">
+    <p>def <span class="ident">sentence_counts</span>(</p><p>self, section=u&#39;default&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return a list of sentence counts, per page</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.sentence_counts', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Volume.sentence_counts" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">sentence_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Return a list of sentence counts, per page &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">sentence_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
 </pre></div>
 
   </div>
@@ -3558,6 +3698,34 @@ the page, else 0) or a term frequency (counts for the term, per page)</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_tokencount_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pages</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">group_tokenlist</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tokencounts</span><span class="p">,</span> <span class="n">pages</span><span class="o">=</span><span class="n">pages</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span>
                            <span class="n">case</span><span class="o">=</span><span class="n">case</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">,</span> <span class="n">page_freq</span><span class="o">=</span><span class="n">page_freq</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Volume.tokens">
+    <p>def <span class="ident">tokens</span>(</p><p>self, section=u&#39;default&#39;, case=True)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Get unique tokens</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.tokens', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Volume.tokens" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Get unique tokens &#39;&#39;&#39;</span>
+    <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenlist</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>\
+                 <span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">case</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">tokens</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
 </pre></div>
 
   </div>
