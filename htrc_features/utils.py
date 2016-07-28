@@ -17,17 +17,28 @@ except:
         return '/'.join(path)
 
 
-def id_to_rsync(htid, kind='basic'):
+def id_to_rsync(htid, **kwargs):
     '''
     Take an HTRC id and convert it to an Rsync location for syncing Extracted
     Features
 
     kind: [basic|advanced]
+
+    schema: Which version of the schema. Prior to 3.0, files were
+    named with the library id (i.e. miun.blahblah.json.bz2), starting with 3.0
+    they are named without the library id (i.e. blahblah.json.bz2).
     '''
+    if 'kind' in kwargs:
+        logging.warn("The basic/advanced split with extracted features files "
+                     "was removed in schema version 3.0. This function only "
+                     "supports the current format for Rsync URLs, if you "
+                     "would like to see the legacy 2.0 format, see Github: "
+                     "https://github.com/htrc/htrc-feature-reader/blob/3e100ae"
+                     "9ea45317443ae05f43a188b12afe2e69a/htrc_features/utils.py"
+                     )
     libid, volid = htid.split('.', 1)
     volid_clean = id_encode(volid)
-    filename = '.'.join([libid, volid_clean, kind, 'json.bz2'])
-
-    path = '/'.join([kind, libid, 'pairtree_root',
-                     id2path(volid).replace('\\', '/'), volid_clean, filename])
+    filename = '.'.join([volid_clean, 'json.bz2'])
+    path = '/'.join([libid, 'pairtree_root', id2path(volid).replace('\\', '/'),
+                     volid_clean, filename])
     return path
