@@ -272,7 +272,7 @@ class FeatureReader(object):
 
 
 class Volume(object):
-    SUPPORTED_SCHEMA = ['1.0', '2.0']
+    SUPPORTED_SCHEMA = ['2.0', '3.0']
     METADATA_FIELDS = [('schemaVersion', 'schema_version'),
                        ('dateCreated', 'date_created'),
                        ('title', 'title'),
@@ -325,10 +325,6 @@ class Volume(object):
                 self._has_advanced = True
                 # Create an internal dataframe for lineChar counts
                 self._line_chars = self._make_line_char_df(advanced['pages'])
-
-                # Count up the capAlphaSeq (longest length of alphabetical
-                # sequence of capital letters starting a line
-                # TODO
 
     def __iter__(self):
         return self.pages()
