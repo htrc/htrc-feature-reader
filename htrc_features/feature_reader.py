@@ -397,7 +397,22 @@ class Volume(object):
 
     def empty_line_counts(self, section='default'):
         ''' Return a list of empty line counts, per page '''
-        return [page.empty_line_count(section=section) for page in self.pages()]
+        return [page.empty_line_count(section=section)
+                for page in self.pages()]
+
+    def cap_alpha_seq(self, section='body'):
+        logging.warn("At the volume-level, use Volume.cap_alpha_seqs()")
+        return self.cap_alpha_seqs(section)
+
+    def cap_alpha_seqs(self, section='body'):
+        ''' Return the longest length of consecutive capital letters starting a
+        line on the page. Returns a list for all pages. Only includes the body:
+        header/footer information is not included.
+        '''
+        if section != 'body':
+            logging.warn("cap_alpha_seq only includes counts for the body "
+                         "section of pages.")
+        return [page.cap_alpha_seq() for page in self.pages()]
 
     def sentence_counts(self, section='default'):
         ''' Return a list of sentence counts, per page '''
@@ -569,7 +584,8 @@ class Page:
                     ('languages', 'languages')]
     ''' List of fields which return primitive values in the schema, as tuples
     with (CamelCase, lower_with_under) mapping '''
-    SECTION_FIELDS = ['lineCount', 'emptyLineCount', 'sentenceCount']
+    SECTION_FIELDS = ['lineCount', 'emptyLineCount', 'sentenceCount',
+                      'capAlphaSeq']
     ''' Fields that are counted by section.'''
 
     def __init__(self, pageobj, volume, default_section='body'):
@@ -586,7 +602,10 @@ class Page:
         arr = np.zeros((len(SECREF), len(self.SECTION_FIELDS)), dtype='u4')
         for i, sec in enumerate(SECREF):
                 for j, stat in enumerate(self.SECTION_FIELDS):
-                            arr[i, j] = self._json[sec][stat]
+                            if stat in self._json[sec]:
+                                arr[i, j] = self._json[sec][stat]
+                            else:
+                                arr[i, j] = 0
         self._basic_stats = pd.DataFrame(arr, columns=self.SECTION_FIELDS,
                                          index=SECREF)
 
@@ -607,6 +626,16 @@ class Page:
 
     def empty_line_count(self, section='default'):
         return self._get_basic_stat(section, 'emptyLineCount')
+
+    def cap_alpha_seq(self, section='body'):
+        ''' Return the longest length of consecutive capital letters starting a
+        line on the page. Returns an integer. Only includes the body:
+        header/footer information is not included.
+        '''
+        if section != 'body':
+            logging.warn("cap_alpha_seq only includes counts for the body "
+                         "section of pages.")
+        return self._get_basic_stat('body', 'capAlphaSeq')
 
     def sentence_count(self, section='default'):
         return self._get_basic_stat(section, 'sentenceCount')
