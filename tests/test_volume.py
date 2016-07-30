@@ -71,7 +71,6 @@ class TestVolume():
         # Field from vol['features']
         assert volume.page_count == metadata['pageCount']
 
-
     def test_metadata_api(self, volume):
         # For now, test for a valid response.
         metadata = volume.metadata
@@ -82,10 +81,12 @@ class TestVolume():
                                              'announced', 'entirely']
 
     def test_line_counting(self, volume):
-        print(volume.line_counts())
         assert sum(volume.line_counts()) == 441
         assert sum(volume.empty_line_counts()) == 92
         assert sum(volume.sentence_counts()) == 191
+
+    def test_cap_alpha_seq(self, volume):
+        assert sum(volume.cap_alpha_seqs()) == 35
 
     def test_token_per_page_counts(self, volume):
         import pandas
