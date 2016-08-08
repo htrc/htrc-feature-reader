@@ -22,4 +22,9 @@ setup(name='htrc-feature-reader',
       install_requires=['six', 'pandas', 'numpy', 'pysolr', 'ujson'],
       setup_requires=['pytest-runner'],
       tests_require=['pytest'],
+      entry_points={
+          'console_scripts': [
+              'htid2rsync = htrc_features.utils:htid2rsync_cmd'
+              ]
+          },
       zip_safe=False)
