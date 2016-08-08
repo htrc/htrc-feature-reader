@@ -47,7 +47,7 @@ for vol in fr.volumes():
     nyp.33433074811310 - June / by Edith Barnard Delano ; with illustrations.
     nyp.33433075749246 - You never know your luck; being the story of a matrimonial deserter, by Gilbert Parker ... illustrated by W.L. Jacobs.
     mdp.39015028036104 - Russian short stories, ed. for school use,
-    
+
 
 Iterating on `FeatureReader` returns `Volume` objects. This is simply an easy way to access `feature_reader.volumes()`.
 Wherever possible, this library tries not to hold things in memory, so most of the time you want to iterate rather than casting to a list.
@@ -123,7 +123,7 @@ print(page)
 ```
 
     <page 00000016 of volume hvd.32044010273894>
-    
+
 
 If you want to pass arguments to page initialization, such as changing the page's default section from 'body' to 'group' (which returns header+footer+body), it can be done with `for page in vol.pages(default_section='group')`.
      
@@ -141,7 +141,7 @@ for vol in fr.volumes():
     Boston ; New York : Houghton Mifflin Company, 1916 (Cambridge : The Riverside Press)
     New York, George H. Doran Company [1914]
     Chicago, New York, Scott, Foresman and company [c1919]
-    
+
 
 
 ```python
@@ -149,7 +149,7 @@ print("METADATA FIELDS: " + ", ".join(vol.metadata.keys()))
 ```
 
     METADATA FIELDS: _version_, htrc_charCount, title, htrc_volumePageCountBin, publishDate, title_a, mainauthor, author_only, oclc, authorSort, country_of_pub, author, htrc_gender, language, ht_id, publisher, author_top, publishDateRange, htrc_pageCount, title_top, callnosort, publication_place, topic, htsource, htrc_wordCount, title_ab, callnumber, fullrecord, htrc_volumeWordCountBin, format, lccn, genre, htrc_genderMale, topic_subject, topicStr, geographic, published, sdrnum, id
-    
+
 
 _At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one volume at a time. Read about the [HTRC Solr Proxy](https://wiki.htrc.illinois.edu/display/COM/Solr+Proxy+API+User+Guide)._
 
@@ -186,7 +186,7 @@ print("The body has %s lines, %s empty lines, and %s sentences" % (page.line_cou
 ```
 
     The body has 30 lines, 0 empty lines, and 9 sentences
-    
+
 
 Since the HTRC provides information by header/body/footer, most methods take a `section=` argument. If not specified, this defaults to `"body"`, or whatever argument is supplied to `Page.default_section`.
 
@@ -200,7 +200,7 @@ print("%s tokens in the footer" % (page.token_count(section='footer')))
     294 tokens in the default section, body
     3 tokens in the header
     0 tokens in the footer
-    
+
 
 There are also two special arguments that can be given to `section`: `"all"` and "`group`". 'all' returns information for each section separately, when appropriate, while 'group' returns information for all header, body, and footer combined.
 
@@ -213,7 +213,7 @@ assert(page.token_count(section='group') == (page.token_count(section='header') 
 ```
 
     297 tokens on the full page
-    
+
 
 Note that for the most part, the properties of the `Page` and `Volume` objects aligns with the names in the HTRC Extracted Features schema, except they are converted to follow [Python naming conventions](https://google.github.io/styleguide/pyguide.html?showone=Naming#Naming): converting the `CamelCase` of the schema to `lowercase_with_underscores`. E.g. `beginLineChars` from the HTRC data is accessible as `Page.begin_line_chars`.
 
@@ -233,7 +233,7 @@ print(page.tokenlist()[:3])
     16   body    !        .        1
                  '        ''       1
                  'Flowers NNS      1
-    
+
 
 `Page.tokenlist()` can be manipulated in various ways. You can case-fold, for example:
 
@@ -248,7 +248,7 @@ print(df[15:18])
     16   body    ancient   JJ       1
                  and       CC      12
                  any       DT       1
-    
+
 
 Or, you can combine part of speech counts into a single integer.
 
@@ -263,7 +263,7 @@ print(df[15:18])
     16   body    Naples        1
                  November      1
                  October       1
-    
+
 
 Section arguments are valid here: 'header', 'body', 'footer', 'all', and 'group'
 
@@ -278,7 +278,7 @@ print(df)
     16   header  ballet         1
                  dancer         1
                  the            1
-    
+
 
 The MultiIndex makes it easy to slice the results, and it is althogether more memory-efficient. If you are new to Pandas DataFrames, you might find it easier to learn by converting the index to columns.
 
@@ -302,7 +302,7 @@ print(nouns.reset_index()[:2])
        page section         token pos  count
     0    16    body  benefactress  NN      1
     1    16    body    bitterness  NN      1
-    
+
 
 If you prefer not to use Pandas, you can always convert the object, with methods like `to_dict` and `to_csv`).
 
@@ -354,7 +354,7 @@ print(all_vol_token_counts.loc[idx[:,'body', 'she'],][:3])
     38   body    she            1
     39   body    she            1
     42   body    she            1
-    
+
 
 Note that a Volume-wide tokenlist is not crunched until you need it, then it will stay cached in case you need it. If you try to access `Page.tokenlist()` _after_ accessing `Volume.tokenlist()`, the Page object will return that page from the Volume's cached representation, rather than preparing it itself.
 
@@ -392,7 +392,7 @@ print(a.loc[10:11,['the','and','is', 'he', 'she']])
     page                           
     10      0.0  1.0  0.0  0.0  0.0
     11     22.0  7.0  4.0  0.0  0.0
-    
+
 
 Volume.term_page_freqs provides a wide DataFrame resembling a matrix, where terms are listed as columns, pages are listed as rows, and the values correspond to the term frequency (or page page frequency with `page_freq=true`).
 Volume.term_volume_freqs() simply sums these.
@@ -464,6 +464,13 @@ utils.id_to_rsync('miun.adx6300.0001.001')
 
 See the [ID to Rsync notebook](examples/ID_to_Rsync_Link.ipynb) for more information on this format and on Rsyncing lists of urls.
 
+There is also a command line utility installed with the HTRC Feature Reader:
+
+```bash
+$ htid2rsync miun.adx6300.0001.001
+miun/pairtree_root/ad/x6/30/0,/00/01/,0/01/adx6300,0001,001/miun.adx6300,0001,001.json.bz2
+```
+
 ### Advanced Features
 
 In the beta Extracted Features release, schema 2.0, a few features were separated out to an advanced files. However, *this designation is no longer present starting with schema 3.0*, meaning information like `beginLineChars`, `endLineChars`, and `capAlphaSeq` are always available:
@@ -494,7 +501,7 @@ print(end_line_chars.head())
                        I         1
                        f         1
                        t         1
-    
+
 
 
 ```python
@@ -510,7 +517,7 @@ print(end_line_chars.loc[idx[:,:,:,'!'],].head())
     77   body    end   !         1
     91   body    end   !         1
     92   body    end   !         1
-    
+
 
 ### Testing
 
