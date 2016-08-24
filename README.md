@@ -35,17 +35,17 @@ The easiest way to start using this library is to use the [FeatureReader](http:/
 import glob
 import pandas as pd
 from htrc_features import FeatureReader
-paths = glob.glob('data/PZ-volumes/*basic.json.bz2')
+paths = glob.glob('data/PZ-volumes/*.json.bz2')
 # Here we're loading five paths, for brevity
-feature_reader = FeatureReader(paths[:5])
-for vol in feature_reader.volumes():
+fr = FeatureReader(paths[:5])
+for vol in fr.volumes():
     print("%s - %s" % (vol.id, vol.title))
 ```
 
     hvd.32044010273894 - The ballet dancer, and On guard,
-    hvd.hwquxe - The man from Glengarry : a tale of the Ottawa / by Ralph Connor.
-    hvd.hwrevu - The lady with the dog, and other stories,
-    hvd.hwrqs8 - Mr. Rutherford's children. By the authors of "The wide, wide world," "Queechy,", "Dollars and cents," etc., etc.
+    njp.32101068970662 - Seven years, and other tales / by Julia Kavanagh.
+    nyp.33433074811310 - June / by Edith Barnard Delano ; with illustrations.
+    nyp.33433075749246 - You never know your luck; being the story of a matrimonial deserter, by Gilbert Parker ... illustrated by W.L. Jacobs.
     mdp.39015028036104 - Russian short stories, ed. for school use,
 
 
@@ -60,47 +60,35 @@ For large sets, it's better to just have a text file of your paths, and read it 
 The feature reader also has a useful method, `multiprocessing(map_func)`, for chunking a running functions across multiple processes.
 This is an advanced feature, but extremely helpful for any large-scale processing.
 
-#### A note on Advanced Features
-
-Version 2.0 of the Extracted Features dataset adds an additional 'advanced' file for each volume ([More info](#Advanced-Files)). This library can support the advanced file if you read in `(basic, advanced)` tuples instead of single path strings. e.g.
+In addition to iterating on `feature_reader.volumes()`, there is a convenient function to grab the first volume in a feature reader. This helps in testing code, and is what we'll do to continue this introduction:
 
 
 ```python
-newpaths = [(x,x.replace('basic', 'advanced')) for x in paths]
-newpaths[:2]
+vol = fr.first()
+vol
 ```
 
 
 
 
-    [('data/PZ-volumes\\hvd.32044010273894.basic.json.bz2',
-      'data/PZ-volumes\\hvd.32044010273894.advanced.json.bz2'),
-     ('data/PZ-volumes\\hvd.hwquxe.basic.json.bz2',
-      'data/PZ-volumes\\hvd.hwquxe.advanced.json.bz2')]
+    <htrc_features.feature_reader.Volume at 0x1d2ffc52240>
 
 
-
-
-```python
-feature_reader = FeatureReader(newpaths[:5])
-vol = feature_reader.first()
-```
 
 ### Volume
 
-A [Volume](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Volume) contains information about the current work and access to the pages of the work.
-
-All the metadata fields from the HTRC JSON file are accessible as properties of the volume object, including _title_, _language_, _imprint_, _oclc_, _pubDate_, and _genre_. The main identifier _id_ and _pageCount_ are also accessible.
+A [Volume](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Volume) contains information about the current work and access to the pages of the work. All the metadata fields from the HTRC JSON file are accessible as properties of the volume object, including _title_, _language_, _imprint_, _oclc_, _pubDate_, and _genre_. The main identifier _id_ and _pageCount_ are also accessible, and you can find the URL for the Full View of the text in the HathiTrust Digital Library - if it exists - with `vol.handle_url`.
 
 
 ```python
-"Volume %s has %s pages in %s" % (vol.id, vol.page_count, vol.language)
+"Volume %s is a %s page text written in %s. You can doublecheck at %s" % (vol.id, vol.page_count,
+                                                                          vol.language, vol.handle_url)
 ```
 
 
 
 
-    'Volume hvd.32044010273894 has 284 pages in eng'
+    'Volume hvd.32044010273894 is a 284 page text written in eng. You can doublecheck at http://hdl.handle.net/2027/hvd.32044010273894'
 
 
 
@@ -144,15 +132,14 @@ Remember that this calls the HTRC servers for each volume, so can add considerab
 
 
 ```python
-fr = FeatureReader(paths[0:5])
 for vol in fr.volumes():
     print(vol.metadata['published'][0])
 ```
 
     New York, and London, Harper & brothers, 1901
-    Chicago, New York [etc.] F. H. Revell company, 1901
-    New York, The Macmillan company, 1917
-    New York, : G. P. Putnam & co., 1853-55
+    London : Hurst and Blackett, 1860
+    Boston ; New York : Houghton Mifflin Company, 1916 (Cambridge : The Riverside Press)
+    New York, George H. Doran Company [1914]
     Chicago, New York, Scott, Foresman and company [c1919]
 
 
@@ -161,10 +148,24 @@ for vol in fr.volumes():
 print("METADATA FIELDS: " + ", ".join(vol.metadata.keys()))
 ```
 
-    METADATA FIELDS: topic, id, htrc_genderMale, title_ab, fullrecord, title_a, format, callnumber, mainauthor, published, topic_subject, oclc, author_only, language, geographic, title, author_top, genre, _version_, publisher, publishDateRange, publishDate, sdrnum, authorSort, publication_place, htrc_wordCount, callnosort, country_of_pub, ht_id, author, htrc_volumePageCountBin, htrc_charCount, htrc_gender, lccn, topicStr, htrc_pageCount, title_top, htsource, htrc_volumeWordCountBin
+    METADATA FIELDS: _version_, htrc_charCount, title, htrc_volumePageCountBin, publishDate, title_a, mainauthor, author_only, oclc, authorSort, country_of_pub, author, htrc_gender, language, ht_id, publisher, author_top, publishDateRange, htrc_pageCount, title_top, callnosort, publication_place, topic, htsource, htrc_wordCount, title_ab, callnumber, fullrecord, htrc_volumeWordCountBin, format, lccn, genre, htrc_genderMale, topic_subject, topicStr, geographic, published, sdrnum, id
 
 
 _At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one volume at a time. Read about the [HTRC Solr Proxy](https://wiki.htrc.illinois.edu/display/COM/Solr+Proxy+API+User+Guide)._
+
+Another source of bibliographic metadata is the HathiTrust Bib API. You can access this information through the URL returned with `vol.ht_bib_url`:
+
+
+```python
+vol.ht_bib_url
+```
+
+
+
+
+    'http://catalog.hathitrust.org/api/volumes/full/htid/mdp.39015028036104.json'
+
+
 
 Volumes also have direct access to volume-wide info of features stored in pages. For example, you can get a list of words per page through [Volume.tokens_per_page()](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Volume.tokens_per_page). We'll discuss these features [below](#Volume-stats-collecting), after looking first at Pages.
 
@@ -179,10 +180,12 @@ A page contains the meat of the HTRC's extracted features, including information
 
 
 ```python
-print("The body has %s lines, %s empty lines, and %s sentences" % (page.line_count, page.empty_line_count, page.sentence_count))
+print("The body has %s lines, %s empty lines, and %s sentences" % (page.line_count(),
+                                                                   page.empty_line_count(),
+                                                                   page.sentence_count()))
 ```
 
-    The body has <bound method Page.line_count of <htrc_features.feature_reader.Page object at 0x0000020B7D4C07F0>> lines, <bound method Page.empty_line_count of <htrc_features.feature_reader.Page object at 0x0000020B7D4C07F0>> empty lines, and <bound method Page.sentence_count of <htrc_features.feature_reader.Page object at 0x0000020B7D4C07F0>> sentences
+    The body has 30 lines, 0 empty lines, and 9 sentences
 
 
 Since the HTRC provides information by header/body/footer, most methods take a `section=` argument. If not specified, this defaults to `"body"`, or whatever argument is supplied to `Page.default_section`.
@@ -440,7 +443,7 @@ find feature-files/ -name '*json.bz2' | parallel --eta --jobs 90% -n 50 python y
 
 ### Iterating through the JSON files
 
-If you need to do fast, highly customized processing without instantiating Volumes, FeatureReader has a convenient generator for getting the raw JSON as a Python dict: `fr.jsons()`. This simply does the file reading, optional decompression, and JSON parsing. Iterate through it as with `fr.volumes()`. If an advanced feature file is included, the dicts for the basic and advanced files are returned as a tuple.
+If you need to do fast, highly customized processing without instantiating Volumes, FeatureReader has a convenient generator for getting the raw JSON as a Python dict: `fr.jsons()`. This simply does the file reading, optional decompression, and JSON parsing.
 
 ### Getting the Rsync URL
 
@@ -455,72 +458,66 @@ utils.id_to_rsync('miun.adx6300.0001.001')
 
 
 
-    'basic/miun/pairtree_root/ad/x6/30/0,/00/01/,0/01/adx6300,0001,001/miun.adx6300,0001,001.basic.json.bz2'
-
-
-
-
-```python
-utils.id_to_rsync('miun.adx6300.0001.001', kind='advanced')
-```
-
-
-
-
-    'advanced/miun/pairtree_root/ad/x6/30/0,/00/01/,0/01/adx6300,0001,001/miun.adx6300,0001,001.advanced.json.bz2'
+    'miun/pairtree_root/ad/x6/30/0,/00/01/,0/01/adx6300,0001,001/miun.adx6300,0001,001.json.bz2'
 
 
 
 See the [ID to Rsync notebook](examples/ID_to_Rsync_Link.ipynb) for more information on this format and on Rsyncing lists of urls.
 
-### Advanced Files
+There is also a command line utility installed with the HTRC Feature Reader:
 
-In the beta Extracted Features release, schema 2.0, a few features were separated out to an advanced files. If you try to access those features, like `endLineChars`, you'll get a error:
+```bash
+$ htid2rsync miun.adx6300.0001.001
+miun/pairtree_root/ad/x6/30/0,/00/01/,0/01/adx6300,0001,001/miun.adx6300,0001,001.json.bz2
+```
+
+### Advanced Features
+
+In the beta Extracted Features release, schema 2.0, a few features were separated out to an advanced files. However, *this designation is no longer present starting with schema 3.0*, meaning information like `beginLineChars`, `endLineChars`, and `capAlphaSeq` are always available:
+
+
+```python
+# What is the longest sequence of capital letter on each page?
+vol.cap_alpha_seqs()[:10]
+```
+
+
+
+
+    [0, 1, 0, 0, 0, 0, 0, 0, 4, 1]
+
+
 
 
 ```python
 end_line_chars = vol.end_line_chars()
-```
-
-It is possible to load the advanced file alongside the basic files by passing in a `(basic, advanced)` tuple of filepaths where you would normally pass in a single path. For example,
-
-
-```python
-newpaths = [(x,x.replace('basic', 'advanced')) for x in paths]
-newpaths[:2]
-```
-
-
-
-
-    [('data/PZ-volumes\\hvd.32044010273894.basic.json.bz2',
-      'data/PZ-volumes\\hvd.32044010273894.advanced.json.bz2'),
-     ('data/PZ-volumes\\hvd.hwquxe.basic.json.bz2',
-      'data/PZ-volumes\\hvd.hwquxe.advanced.json.bz2')]
-
-
-
-
-```python
-fr = FeatureReader(newpaths)
-vol = next(fr.volumes())
-idx = pd.IndexSlice
-end_line_chars = vol.end_line_chars()
-print(end_line_chars.loc[idx[:,:,:,'!'],][:5])
+print(end_line_chars.head())
 ```
 
                              count
     page section place char       
-    14   body    end   !         1
-    17   body    end   !         1
-    20   body    end   !         2
-    34   body    end   !         1
-    40   body    end   !         1
+    2    body    end   -         1
+                       :         1
+                       I         1
+                       f         1
+                       t         1
 
 
-Note that the advanced files are not as carefully supported because the basic/advanced split will not continue for future releases.
 
-Remember that loading and parsing the advanced feature files adds non-negligible time (about `1.3` seconds on my computer) and often you won't need them.
+```python
+# Find pages that have lines ending with "!"
+idx = pd.IndexSlice
+print(end_line_chars.loc[idx[:,:,:,'!'],].head())
+```
+
+                             count
+    page section place char       
+    45   body    end   !         1
+    75   body    end   !         1
+    77   body    end   !         1
+    91   body    end   !         1
+    92   body    end   !         1
+
 
 ### Testing
 

@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='htrc-feature-reader',
-      version='1.50',
+      version='1.70',
       description='Library for working with the HTRC Extracted Features dataset',
       classifiers=[
           'Development Status :: 4 - Beta',
@@ -22,4 +22,9 @@ setup(name='htrc-feature-reader',
       install_requires=['six', 'pandas', 'numpy', 'pysolr', 'ujson'],
       setup_requires=['pytest-runner'],
       tests_require=['pytest'],
+      entry_points={
+          'console_scripts': [
+              'htid2rsync = htrc_features.utils:htid2rsync_cmd'
+              ]
+          },
       zip_safe=False)
