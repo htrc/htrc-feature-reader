@@ -1,26 +1,26 @@
 package:
   name: htrc-feature-reader
-  version: "1.50"
+  version: "1.70"
 
 source:
-  fn: htrc-feature-reader-1.50.tar.gz
-  url: https://files.pythonhosted.org/packages/58/d0/d783e1587ad8721b901170a95b777c4e07155f6b498388bc54d35dc63f28/htrc-feature-reader-1.50.tar.gz
-  md5: 0f1a573232aae290f4f26f02b5d460b1
+  fn: htrc-feature-reader-1.70.tar.gz
+  url: https://pypi.python.org/packages/98/f6/fb8e470048227651faf3a949734ddfe098f06e70f7198bceffe8687bbf66/htrc-feature-reader-1.70.tar.gz
+  md5: f37f2f5f72b320411231ca8bacf697dc
 #  patches:
    # List any patch files here
    # - fix.patch
 
-# build:
+build:
   # noarch_python: True
   # preserve_egg_dir: True
-  # entry_points:
+  entry_points:
     # Put any entry points (scripts to be generated automatically) here. The
     # syntax is module:function.  For example
     #
     # - htrc-feature-reader = htrc-feature-reader:main
     #
     # Would create an entry point called htrc-feature-reader that calls htrc-feature-reader.main()
-
+    - htid2rsync = htrc_features.utils:htid2rsync_cmd
 
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
@@ -50,10 +50,10 @@ test:
   imports:
     - htrc_features
 
-  # commands:
+  commands:
     # You can put test commands to be run here.  Use this to test that the
     # entry points work.
-
+    - htid2rsync --help
 
   # You can also put a file called run_test.py in the recipe that will be run
   # at test time.
@@ -67,6 +67,7 @@ about:
   home: https://github.com/organisciak/htrc-feature-reader
   license: University of Illinois/NCSA Open Source License
   summary: 'Library for working with the HTRC Extracted Features dataset'
+  license_family: Proprietary
 
 # See
 # http://docs.continuum.io/conda/build.html for
