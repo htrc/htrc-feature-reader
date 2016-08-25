@@ -1038,6 +1038,7 @@ table {
     <li class="set"><h3><a href="#header-functions">Functions</a></h3>
       
   <ul>
+    <li class="mono"><a href="#htrc_features.utils.htid2rsync_cmd">htid2rsync_cmd</a></li>
     <li class="mono"><a href="#htrc_features.utils.id2path">id2path</a></li>
     <li class="mono"><a href="#htrc_features.utils.id_encode">id_encode</a></li>
     <li class="mono"><a href="#htrc_features.utils.id_to_rsync">id_to_rsync</a></li>
@@ -1081,20 +1082,44 @@ table {
         <span class="k">return</span> <span class="s">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s">&#39;basic&#39;</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Take an HTRC id and convert it to an Rsync location for syncing Extracted</span>
 <span class="sd">    Features</span>
-
-<span class="sd">    kind: [basic|advanced]</span>
 <span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">if</span> <span class="s">&#39;kind&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;The basic/advanced split with extracted features files &quot;</span>
+                     <span class="s">&quot;was removed in schema version 3.0. This function only &quot;</span>
+                     <span class="s">&quot;supports the current format for Rsync URLs, if you &quot;</span>
+                     <span class="s">&quot;would like to see the legacy 2.0 format, see Github: &quot;</span>
+                     <span class="s">&quot;https://github.com/htrc/htrc-feature-reader/blob/3e100ae&quot;</span>
+                     <span class="s">&quot;9ea45317443ae05f43a188b12afe2e69a/htrc_features/utils.py&quot;</span>
+                     <span class="p">)</span>
     <span class="n">libid</span><span class="p">,</span> <span class="n">volid</span> <span class="o">=</span> <span class="n">htid</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
     <span class="n">volid_clean</span> <span class="o">=</span> <span class="n">id_encode</span><span class="p">(</span><span class="n">volid</span><span class="p">)</span>
-    <span class="n">filename</span> <span class="o">=</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">libid</span><span class="p">,</span> <span class="n">volid_clean</span><span class="p">,</span> <span class="n">kind</span><span class="p">,</span> <span class="s">&#39;json.bz2&#39;</span><span class="p">])</span>
-
-    <span class="n">path</span> <span class="o">=</span> <span class="s">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">kind</span><span class="p">,</span> <span class="n">libid</span><span class="p">,</span> <span class="s">&#39;pairtree_root&#39;</span><span class="p">,</span>
-                     <span class="n">id2path</span><span class="p">(</span><span class="n">volid</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\\</span><span class="s">&#39;</span><span class="p">,</span> <span class="s">&#39;/&#39;</span><span class="p">),</span> <span class="n">volid_clean</span><span class="p">,</span> <span class="n">filename</span><span class="p">])</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">libid</span><span class="p">,</span> <span class="n">volid_clean</span><span class="p">,</span> <span class="s">&#39;json.bz2&#39;</span><span class="p">])</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="s">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">libid</span><span class="p">,</span> <span class="s">&#39;pairtree_root&#39;</span><span class="p">,</span> <span class="n">id2path</span><span class="p">(</span><span class="n">volid</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\\</span><span class="s">&#39;</span><span class="p">,</span> <span class="s">&#39;/&#39;</span><span class="p">),</span>
+                     <span class="n">volid_clean</span><span class="p">,</span> <span class="n">filename</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">path</span>
+
+
+<span class="k">def</span> <span class="nf">htid2rsync_cmd</span><span class="p">():</span>
+    <span class="sd">&#39;&#39;&#39; A module to install for command line access, through &#39;htid2rsync&#39; &#39;&#39;&#39;</span>
+    <span class="kn">import</span> <span class="nn">argparse</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s">&#39;Convert a HathiTrust ID to &#39;</span>
+                                     <span class="s">&#39;a pairtree path for Rsyncing that id</span><span class="se">\&#39;</span><span class="s">s &#39;</span>
+                                     <span class="s">&#39;Extracted Features dataset file. This &#39;</span>
+                                     <span class="s">&#39;does not check if the file exists.&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s">&#39;+&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s">&quot;A HathiTrust id or multiple ids to convert.&quot;</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+    <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span><span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">)</span> <span class="k">for</span> <span class="n">htid</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">urls</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">htid2rsync_cmd</span><span class="p">()</span>
 </pre></div>
 
   </div>
@@ -1104,6 +1129,39 @@ table {
   <section id="section-items">
 
     <h2 class="section-title" id="header-functions">Functions</h2>
+      
+  <div class="item">
+    <div class="name def" id="htrc_features.utils.htid2rsync_cmd">
+    <p>def <span class="ident">htid2rsync_cmd</span>(</p><p>)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>A module to install for command line access, through 'htid2rsync'</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.utils.htid2rsync_cmd', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.utils.htid2rsync_cmd" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">htid2rsync_cmd</span><span class="p">():</span>
+    <span class="sd">&#39;&#39;&#39; A module to install for command line access, through &#39;htid2rsync&#39; &#39;&#39;&#39;</span>
+    <span class="kn">import</span> <span class="nn">argparse</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s">&#39;Convert a HathiTrust ID to &#39;</span>
+                                     <span class="s">&#39;a pairtree path for Rsyncing that id</span><span class="se">\&#39;</span><span class="s">s &#39;</span>
+                                     <span class="s">&#39;Extracted Features dataset file. This &#39;</span>
+                                     <span class="s">&#39;does not check if the file exists.&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s">&#39;+&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s">&quot;A HathiTrust id or multiple ids to convert.&quot;</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+    <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span><span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">)</span> <span class="k">for</span> <span class="n">htid</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">urls</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
       
   <div class="item">
     <div class="name def" id="htrc_features.utils.id2path">
@@ -1154,31 +1212,35 @@ table {
       
   <div class="item">
     <div class="name def" id="htrc_features.utils.id_to_rsync">
-    <p>def <span class="ident">id_to_rsync</span>(</p><p>htid, kind=&#39;basic&#39;)</p>
+    <p>def <span class="ident">id_to_rsync</span>(</p><p>htid, **kwargs)</p>
     </div>
     
 
     
   
     <div class="desc"><p>Take an HTRC id and convert it to an Rsync location for syncing Extracted
-Features</p>
-<p>kind: [basic|advanced]</p></div>
+Features</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.utils.id_to_rsync', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.utils.id_to_rsync" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s">&#39;basic&#39;</span><span class="p">):</span>
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Take an HTRC id and convert it to an Rsync location for syncing Extracted</span>
 <span class="sd">    Features</span>
-
-<span class="sd">    kind: [basic|advanced]</span>
 <span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">if</span> <span class="s">&#39;kind&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;The basic/advanced split with extracted features files &quot;</span>
+                     <span class="s">&quot;was removed in schema version 3.0. This function only &quot;</span>
+                     <span class="s">&quot;supports the current format for Rsync URLs, if you &quot;</span>
+                     <span class="s">&quot;would like to see the legacy 2.0 format, see Github: &quot;</span>
+                     <span class="s">&quot;https://github.com/htrc/htrc-feature-reader/blob/3e100ae&quot;</span>
+                     <span class="s">&quot;9ea45317443ae05f43a188b12afe2e69a/htrc_features/utils.py&quot;</span>
+                     <span class="p">)</span>
     <span class="n">libid</span><span class="p">,</span> <span class="n">volid</span> <span class="o">=</span> <span class="n">htid</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
     <span class="n">volid_clean</span> <span class="o">=</span> <span class="n">id_encode</span><span class="p">(</span><span class="n">volid</span><span class="p">)</span>
-    <span class="n">filename</span> <span class="o">=</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">libid</span><span class="p">,</span> <span class="n">volid_clean</span><span class="p">,</span> <span class="n">kind</span><span class="p">,</span> <span class="s">&#39;json.bz2&#39;</span><span class="p">])</span>
-
-    <span class="n">path</span> <span class="o">=</span> <span class="s">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">kind</span><span class="p">,</span> <span class="n">libid</span><span class="p">,</span> <span class="s">&#39;pairtree_root&#39;</span><span class="p">,</span>
-                     <span class="n">id2path</span><span class="p">(</span><span class="n">volid</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\\</span><span class="s">&#39;</span><span class="p">,</span> <span class="s">&#39;/&#39;</span><span class="p">),</span> <span class="n">volid_clean</span><span class="p">,</span> <span class="n">filename</span><span class="p">])</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">libid</span><span class="p">,</span> <span class="n">volid_clean</span><span class="p">,</span> <span class="s">&#39;json.bz2&#39;</span><span class="p">])</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="s">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">libid</span><span class="p">,</span> <span class="s">&#39;pairtree_root&#39;</span><span class="p">,</span> <span class="n">id2path</span><span class="p">(</span><span class="n">volid</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\\</span><span class="s">&#39;</span><span class="p">,</span> <span class="s">&#39;/&#39;</span><span class="p">),</span>
+                     <span class="n">volid_clean</span><span class="p">,</span> <span class="n">filename</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">path</span>
 </pre></div>
 

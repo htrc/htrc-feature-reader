@@ -1074,6 +1074,7 @@ table {
   <ul>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.__init__">__init__</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.begin_line_chars">begin_line_chars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Page.cap_alpha_seq">cap_alpha_seq</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.count">count</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.empty_line_count">empty_line_count</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Page.end_line_chars">end_line_chars</a></li>
@@ -1093,6 +1094,8 @@ table {
   <ul>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.__init__">__init__</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.begin_line_chars">begin_line_chars</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Volume.cap_alpha_seq">cap_alpha_seq</a></li>
+    <li class="mono"><a href="#htrc_features.feature_reader.Volume.cap_alpha_seqs">cap_alpha_seqs</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.empty_line_counts">empty_line_counts</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.end_line_chars">end_line_chars</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.Volume.line_chars">line_chars</a></li>
@@ -1400,12 +1403,15 @@ table {
 
 
 <span class="k">class</span> <span class="nc">Volume</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="n">SUPPORTED_SCHEMA</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;1.0&#39;</span><span class="p">,</span> <span class="s">&#39;2.0&#39;</span><span class="p">]</span>
+    <span class="n">SUPPORTED_SCHEMA</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;2.0&#39;</span><span class="p">,</span> <span class="s">&#39;3.0&#39;</span><span class="p">]</span>
     <span class="n">METADATA_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">,</span> <span class="s">&#39;schema_version&#39;</span><span class="p">),</span>
-                       <span class="p">(</span><span class="s">&#39;dateCreated&#39;</span><span class="p">,</span> <span class="s">&#39;date_created&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;title&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;dateCreated&#39;</span><span class="p">,</span> <span class="s">&#39;date_created&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;title&#39;</span><span class="p">),</span>
                        <span class="p">(</span><span class="s">&#39;pubDate&#39;</span><span class="p">,</span> <span class="s">&#39;pub_date&#39;</span><span class="p">),</span>
-                       <span class="p">(</span><span class="s">&#39;language&#39;</span><span class="p">,</span> <span class="s">&#39;language&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;htBibUrl&#39;</span><span class="p">,</span> <span class="s">&#39;ht_bib_url&#39;</span><span class="p">),</span>
-                       <span class="p">(</span><span class="s">&#39;handleUrl&#39;</span><span class="p">,</span> <span class="s">&#39;handle_url&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;oclc&#39;</span><span class="p">,</span> <span class="s">&#39;oclc&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;language&#39;</span><span class="p">,</span> <span class="s">&#39;language&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;htBibUrl&#39;</span><span class="p">,</span> <span class="s">&#39;ht_bib_url&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;handleUrl&#39;</span><span class="p">,</span> <span class="s">&#39;handle_url&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;oclc&#39;</span><span class="p">,</span> <span class="s">&#39;oclc&#39;</span><span class="p">),</span>
                        <span class="p">(</span><span class="s">&#39;imprint&#39;</span><span class="p">,</span> <span class="s">&#39;imprint&#39;</span><span class="p">)]</span>
     <span class="sd">&#39;&#39;&#39; List of metadata fields, with their pythonic name mapping. &#39;&#39;&#39;</span>
 
@@ -1450,10 +1456,6 @@ table {
                 <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span> <span class="o">=</span> <span class="bp">True</span>
                 <span class="c"># Create an internal dataframe for lineChar counts</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="n">advanced</span><span class="p">[</span><span class="s">&#39;pages&#39;</span><span class="p">])</span>
-
-                <span class="c"># Count up the capAlphaSeq (longest length of alphabetical</span>
-                <span class="c"># sequence of capital letters starting a line</span>
-                <span class="c"># TODO</span>
 
     <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()</span>
@@ -1525,7 +1527,22 @@ table {
 
     <span class="k">def</span> <span class="nf">empty_line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Return a list of empty line counts, per page &#39;&#39;&#39;</span>
-        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+
+    <span class="k">def</span> <span class="nf">cap_alpha_seq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;At the volume-level, use Volume.cap_alpha_seqs()&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cap_alpha_seqs</span><span class="p">(</span><span class="n">section</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">cap_alpha_seqs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return the longest length of consecutive capital letters starting a</span>
+<span class="sd">        line on the page. Returns a list for all pages. Only includes the body:</span>
+<span class="sd">        header/footer information is not included.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">section</span> <span class="o">!=</span> <span class="s">&#39;body&#39;</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;cap_alpha_seq only includes counts for the body &quot;</span>
+                         <span class="s">&quot;section of pages.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">cap_alpha_seq</span><span class="p">()</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
 
     <span class="k">def</span> <span class="nf">sentence_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Return a list of sentence counts, per page &#39;&#39;&#39;</span>
@@ -1697,7 +1714,8 @@ table {
                     <span class="p">(</span><span class="s">&#39;languages&#39;</span><span class="p">,</span> <span class="s">&#39;languages&#39;</span><span class="p">)]</span>
     <span class="sd">&#39;&#39;&#39; List of fields which return primitive values in the schema, as tuples</span>
 <span class="sd">    with (CamelCase, lower_with_under) mapping &#39;&#39;&#39;</span>
-    <span class="n">SECTION_FIELDS</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;lineCount&#39;</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">]</span>
+    <span class="n">SECTION_FIELDS</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;lineCount&#39;</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;capAlphaSeq&#39;</span><span class="p">]</span>
     <span class="sd">&#39;&#39;&#39; Fields that are counted by section.&#39;&#39;&#39;</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">default_section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
@@ -1714,7 +1732,10 @@ table {
         <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">SECREF</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;u4&#39;</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sec</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">SECREF</span><span class="p">):</span>
                 <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">stat</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">):</span>
-                            <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+                            <span class="k">if</span> <span class="n">stat</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">]:</span>
+                                <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">,</span>
                                          <span class="n">index</span><span class="o">=</span><span class="n">SECREF</span><span class="p">)</span>
 
@@ -1735,6 +1756,16 @@ table {
 
     <span class="k">def</span> <span class="nf">empty_line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">cap_alpha_seq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return the longest length of consecutive capital letters starting a</span>
+<span class="sd">        line on the page. Returns an integer. Only includes the body:</span>
+<span class="sd">        header/footer information is not included.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">section</span> <span class="o">!=</span> <span class="s">&#39;body&#39;</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;cap_alpha_seq only includes counts for the body &quot;</span>
+                         <span class="s">&quot;section of pages.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="s">&#39;body&#39;</span><span class="p">,</span> <span class="s">&#39;capAlphaSeq&#39;</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">sentence_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">)</span>
@@ -2419,7 +2450,8 @@ created. Returns a (key, value) tuple.</p>
                     <span class="p">(</span><span class="s">&#39;languages&#39;</span><span class="p">,</span> <span class="s">&#39;languages&#39;</span><span class="p">)]</span>
     <span class="sd">&#39;&#39;&#39; List of fields which return primitive values in the schema, as tuples</span>
 <span class="sd">    with (CamelCase, lower_with_under) mapping &#39;&#39;&#39;</span>
-    <span class="n">SECTION_FIELDS</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;lineCount&#39;</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">]</span>
+    <span class="n">SECTION_FIELDS</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;lineCount&#39;</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;capAlphaSeq&#39;</span><span class="p">]</span>
     <span class="sd">&#39;&#39;&#39; Fields that are counted by section.&#39;&#39;&#39;</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pageobj</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">default_section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
@@ -2436,7 +2468,10 @@ created. Returns a (key, value) tuple.</p>
         <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">SECREF</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;u4&#39;</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sec</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">SECREF</span><span class="p">):</span>
                 <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">stat</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">):</span>
-                            <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+                            <span class="k">if</span> <span class="n">stat</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">]:</span>
+                                <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">,</span>
                                          <span class="n">index</span><span class="o">=</span><span class="n">SECREF</span><span class="p">)</span>
 
@@ -2457,6 +2492,16 @@ created. Returns a (key, value) tuple.</p>
 
     <span class="k">def</span> <span class="nf">empty_line_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;emptyLineCount&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">cap_alpha_seq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return the longest length of consecutive capital letters starting a</span>
+<span class="sd">        line on the page. Returns an integer. Only includes the body:</span>
+<span class="sd">        header/footer information is not included.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">section</span> <span class="o">!=</span> <span class="s">&#39;body&#39;</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;cap_alpha_seq only includes counts for the body &quot;</span>
+                         <span class="s">&quot;section of pages.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="s">&#39;body&#39;</span><span class="p">,</span> <span class="s">&#39;capAlphaSeq&#39;</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">sentence_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="s">&#39;sentenceCount&#39;</span><span class="p">)</span>
@@ -2660,7 +2705,10 @@ with (CamelCase, lower_with_under) mapping</p></div>
     <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">SECREF</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;u4&#39;</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sec</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">SECREF</span><span class="p">):</span>
             <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">stat</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">):</span>
-                        <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+                        <span class="k">if</span> <span class="n">stat</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">]:</span>
+                            <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_json</span><span class="p">[</span><span class="n">sec</span><span class="p">][</span><span class="n">stat</span><span class="p">]</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_basic_stats</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">SECTION_FIELDS</span><span class="p">,</span>
                                      <span class="n">index</span><span class="o">=</span><span class="n">SECREF</span><span class="p">)</span>
 </pre></div>
@@ -2684,6 +2732,37 @@ with (CamelCase, lower_with_under) mapping</p></div>
   <div id="source-htrc_features.feature_reader.Page.begin_line_chars" class="source">
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">begin_line_chars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_chars</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">,</span> <span class="n">place</span><span class="o">=</span><span class="s">&#39;begin&#39;</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Page.cap_alpha_seq">
+    <p>def <span class="ident">cap_alpha_seq</span>(</p><p>self, section=u&#39;body&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the longest length of consecutive capital letters starting a
+line on the page. Returns an integer. Only includes the body:
+header/footer information is not included.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Page.cap_alpha_seq', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Page.cap_alpha_seq" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">cap_alpha_seq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Return the longest length of consecutive capital letters starting a</span>
+<span class="sd">    line on the page. Returns an integer. Only includes the body:</span>
+<span class="sd">    header/footer information is not included.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">if</span> <span class="n">section</span> <span class="o">!=</span> <span class="s">&#39;body&#39;</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;cap_alpha_seq only includes counts for the body &quot;</span>
+                     <span class="s">&quot;section of pages.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_basic_stat</span><span class="p">(</span><span class="s">&#39;body&#39;</span><span class="p">,</span> <span class="s">&#39;capAlphaSeq&#39;</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2985,12 +3064,15 @@ with (CamelCase, lower_with_under) mapping</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.feature_reader.Volume" class="source">
     <div class="codehilite"><pre><span class="k">class</span> <span class="nc">Volume</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="n">SUPPORTED_SCHEMA</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;1.0&#39;</span><span class="p">,</span> <span class="s">&#39;2.0&#39;</span><span class="p">]</span>
+    <span class="n">SUPPORTED_SCHEMA</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;2.0&#39;</span><span class="p">,</span> <span class="s">&#39;3.0&#39;</span><span class="p">]</span>
     <span class="n">METADATA_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">,</span> <span class="s">&#39;schema_version&#39;</span><span class="p">),</span>
-                       <span class="p">(</span><span class="s">&#39;dateCreated&#39;</span><span class="p">,</span> <span class="s">&#39;date_created&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;title&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;dateCreated&#39;</span><span class="p">,</span> <span class="s">&#39;date_created&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;title&#39;</span><span class="p">),</span>
                        <span class="p">(</span><span class="s">&#39;pubDate&#39;</span><span class="p">,</span> <span class="s">&#39;pub_date&#39;</span><span class="p">),</span>
-                       <span class="p">(</span><span class="s">&#39;language&#39;</span><span class="p">,</span> <span class="s">&#39;language&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;htBibUrl&#39;</span><span class="p">,</span> <span class="s">&#39;ht_bib_url&#39;</span><span class="p">),</span>
-                       <span class="p">(</span><span class="s">&#39;handleUrl&#39;</span><span class="p">,</span> <span class="s">&#39;handle_url&#39;</span><span class="p">),</span> <span class="p">(</span><span class="s">&#39;oclc&#39;</span><span class="p">,</span> <span class="s">&#39;oclc&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;language&#39;</span><span class="p">,</span> <span class="s">&#39;language&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;htBibUrl&#39;</span><span class="p">,</span> <span class="s">&#39;ht_bib_url&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;handleUrl&#39;</span><span class="p">,</span> <span class="s">&#39;handle_url&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;oclc&#39;</span><span class="p">,</span> <span class="s">&#39;oclc&#39;</span><span class="p">),</span>
                        <span class="p">(</span><span class="s">&#39;imprint&#39;</span><span class="p">,</span> <span class="s">&#39;imprint&#39;</span><span class="p">)]</span>
     <span class="sd">&#39;&#39;&#39; List of metadata fields, with their pythonic name mapping. &#39;&#39;&#39;</span>
 
@@ -3035,10 +3117,6 @@ with (CamelCase, lower_with_under) mapping</p></div>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span> <span class="o">=</span> <span class="bp">True</span>
                 <span class="c"># Create an internal dataframe for lineChar counts</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_line_chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_line_char_df</span><span class="p">(</span><span class="n">advanced</span><span class="p">[</span><span class="s">&#39;pages&#39;</span><span class="p">])</span>
-
-                <span class="c"># Count up the capAlphaSeq (longest length of alphabetical</span>
-                <span class="c"># sequence of capital letters starting a line</span>
-                <span class="c"># TODO</span>
 
     <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()</span>
@@ -3110,7 +3188,22 @@ with (CamelCase, lower_with_under) mapping</p></div>
 
     <span class="k">def</span> <span class="nf">empty_line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Return a list of empty line counts, per page &#39;&#39;&#39;</span>
-        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+
+    <span class="k">def</span> <span class="nf">cap_alpha_seq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;At the volume-level, use Volume.cap_alpha_seqs()&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cap_alpha_seqs</span><span class="p">(</span><span class="n">section</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">cap_alpha_seqs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Return the longest length of consecutive capital letters starting a</span>
+<span class="sd">        line on the page. Returns a list for all pages. Only includes the body:</span>
+<span class="sd">        header/footer information is not included.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">section</span> <span class="o">!=</span> <span class="s">&#39;body&#39;</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;cap_alpha_seq only includes counts for the body &quot;</span>
+                         <span class="s">&quot;section of pages.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">cap_alpha_seq</span><span class="p">()</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
 
     <span class="k">def</span> <span class="nf">sentence_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Return a list of sentence counts, per page &#39;&#39;&#39;</span>
@@ -3438,6 +3531,59 @@ the far left of the page.</p></div>
   
             
   <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Volume.cap_alpha_seq">
+    <p>def <span class="ident">cap_alpha_seq</span>(</p><p>self, section=u&#39;body&#39;)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.cap_alpha_seq', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Volume.cap_alpha_seq" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">cap_alpha_seq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;At the volume-level, use Volume.cap_alpha_seqs()&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cap_alpha_seqs</span><span class="p">(</span><span class="n">section</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="htrc_features.feature_reader.Volume.cap_alpha_seqs">
+    <p>def <span class="ident">cap_alpha_seqs</span>(</p><p>self, section=u&#39;body&#39;)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Return the longest length of consecutive capital letters starting a
+line on the page. Returns a list for all pages. Only includes the body:
+header/footer information is not included.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.Volume.cap_alpha_seqs', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.feature_reader.Volume.cap_alpha_seqs" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">cap_alpha_seqs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;body&#39;</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Return the longest length of consecutive capital letters starting a</span>
+<span class="sd">    line on the page. Returns a list for all pages. Only includes the body:</span>
+<span class="sd">    header/footer information is not included.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">if</span> <span class="n">section</span> <span class="o">!=</span> <span class="s">&#39;body&#39;</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;cap_alpha_seq only includes counts for the body &quot;</span>
+                     <span class="s">&quot;section of pages.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">cap_alpha_seq</span><span class="p">()</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
     <div class="name def" id="htrc_features.feature_reader.Volume.empty_line_counts">
     <p>def <span class="ident">empty_line_counts</span>(</p><p>self, section=u&#39;default&#39;)</p>
     </div>
@@ -3451,7 +3597,8 @@ the far left of the page.</p></div>
   <div id="source-htrc_features.feature_reader.Volume.empty_line_counts" class="source">
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">empty_line_counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="o">=</span><span class="s">&#39;default&#39;</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39; Return a list of empty line counts, per page &#39;&#39;&#39;</span>
-    <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">page</span><span class="o">.</span><span class="n">empty_line_count</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="n">section</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pages</span><span class="p">()]</span>
 </pre></div>
 
   </div>
