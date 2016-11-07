@@ -281,7 +281,28 @@ class Volume(object):
                        ('htBibUrl', 'ht_bib_url'),
                        ('handleUrl', 'handle_url'),
                        ('oclc', 'oclc'),
-                       ('imprint', 'imprint')]
+                       ('imprint', 'imprint'),
+                       ('names', 'names'),
+                       ('classification', 'classification'),
+                       ('typeOfResource', 'type_of_resource'),
+                       ('issuance', 'issuance'),
+                       ('genre', 'genre'),
+                       ("bibliographicFormat", "bibliographic_format"),
+                       ("pubPlace", "pub_place"),
+                       ("governmentDocument", "government_document"),
+                       ("sourceInstitution", "source_institution"),
+                       ("enumerationChronology", "enumeration_chronology"),
+                       ("hathitrustRecordNumber", "hathitrust_record_number"),
+                       ("rightsAttributes", "rights_attributes"),
+                       ("accessProfile", "access_profile"),
+                       ("volumeIdentifier", "volume_identifier"),
+                       ("sourceInstitutionRecordNumber",
+                        "source_institution_record_number"),
+                       ("isbn", "isbn"),
+                       ("issn", "issn"),
+                       ("lccn", "lccn"),
+                       ("lastUpdateDate", "last_update_date")
+                      ]
     ''' List of metadata fields, with their pythonic name mapping. '''
 
     BASIC_FIELDS = [('pageCount', 'page_count')]
@@ -312,7 +333,8 @@ class Volume(object):
             if key in obj['features']:
                 setattr(self, pythonkey, obj['features'][key])
 
-        if hasattr(self, 'genre'):
+        if (hasattr(self, 'genre') and 
+            obj['metadata']['schemaVersion'] in ["1.0", "2.0"]):
             self.genre = self.genre.split(", ")
 
         self._has_advanced = False
@@ -336,6 +358,11 @@ class Volume(object):
     def year(self):
         ''' A friendlier name wrapping Volume.pubDate '''
         return self.pub_date
+    
+    @property
+    def author(self):
+        ''' A friendlier name wrapping Volume.names. Returns list. '''
+        return self.names
 
     @property
     def metadata(self):
