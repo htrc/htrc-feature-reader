@@ -6,4 +6,4 @@
 # e.g.
 # 	./get_data.sh PZ-volumes.txt version2-examples/
 
-rsync -azv --files-from=$1 data.sharc.hathitrust.org::pd-features/ $2
+rsync -azv --files-from=$1 data.analytics.hathitrust.org::features/ $2
