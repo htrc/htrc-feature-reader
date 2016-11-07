@@ -20,26 +20,26 @@ class TestVolume():
 
     def test_command_id(self, capsys, volume_ids, volume_paths):
         ''' Test the command line tool for one id'''
-        parser = utils.htid2rsync_argparser()
+        parser = utils._htid2rsync_argparser()
         for i, volume_id in enumerate(volume_ids):
-            utils.htid2rsync_parse_args(parser, [volume_id])
+            utils._htid2rsync_parse_args(parser, [volume_id])
             # Catch what was written to stdout
             out, err = capsys.readouterr()
             assert out.strip() == volume_paths[i]
     
     def test_command_ids(self, capsys, volume_ids, volume_paths):
         ''' Test the command line tool for multiple ids'''
-        parser = utils.htid2rsync_argparser()
-        utils.htid2rsync_parse_args(parser, volume_ids)
+        parser = utils._htid2rsync_argparser()
+        utils._htid2rsync_parse_args(parser, volume_ids)
         out, err = capsys.readouterr()
         assert out.strip().split("\n") == volume_paths
     
     def test_command_outfile(self, tmpdir, volume_ids, volume_paths):
         ''' Test the command line tool with an output file'''
         # Output volume paths to file with outfile
-        parser = utils.htid2rsync_argparser()
+        parser = utils._htid2rsync_argparser()
         outfile = os.path.join(str(tmpdir), "volumepaths.txt")
-        utils.htid2rsync_parse_args(parser, ["--outfile", outfile] + volume_ids)
+        utils._htid2rsync_parse_args(parser, ["--outfile", outfile] + volume_ids)
         # Re-open
         with open(outfile) as f:
             assert f.read().strip().split("\n") == volume_paths
@@ -52,13 +52,13 @@ class TestVolume():
         with open(idfile, "w") as f:
             f.write("\n".join(volume_ids))
         
-        parser = utils.htid2rsync_argparser()
+        parser = utils._htid2rsync_argparser()
         
         # Assert proper functionality
-        utils.htid2rsync_parse_args(parser, ["--from-file", idfile])
+        utils._htid2rsync_parse_args(parser, ["--from-file", idfile])
         out, err = capsys.readouterr()
         assert out.strip().split("\n") == volume_paths
         
         # Assert error when grouping cmd args and file
         with pytest.raises(SystemExit):
-            utils.htid2rsync_parse_args(parser, ["--from-file", idfile] + volume_ids)
+            utils._htid2rsync_parse_args(parser, ["--from-file", idfile] + volume_ids)

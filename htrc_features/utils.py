@@ -41,10 +41,10 @@ def id_to_rsync(htid, **kwargs):
 def htid2rsync_cmd():
     ''' A module to install for command line access, through 'htid2rsync' '''
     import sys
-    parser = htid2rsync_argparser()
-    htid2rsync_parse_args(parser, sys.argv[1:])
+    parser = _htid2rsync_argparser()
+    _htid2rsync_parse_args(parser, sys.argv[1:])
     
-def htid2rsync_argparser():
+def _htid2rsync_argparser():
     '''
     Return arg parser. Separated from htid2rsync_cmd For easier testing. 
     '''
@@ -69,7 +69,7 @@ def htid2rsync_argparser():
                        )
     return parser
 
-def htid2rsync_parse_args(parser, in_args):
+def _htid2rsync_parse_args(parser, in_args):
     import sys
     args = parser.parse_args(in_args)
     if (args.id and len(args.id) > 0) and args.from_file:
