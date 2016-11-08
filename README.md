@@ -1,8 +1,8 @@
 
-HTRC-Features
+HTRC-Features [![Build Status](https://travis-ci.org/htrc/htrc-feature-reader.svg?branch=master)](https://travis-ci.org/htrc/htrc-feature-reader) [![PyPI version](https://badge.fury.io/py/htrc-feature-reader.svg)](https://badge.fury.io/py/htrc-feature-reader) [![Anaconda-Server Badge](https://anaconda.org/organisciak/htrc-feature-reader/badges/installer/conda.svg)](https://anaconda.org/organisciak/htrc-feature-reader)
 =============
 
-Tools for working with the [HTRC Extracted Features dataset](https://sharc.hathitrust.org/features), a dataset of page-level text analysis features extracted from 4.8 million public domain volumes.
+Tools for working with the [HTRC Extracted Features dataset](https://sharc.hathitrust.org/features), a dataset of page-level text analysis features extracted from from 4.8 million public domain volumes.
 
 This library provides a `FeatureReader` for parsing files, which are handled as `Volume` objects with collections of `Page` objects. Volumes provide access to metadata (e.g. language), volume-wide feature information (e.g. token counts), and access to Pages. Pages allow you to easily parse page-level features, particularly token lists.
 
@@ -14,15 +14,28 @@ This library makes heavy use of [Pandas](pandas.pydata.org), returning many data
 **Links**: 
 [HTRC Feature Reader Documentation](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html) | [HTRC Extracted Features Dataset](https://sharc.hathitrust.org/features)
 
+
 ## Installation
 
 To install,
 
+```bash
     pip install htrc-feature-reader
+```
 
-That's it! This library is written for Python 2.7 and 3.0+. Optional: [installing the development version](#Installing-the-development-version). For Python beginners, you'll need [pip](https://pip.pypa.io/en/stable/installing/).
+That's it! This library is written for Python 2.7 and 3.0+. For Python beginners, you'll need [pip](https://pip.pypa.io/en/stable/installing/).
+
+Alternately, if you are using [Anaconda](https://www.continuum.io/downloads), you can install with
+
+```bash
+    conda install -c organisciak htrc-feature-reader
+```
+
+This approach is recommended, because it makes sure that some of the hard-to-install dependencies are properly installed.
 
 Given the nature of data analysis, using iPython with Jupyter notebooks for preparing your scripts interactively is a recommended convenience. Most basically, it can be installed with `pip install ipython[notebook]` and run with `ipython notebook` from the command line, which starts a session that you can access through your browser. If this doesn't work, consult the [iPython documentation](http://ipython.readthedocs.org/).
+
+Optional: [installing the development version](#Installing-the-development-version). 
 
 ## Usage
 
