@@ -38,35 +38,51 @@ class TestVolume():
         assert 2*tokenlist_times[0] > sum(tokenlist_times[1:])
 
     def test_included_metadata(self, volume):
+        import re
         metadata = {
-            "id": "uc2.ark:/13960/t1xd0sc6x",
-            "schemaVersion": "1.2",
-            "dateCreated": "2015-02-12T13:30",
-            "title": "Anne of Green Gables / L.M. Montgomery.",
-            "pubDate": "1908",
-            "language": "eng",
-            "htBibUrl": "http://catalog.hathitrust.org/api/volumes/"
-            "full/htid/uc2.ark:/13960/t1xd0sc6x.json",
-            "handleUrl": "http://hdl.handle.net/2027/uc2.ark:/13960/"
-            "t1xd0sc6x",
-            "oclc": "320127250",
-            "imprint": "Ryerson Press, c1908 by L.C. Page.",
-            "pageCount": 414
-            }
-        assert volume.id == metadata['id']
+          "handleUrl": "http://hdl.handle.net/2027/uc2.ark:/13960/t1xd0sc6x",
+          "htBibUrl": "http://catalog.hathitrust.org/api/volumes/full/htid/uc2.ark:/13960/t1xd0sc6x.json",
+          "names": [
+            "Montgomery, L. M. (Lucy Maud) 1874-1942 "
+          ],
+          "classification": {},
+          "typeOfResource": "text",
+          "issuance": "monographic",
+          "genre": [],
+          "bibliographicFormat": "BK",
+          "language": "eng",
+          "pubPlace": "onc",
+          "pubDate": "1908",
+          "governmentDocument": False,
+          "sourceInstitution": "UC",
+          "enumerationChronology": " ",
+          "hathitrustRecordNumber": "7668057",
+          "rightsAttributes": "pdus",
+          "accessProfile": "open",
+          "volumeIdentifier": "uc2.ark:/13960/t1xd0sc6x",
+          "dateCreated": "2016-06-19T02:14:20.7051367Z",
+          "schemaVersion": "1.3",
+          "sourceInstitutionRecordNumber": "2480325",
+          "oclc": [
+            "320127250"
+          ],
+          "isbn": [],
+          "issn": [],
+          "lccn": [],
+          "title": "Anne of Green Gables / L.M. Montgomery.",
+          "imprint": "Ryerson Press, c1908 by L.C. Page.",
+          "lastUpdateDate": "2010-04-29 20:31:43",
+          "pageCount": 414
+        }
 
-        assert volume.schema_version == metadata['schemaVersion']
-        assert volume.title == metadata['title']
-        assert volume.date_created == metadata['dateCreated']
-        assert volume.pub_date == metadata['pubDate']
-        assert volume.language == metadata['language']
-        assert volume.ht_bib_url == metadata['htBibUrl']
-        assert volume.handle_url == metadata['handleUrl']
-        assert volume.oclc == metadata['oclc']
-        assert volume.imprint == metadata['imprint']
+        for CapitalCaseKey in metadata:
+            s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', CapitalCaseKey)
+            camel_case = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+            assert getattr(volume, camel_case) == metadata[CapitalCaseKey]
 
         # Syntactic sugar fields
         assert volume.year == metadata['pubDate']
+        assert volume.author == metadata["names"]
 
         # Field from vol['features']
         assert volume.page_count == metadata['pageCount']
