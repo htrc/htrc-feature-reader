@@ -1412,7 +1412,28 @@ table {
                        <span class="p">(</span><span class="s">&#39;htBibUrl&#39;</span><span class="p">,</span> <span class="s">&#39;ht_bib_url&#39;</span><span class="p">),</span>
                        <span class="p">(</span><span class="s">&#39;handleUrl&#39;</span><span class="p">,</span> <span class="s">&#39;handle_url&#39;</span><span class="p">),</span>
                        <span class="p">(</span><span class="s">&#39;oclc&#39;</span><span class="p">,</span> <span class="s">&#39;oclc&#39;</span><span class="p">),</span>
-                       <span class="p">(</span><span class="s">&#39;imprint&#39;</span><span class="p">,</span> <span class="s">&#39;imprint&#39;</span><span class="p">)]</span>
+                       <span class="p">(</span><span class="s">&#39;imprint&#39;</span><span class="p">,</span> <span class="s">&#39;imprint&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;names&#39;</span><span class="p">,</span> <span class="s">&#39;names&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;classification&#39;</span><span class="p">,</span> <span class="s">&#39;classification&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;typeOfResource&#39;</span><span class="p">,</span> <span class="s">&#39;type_of_resource&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;issuance&#39;</span><span class="p">,</span> <span class="s">&#39;issuance&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;genre&#39;</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;bibliographicFormat&quot;</span><span class="p">,</span> <span class="s">&quot;bibliographic_format&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;pubPlace&quot;</span><span class="p">,</span> <span class="s">&quot;pub_place&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;governmentDocument&quot;</span><span class="p">,</span> <span class="s">&quot;government_document&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;sourceInstitution&quot;</span><span class="p">,</span> <span class="s">&quot;source_institution&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;enumerationChronology&quot;</span><span class="p">,</span> <span class="s">&quot;enumeration_chronology&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;hathitrustRecordNumber&quot;</span><span class="p">,</span> <span class="s">&quot;hathitrust_record_number&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;rightsAttributes&quot;</span><span class="p">,</span> <span class="s">&quot;rights_attributes&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;accessProfile&quot;</span><span class="p">,</span> <span class="s">&quot;access_profile&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;volumeIdentifier&quot;</span><span class="p">,</span> <span class="s">&quot;volume_identifier&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;sourceInstitutionRecordNumber&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;source_institution_record_number&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;isbn&quot;</span><span class="p">,</span> <span class="s">&quot;isbn&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;issn&quot;</span><span class="p">,</span> <span class="s">&quot;issn&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;lccn&quot;</span><span class="p">,</span> <span class="s">&quot;lccn&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;lastUpdateDate&quot;</span><span class="p">,</span> <span class="s">&quot;last_update_date&quot;</span><span class="p">)</span>
+                      <span class="p">]</span>
     <span class="sd">&#39;&#39;&#39; List of metadata fields, with their pythonic name mapping. &#39;&#39;&#39;</span>
 
     <span class="n">BASIC_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;pageCount&#39;</span><span class="p">,</span> <span class="s">&#39;page_count&#39;</span><span class="p">)]</span>
@@ -1443,7 +1464,8 @@ table {
             <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]:</span>
                 <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
 
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">)</span> <span class="ow">and</span> 
+            <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">][</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&quot;1.0&quot;</span><span class="p">,</span> <span class="s">&quot;2.0&quot;</span><span class="p">]):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">genre</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">genre</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&quot;, &quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span> <span class="o">=</span> <span class="bp">False</span>
@@ -1467,6 +1489,11 @@ table {
     <span class="k">def</span> <span class="nf">year</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; A friendlier name wrapping Volume.pubDate &#39;&#39;&#39;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pub_date</span>
+    
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">author</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; A friendlier name wrapping Volume.names. Returns list. &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -3073,7 +3100,28 @@ header/footer information is not included.</p></div>
                        <span class="p">(</span><span class="s">&#39;htBibUrl&#39;</span><span class="p">,</span> <span class="s">&#39;ht_bib_url&#39;</span><span class="p">),</span>
                        <span class="p">(</span><span class="s">&#39;handleUrl&#39;</span><span class="p">,</span> <span class="s">&#39;handle_url&#39;</span><span class="p">),</span>
                        <span class="p">(</span><span class="s">&#39;oclc&#39;</span><span class="p">,</span> <span class="s">&#39;oclc&#39;</span><span class="p">),</span>
-                       <span class="p">(</span><span class="s">&#39;imprint&#39;</span><span class="p">,</span> <span class="s">&#39;imprint&#39;</span><span class="p">)]</span>
+                       <span class="p">(</span><span class="s">&#39;imprint&#39;</span><span class="p">,</span> <span class="s">&#39;imprint&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;names&#39;</span><span class="p">,</span> <span class="s">&#39;names&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;classification&#39;</span><span class="p">,</span> <span class="s">&#39;classification&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;typeOfResource&#39;</span><span class="p">,</span> <span class="s">&#39;type_of_resource&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;issuance&#39;</span><span class="p">,</span> <span class="s">&#39;issuance&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&#39;genre&#39;</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;bibliographicFormat&quot;</span><span class="p">,</span> <span class="s">&quot;bibliographic_format&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;pubPlace&quot;</span><span class="p">,</span> <span class="s">&quot;pub_place&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;governmentDocument&quot;</span><span class="p">,</span> <span class="s">&quot;government_document&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;sourceInstitution&quot;</span><span class="p">,</span> <span class="s">&quot;source_institution&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;enumerationChronology&quot;</span><span class="p">,</span> <span class="s">&quot;enumeration_chronology&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;hathitrustRecordNumber&quot;</span><span class="p">,</span> <span class="s">&quot;hathitrust_record_number&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;rightsAttributes&quot;</span><span class="p">,</span> <span class="s">&quot;rights_attributes&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;accessProfile&quot;</span><span class="p">,</span> <span class="s">&quot;access_profile&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;volumeIdentifier&quot;</span><span class="p">,</span> <span class="s">&quot;volume_identifier&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;sourceInstitutionRecordNumber&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;source_institution_record_number&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;isbn&quot;</span><span class="p">,</span> <span class="s">&quot;isbn&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;issn&quot;</span><span class="p">,</span> <span class="s">&quot;issn&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;lccn&quot;</span><span class="p">,</span> <span class="s">&quot;lccn&quot;</span><span class="p">),</span>
+                       <span class="p">(</span><span class="s">&quot;lastUpdateDate&quot;</span><span class="p">,</span> <span class="s">&quot;last_update_date&quot;</span><span class="p">)</span>
+                      <span class="p">]</span>
     <span class="sd">&#39;&#39;&#39; List of metadata fields, with their pythonic name mapping. &#39;&#39;&#39;</span>
 
     <span class="n">BASIC_FIELDS</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;pageCount&#39;</span><span class="p">,</span> <span class="s">&#39;page_count&#39;</span><span class="p">)]</span>
@@ -3104,7 +3152,8 @@ header/footer information is not included.</p></div>
             <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]:</span>
                 <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
 
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">)</span> <span class="ow">and</span> 
+            <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">][</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&quot;1.0&quot;</span><span class="p">,</span> <span class="s">&quot;2.0&quot;</span><span class="p">]):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">genre</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">genre</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&quot;, &quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span> <span class="o">=</span> <span class="bp">False</span>
@@ -3128,6 +3177,11 @@ header/footer information is not included.</p></div>
     <span class="k">def</span> <span class="nf">year</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; A friendlier name wrapping Volume.pubDate &#39;&#39;&#39;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pub_date</span>
+    
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">author</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; A friendlier name wrapping Volume.names. Returns list. &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -3413,6 +3467,17 @@ with (CamelCase, lower_with_under) mapping.</p></div>
             </div>
           <h3>Instance variables</h3>
             <div class="item">
+            <p id="htrc_features.feature_reader.Volume.author" class="name">var <span class="ident">author</span></p>
+            
+
+            
+  
+    <div class="desc"><p>A friendlier name wrapping Volume.names. Returns list.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
             <p id="htrc_features.feature_reader.Volume.default_page_section" class="name">var <span class="ident">default_page_section</span></p>
             
 
@@ -3484,7 +3549,8 @@ with (CamelCase, lower_with_under) mapping.</p></div>
     <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">pythonkey</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">BASIC_FIELDS</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">]:</span>
             <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pythonkey</span><span class="p">,</span> <span class="n">obj</span><span class="p">[</span><span class="s">&#39;features&#39;</span><span class="p">][</span><span class="n">key</span><span class="p">])</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">):</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;genre&#39;</span><span class="p">)</span> <span class="ow">and</span> 
+        <span class="n">obj</span><span class="p">[</span><span class="s">&#39;metadata&#39;</span><span class="p">][</span><span class="s">&#39;schemaVersion&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&quot;1.0&quot;</span><span class="p">,</span> <span class="s">&quot;2.0&quot;</span><span class="p">]):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">genre</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">genre</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&quot;, &quot;</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_has_advanced</span> <span class="o">=</span> <span class="bp">False</span>
     <span class="k">if</span> <span class="n">advanced</span><span class="p">:</span>

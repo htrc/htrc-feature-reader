@@ -1105,17 +1105,58 @@ table {
 
 <span class="k">def</span> <span class="nf">htid2rsync_cmd</span><span class="p">():</span>
     <span class="sd">&#39;&#39;&#39; A module to install for command line access, through &#39;htid2rsync&#39; &#39;&#39;&#39;</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">_htid2rsync_argparser</span><span class="p">()</span>
+    <span class="n">_htid2rsync_parse_args</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+    
+<span class="k">def</span> <span class="nf">_htid2rsync_argparser</span><span class="p">():</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Return arg parser. Separated from htid2rsync_cmd For easier testing. </span>
+<span class="sd">    &#39;&#39;&#39;</span>
     <span class="kn">import</span> <span class="nn">argparse</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
     <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s">&#39;Convert a HathiTrust ID to &#39;</span>
                                      <span class="s">&#39;a pairtree path for Rsyncing that id</span><span class="se">\&#39;</span><span class="s">s &#39;</span>
                                      <span class="s">&#39;Extracted Features dataset file. This &#39;</span>
                                      <span class="s">&#39;does not check if the file exists.&#39;</span><span class="p">)</span>
-    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s">&#39;+&#39;</span><span class="p">,</span>
+    
+    <span class="c">#group = parser.add_mutually_exclusive_group()</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s">&#39;*&#39;</span><span class="p">,</span>
                         <span class="n">help</span><span class="o">=</span><span class="s">&quot;A HathiTrust id or multiple ids to convert.&quot;</span><span class="p">)</span>
-    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
-    <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span><span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">)</span> <span class="k">for</span> <span class="n">htid</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
-    <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">urls</span><span class="p">:</span>
-        <span class="k">print</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">&#39;--from-file&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s">&#39;?&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">FileType</span><span class="p">(</span><span class="s">&#39;r&#39;</span><span class="p">),</span>
+                        <span class="n">const</span><span class="o">=</span><span class="s">&#39;-&#39;</span><span class="p">,</span>
+                       <span class="n">help</span><span class="o">=</span><span class="s">&quot;Read volume ids from an external file. Use as flag or supply - to read from stdin.&quot;</span><span class="p">)</span>
+    
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">&#39;--outfile&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s">&#39;?&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">FileType</span><span class="p">(</span><span class="s">&#39;w&#39;</span><span class="p">),</span>
+                        <span class="n">default</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s">&quot;File to save to. By default it writes to standard out.&quot;</span>
+                       <span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+<span class="k">def</span> <span class="nf">_htid2rsync_parse_args</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">in_args</span><span class="p">):</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">in_args</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">id</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">from_file</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;ERROR: Can&#39;t combine id arguments with --from-file. Only use one. </span><span class="se">\n</span><span class="s">-----</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">id</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span><span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">)</span> <span class="k">for</span> <span class="n">htid</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">urls</span><span class="p">:</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">url</span><span class="o">+</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">from_file</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">from_file</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
+                <span class="n">url</span> <span class="o">=</span> <span class="n">id_to_rsync</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+                <span class="n">args</span><span class="o">.</span><span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">url</span><span class="o">+</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+            <span class="k">pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;ERROR: Need to supply volume ids, either through positional arguments or a file with --from-file. Run with --help for details. </span><span class="se">\n</span><span class="s">-----</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
 
 
 <span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
@@ -1144,17 +1185,9 @@ table {
   <div id="source-htrc_features.utils.htid2rsync_cmd" class="source">
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">htid2rsync_cmd</span><span class="p">():</span>
     <span class="sd">&#39;&#39;&#39; A module to install for command line access, through &#39;htid2rsync&#39; &#39;&#39;&#39;</span>
-    <span class="kn">import</span> <span class="nn">argparse</span>
-    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s">&#39;Convert a HathiTrust ID to &#39;</span>
-                                     <span class="s">&#39;a pairtree path for Rsyncing that id</span><span class="se">\&#39;</span><span class="s">s &#39;</span>
-                                     <span class="s">&#39;Extracted Features dataset file. This &#39;</span>
-                                     <span class="s">&#39;does not check if the file exists.&#39;</span><span class="p">)</span>
-    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s">&#39;+&#39;</span><span class="p">,</span>
-                        <span class="n">help</span><span class="o">=</span><span class="s">&quot;A HathiTrust id or multiple ids to convert.&quot;</span><span class="p">)</span>
-    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
-    <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span><span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">)</span> <span class="k">for</span> <span class="n">htid</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
-    <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">urls</span><span class="p">:</span>
-        <span class="k">print</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">_htid2rsync_argparser</span><span class="p">()</span>
+    <span class="n">_htid2rsync_parse_args</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
 </pre></div>
 
   </div>
