@@ -1,14 +1,9 @@
 package:
   name: htrc-feature-reader
-  version: "1.70"
+  version: "1.80"
 
 source:
-  fn: htrc-feature-reader-1.70.tar.gz
-  url: https://pypi.python.org/packages/98/f6/fb8e470048227651faf3a949734ddfe098f06e70f7198bceffe8687bbf66/htrc-feature-reader-1.70.tar.gz
-  md5: f37f2f5f72b320411231ca8bacf697dc
-#  patches:
-   # List any patch files here
-   # - fix.patch
+  path: ../..
 
 build:
   # noarch_python: True
