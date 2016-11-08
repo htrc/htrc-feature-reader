@@ -40,8 +40,15 @@ class TestVolume():
         parser = utils._htid2rsync_argparser()
         outfile = os.path.join(str(tmpdir), "volumepaths.txt")
         utils._htid2rsync_parse_args(parser, ["--outfile", outfile] + volume_ids)
+        
+        # Save with short arg
+        utils._htid2rsync_parse_args(parser, ["-o", outfile + ".short"] + volume_ids)
+        
         # Re-open
         with open(outfile) as f:
+            assert f.read().strip().split("\n") == volume_paths
+
+        with open(outfile + ".short") as f:
             assert f.read().strip().split("\n") == volume_paths
     
     def test_command_infile(self, tmpdir, capsys, volume_ids, volume_paths):
@@ -59,6 +66,15 @@ class TestVolume():
         out, err = capsys.readouterr()
         assert out.strip().split("\n") == volume_paths
         
+        # Short arg
+        utils._htid2rsync_parse_args(parser, ["--f", idfile])
+        out2, err2 = capsys.readouterr()
+        assert out == out2
+        
         # Assert error when grouping cmd args and file
         with pytest.raises(SystemExit):
             utils._htid2rsync_parse_args(parser, ["--from-file", idfile] + volume_ids)
+            
+        # Assert error when grouping cmd args and file
+        with pytest.raises(SystemExit):
+            utils._htid2rsync_parse_args(parser, ["-f", idfile] + volume_ids)

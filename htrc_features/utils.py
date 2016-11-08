@@ -59,11 +59,11 @@ def _htid2rsync_argparser():
     parser.add_argument('id', type=str, nargs='*',
                         help="A HathiTrust id or multiple ids to convert.")
     
-    parser.add_argument('--from-file', nargs='?', type=argparse.FileType('r'),
+    parser.add_argument('--from-file', '-f', nargs='?', type=argparse.FileType('r'),
                         const='-',
                        help="Read volume ids from an external file. Use as flag or supply - to read from stdin.")
     
-    parser.add_argument('--outfile', nargs='?', type=argparse.FileType('w'),
+    parser.add_argument('--outfile', '-o', nargs='?', type=argparse.FileType('w'),
                         default=sys.stdout,
                         help="File to save to. By default it writes to standard out."
                        )
