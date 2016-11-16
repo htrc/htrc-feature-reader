@@ -1,5 +1,5 @@
 
-HTRC-Features [![Build Status](https://travis-ci.org/htrc/htrc-feature-reader.svg?branch=master)](https://travis-ci.org/htrc/htrc-feature-reader) [![PyPI version](https://badge.fury.io/py/htrc-feature-reader.svg)](https://badge.fury.io/py/htrc-feature-reader) [![Anaconda-Server Badge](https://anaconda.org/organisciak/htrc-feature-reader/badges/installer/conda.svg)](https://anaconda.org/organisciak/htrc-feature-reader)
+HTRC-Features [![Build Status](https://travis-ci.org/htrc/htrc-feature-reader.svg?branch=master)](https://travis-ci.org/htrc/htrc-feature-reader) [![PyPI version](https://badge.fury.io/py/htrc-feature-reader.svg)](https://badge.fury.io/py/htrc-feature-reader) [![Anaconda-Server Badge](https://anaconda.org/htrc/htrc-feature-reader/badges/installer/conda.svg)](https://anaconda.org/htrc/htrc-feature-reader)
 =============
 
 Tools for working with the [HTRC Extracted Features dataset](https://sharc.hathitrust.org/features), a dataset of page-level text analysis features extracted from from 4.8 million public domain volumes.
@@ -28,7 +28,7 @@ That's it! This library is written for Python 2.7 and 3.0+. For Python beginners
 Alternately, if you are using [Anaconda](https://www.continuum.io/downloads), you can install with
 
 ```bash
-    conda install -c organisciak htrc-feature-reader
+    conda install -c htrc htrc-feature-reader
 ```
 
 This approach is recommended, because it makes sure that some of the hard-to-install dependencies are properly installed.
