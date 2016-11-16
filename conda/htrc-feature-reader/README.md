@@ -10,4 +10,4 @@ Since the HTRC Feature Reader is pure Python, it can easily be converted to vers
 		1.2.1 `conda build --python 3.5 .` At the end of the build process, it will provide a location in a `conda-bld` directory where the a tar.bz2 is placed.
 		1.2.2 `cd packages`
 		1.2.3 `conda convert {built_file_location} -p all` converts the built file to all targets: linux-32, linux-64, win-32, win-64, osx-64.
-		1.2.4 `find . - type f | parallel -n1 anaconda upload` will upload each file to anaconda cloud.
+		1.2.4 `find . - type f | parallel -n1 anaconda --user htrc upload {}` will upload each file to anaconda cloud.
