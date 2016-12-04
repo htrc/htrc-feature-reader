@@ -100,6 +100,15 @@ class TestVolume():
         assert sum(volume.line_counts()) == 441
         assert sum(volume.empty_line_counts()) == 92
         assert sum(volume.sentence_counts()) == 191
+        
+    def test_char_counts(self, volume):
+        begin_characters = volume.begin_line_chars()
+        assert(begin_characters.loc[(3, 'body', 'begin', '/'),].values[0] == 1)
+        assert(begin_characters.groupby(level='char').sum().loc['a'].values[0] == 22)
+        
+        end_characters = volume.end_line_chars()
+        assert(end_characters.loc[(3, 'body', 'end', '3'), ].values[0] == 1)
+        assert(end_characters.groupby(level='char').sum().loc['.'].values[0] == 46)
 
     def test_cap_alpha_seq(self, volume):
         assert sum(volume.cap_alpha_seqs()) == 35

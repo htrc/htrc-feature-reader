@@ -347,6 +347,11 @@ class Volume(object):
                 self._has_advanced = True
                 # Create an internal dataframe for lineChar counts
                 self._line_chars = self._make_line_char_df(advanced['pages'])
+                
+        if (self._schema in ['2.0', '3.0']) and (self.language in ['jpn', 'chi']):
+            logging.warn("This version of the EF dataset has a tokenization bug for Chinese and Japanese."
+                         "See https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
+
 
     def __iter__(self):
         return self.pages()
@@ -577,7 +582,13 @@ class Volume(object):
 
         Provide an array of pages that hold beginLineChars and endLineChars.
         '''
-
+        if self._schema == '3.0':
+            logging.warn("Adapted to erroneous key names in schema 3.0.")
+            place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
+        else:
+            place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
+           
+        
         # Make structured numpy array
         # Because it is typed, this approach is ~40x faster than earlier
         # methods
@@ -590,8 +601,8 @@ class Volume(object):
         i = 0
         for page in pages:
             for sec in ['header', 'body', 'footer']:
-                for place in ['begin', 'end']:
-                    for char, value in iteritems(page[sec][place+'LineChars']):
+                for place, json_key in  place_key:
+                    for char, value in iteritems(page[sec][json_key]):
                         arr[i] = (page['seq'], sec, place, char, value)
                         i += 1
 
