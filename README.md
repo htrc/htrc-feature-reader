@@ -14,6 +14,9 @@ This library makes heavy use of [Pandas](pandas.pydata.org), returning many data
 **Links**: 
 [HTRC Feature Reader Documentation](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html) | [HTRC Extracted Features Dataset](https://sharc.hathitrust.org/features)
 
+**Citation**:
+Peter Organisciak and Boris Capitanu, "Text Mining in Python through the HTRC Feature Reader," *Programming Historian*, (22 November 2016), http://programminghistorian.org/lessons/text-mining-with-extracted-features.
+
 
 ## Installation
 
@@ -38,6 +41,8 @@ Given the nature of data analysis, using iPython with Jupyter notebooks for prep
 Optional: [installing the development version](#Installing-the-development-version). 
 
 ## Usage
+
+*Note: for new Python users, a more in-depth lesson is published by Programming Historian: [Text Mining in Python through the HTRC Feature Reader](http://programminghistorian.org/lessons/text-mining-with-extracted-features). That leis lesson is also the official citation associated with the HTRC Feature Reader library.*
 
 ### Reading feature files
 
