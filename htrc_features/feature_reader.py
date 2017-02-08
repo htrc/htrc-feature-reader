@@ -539,8 +539,6 @@ class Volume(object):
         '''
         Returns a Pandas dataframe of:
             page / section / place(i.e. begin/end) / char / count
-
-        Provide an array of pages that hold beginLineChars and endLineChars.
         '''
         if self._schema == '1.0':
             tname = 'tokens'
@@ -550,7 +548,7 @@ class Volume(object):
         # Make structured numpy array
         # Because it is typed, this approach is ~40x faster than earlier
         # methods
-        m = len(pages) * 2000  # Pages * oversized estimate for tokens/page
+        m = sum([page['tokenCount'] for page in pages])
         arr = np.zeros(m, dtype=[(str('page'), str('u8')),
                                  (str('section'), str('U6')),
                                  (str('token'), str('U64')),

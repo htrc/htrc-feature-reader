@@ -11,7 +11,6 @@ import os
 def paths():
     return [os.path.join('tests', 'data', 'green-gables-15pages.json')]
 
-
 @pytest.fixture(scope="module")
 def volume(paths):
     paths = paths[0]
@@ -187,3 +186,11 @@ class TestVolume():
         vol.tokenlist(case=False)
         assert vol._tokencounts.index.names == ['page', 'section', 'token',
                                                 'pos']
+        
+    def test_big_pages(self):
+        ''' Test a document with *many* tokens per page. '''
+        path = os.path.join('tests', 'data', 'aeu.ark+=13960=t1rf63t52.json.bz2')
+        feature_reader = FeatureReader(path)
+        volume = feature_reader.first()
+        tokenlist = volume.tokenlist()
+        assert tokenlist.shape[0] == 56397
