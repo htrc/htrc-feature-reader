@@ -10,7 +10,7 @@ def id2path(id):
     while len(clean_id) > 0:
         val, clean_id = clean_id[:2], clean_id[2:]
         path.append(val)
-        return '/'.join(path)
+    return '/'.join(path)
 
 
 def download_file(htids, outdir='./', keep_dirs=False, silent=True):
@@ -44,7 +44,7 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
             f.write("\n".join(paths))
         args = ["--files-from=%s" % tmppath, "data.analytics.hathitrust.org::features/"]
 
-    cmd = ["rsync", relative, "-a","-v", *args, outdir]
+    cmd = ["rsync", relative, "-a","-v"] + args + [outdir]
     
     # Support older Python, currently without error catching yet
     major, minor = sys.version_info[:2]
@@ -53,7 +53,7 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
     else:
         if not silent:
             sub_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        response = subprocess.run(cmd, **sub_kwargs, check=True)
+        response = subprocess.run(cmd, check=True, **sub_kwargs)
         out = (response.returncode, response.stdout)
     
     if tmppath:
