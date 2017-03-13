@@ -1,19 +1,15 @@
 import logging
 
-try:
-    from pairtree import id2path, id_encode
-except:
-    logging.debug("Falling back on custom functions to replace pairtree.")
+def id_encode(id):
+    return id.replace(":", "+").replace("/", "=").replace(".", ",")
 
-    def id_encode(id):
-        return id.replace(":", "+").replace("/", "=").replace(".", ",")
 
-    def id2path(id):
-        clean_id = id_encode(id)
-        path = []
-        while len(clean_id) > 0:
-            val, clean_id = clean_id[:2], clean_id[2:]
-            path.append(val)
+def id2path(id):
+    clean_id = id_encode(id)
+    path = []
+    while len(clean_id) > 0:
+        val, clean_id = clean_id[:2], clean_id[2:]
+        path.append(val)
         return '/'.join(path)
 
 
