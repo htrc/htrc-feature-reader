@@ -17,6 +17,57 @@ except:
         return '/'.join(path)
 
 
+def download_file(htids, outdir='./', keep_dirs=False, silent=True):
+    import subprocess
+    import tempfile
+    import os
+    import sys
+    from six import string_types
+
+    tmppath = None
+    sub_kwargs = dict()
+    
+    if not outdir.endswith("/"):
+        outdir += "/"
+    
+    if keep_dirs:
+        relative = '--relative'
+    else:
+        relative = '--no-relative'
+
+    if isinstance(htids, string_types):
+        # Download a single file
+        dest_file = id_to_rsync(htids)
+        args = ["data.analytics.hathitrust.org::features/" + dest_file]
+    else:
+        # Download a list of files
+        paths = [id_to_rsync(htid) for htid in htids]
+        
+        fdescrip, tmppath =  tempfile.mkstemp()
+        with open(tmppath, mode='w') as f:
+            f.write("\n".join(paths))
+        args = ["--files-from=%s" % tmppath, "data.analytics.hathitrust.org::features/"]
+
+    cmd = ["rsync", relative, "-a","-v", *args, outdir]
+    
+    # Support older Python, currently without error catching yet
+    major, minor = sys.version_info[:2]
+    if major <= 3 and minor < 5:
+        out = (subprocess.call(cmd), None)
+    else:
+        if not silent:
+            sub_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        response = subprocess.run(cmd, **sub_kwargs, check=True)
+        out = (response.returncode, response.stdout)
+    
+    if tmppath:
+        f.close()
+        os.close(fdescrip)
+        os.remove(tmppath)
+        
+    return out
+
+    
 def id_to_rsync(htid, **kwargs):
     '''
     Take an HTRC id and convert it to an Rsync location for syncing Extracted
