@@ -14,6 +14,57 @@ def id2path(id):
 
 
 def download_file(htids, outdir='./', keep_dirs=False, silent=True):
+    '''
+    A function for downloading one or more Extracted Features files by ID.
+    
+    This uses a subprocess call to 'rsync', so will only work if rsync is available
+    on your system and accessible in the same environment as Python.
+    
+    Returns (return code, stdout) tuple.
+    
+    htids:
+        A string or list of strings, comprising HathiTrust identifiers.
+        
+    outdir:
+        Location to save the file(s). Defaults to current directory.
+        
+    keep_dirs:
+        Whether to keep the remote pairtree file structure or save just the files to outdir.
+        Defaults to False (flattening).
+        
+    silent:
+        If False, return the rsync stdout.
+        
+     
+    Usage
+    -------
+    
+    Download one file to the current directory:
+    
+    ```
+    utils.download_file(htids='nyp.33433042068894')
+    ```
+    
+    Download multiple files to the current directory:
+    
+    ```
+    ids = ['nyp.33433042068894', 'nyp.33433074943592', 'nyp.33433074943600']
+    utils.download_file(htids=ids)
+    ```
+    
+    Download file to `/tmp`:
+    ```
+    utils.download_file(htids='nyp.33433042068894', outdir='/tmp')
+    ```
+    
+    Download file current directory, keeping pairtree directory structure,
+    i.e. './nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2':
+    
+    ```
+    utils.download_file(htids='nyp.33433042068894', keep_dirs=True)
+    ```
+    
+    '''
     import subprocess
     import tempfile
     import os
@@ -68,7 +119,7 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
 def id_to_rsync(htid, **kwargs):
     '''
     Take an HTRC id and convert it to an Rsync location for syncing Extracted
-    Features
+    Features.
     '''
     if 'kind' in kwargs:
         logging.warn("The basic/advanced split with extracted features files "
