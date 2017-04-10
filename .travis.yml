@@ -2,6 +2,12 @@ language: python
 python:
   - "2.7"
   - "3.5"
+addons:
+  apt:
+    packages:
+      - rsync
+before_install:
+  - sudo apt-get install 
 # command to install dependencies
 install: "python setup.py install" 
 # command to run tests

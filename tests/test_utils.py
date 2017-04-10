@@ -12,7 +12,7 @@ def volume_paths():
     return ["uc1/pairtree_root/$b/36/45/13/$b364513/uc1.$b364513.json.bz2", "coo1/pairtree_root/ar/k+/=1/39/60/=t/3d/z0/tr/56/ark+=13960=t3dz0tr56/coo1.ark+=13960=t3dz0tr56.json.bz2", "ufl1/pairtree_root/ar/k+/=1/39/60/=t/36/12/0v/0s/ark+=13960=t36120v0s/ufl1.ark+=13960=t36120v0s.json.bz2", "hvd/pairtree_root/32/04/41/00/88/73/89/32044100887389/hvd.32044100887389.json.bz2"
     ]
 
-class TestVolume():
+class TestUtils():
 
     def test_id_to_rsync(self, volume_ids, volume_paths):
         for i, volume_id in enumerate(volume_ids):
@@ -78,3 +78,19 @@ class TestVolume():
         # Assert error when grouping cmd args and file
         with pytest.raises(SystemExit):
             utils._htid2rsync_parse_args(parser, ["-f", idfile] + volume_ids)
+            
+    def test_rsync_single_file(self, tmpdir, volume_ids, volume_paths):
+        expected_fname = os.path.split(volume_paths[0])[1]
+        utils.download_file(htids=volume_ids[0], outdir=tmpdir.dirname)
+        assert os.path.exists(os.path.join(tmpdir.dirname, expected_fname))
+        
+    def test_rsync_multi_file(self, tmpdir, volume_ids, volume_paths):
+        utils.download_file(htids=volume_ids, outdir=tmpdir.dirname)
+        for path in volume_paths:
+            expected_fname = os.path.split(path)[1]
+            assert os.path.exists(os.path.join(tmpdir.dirname, expected_fname))
+            
+    def test_recursive_rsync(self, tmpdir, volume_ids, volume_paths):
+        utils.download_file(htids=volume_ids, outdir=tmpdir.dirname, keep_dirs=True)
+        for path in volume_paths:
+            assert os.path.exists(os.path.join(tmpdir.dirname, path))
