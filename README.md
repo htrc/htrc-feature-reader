@@ -42,7 +42,7 @@ Optional: [installing the development version](#Installing-the-development-versi
 
 ## Usage
 
-*Note: for new Python users, a more in-depth lesson is published by Programming Historian: [Text Mining in Python through the HTRC Feature Reader](http://programminghistorian.org/lessons/text-mining-with-extracted-features). That leis lesson is also the official citation associated with the HTRC Feature Reader library.*
+*Note: for new Python users, a more in-depth lesson is published by Programming Historian: [Text Mining in Python through the HTRC Feature Reader](http://programminghistorian.org/lessons/text-mining-with-extracted-features). That lesson is also the official citation associated the HTRC Feature Reader library.*
 
 ### Reading feature files
 
@@ -462,6 +462,37 @@ find feature-files/ -name '*json.bz2' | parallel --eta --jobs 90% -n 50 python y
 ### Iterating through the JSON files
 
 If you need to do fast, highly customized processing without instantiating Volumes, FeatureReader has a convenient generator for getting the raw JSON as a Python dict: `fr.jsons()`. This simply does the file reading, optional decompression, and JSON parsing.
+
+### Downloading files within the library
+
+`utils` includes an Rsyncing utility, `download_file`. This requires Rsync to be installed on your system.
+
+**Usage:**
+
+Download one file to the current directory:
+    
+```
+utils.download_file(htids='nyp.33433042068894')
+```
+
+Download multiple files to the current directory:
+
+```
+ids = ['nyp.33433042068894', 'nyp.33433074943592', 'nyp.33433074943600']
+utils.download_file(htids=ids)
+```
+
+Download file to `/tmp`:
+```
+utils.download_file(htids='nyp.33433042068894', outdir='/tmp')
+```
+
+Download file to current directory, keeping pairtree directory structure,
+i.e. `./nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2`:
+
+```
+utils.download_file(htids='nyp.33433042068894', keep_dirs=True)
+    ```
 
 ### Getting the Rsync URL
 

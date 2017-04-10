@@ -57,7 +57,7 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
     utils.download_file(htids='nyp.33433042068894', outdir='/tmp')
     ```
     
-    Download file current directory, keeping pairtree directory structure,
+    Download file to current directory, keeping pairtree directory structure;
     i.e. './nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2':
     
     ```
