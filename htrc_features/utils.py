@@ -46,15 +46,16 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
 
     cmd = ["rsync", relative, "-a","-v"] + args + [outdir]
     
-    # Support older Python, currently without error catching yet
     major, minor = sys.version_info[:2]
-    if major <= 3 and minor < 5:
-        out = (subprocess.call(cmd), None)
-    else:
+    if (major >= 3 and minor >=5):
+        # Recommended use for 3.5+ is subprocess.run
         if not silent:
             sub_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         response = subprocess.run(cmd, check=True, **sub_kwargs)
         out = (response.returncode, response.stdout)
+    else:
+        # Support older Python, currently without error catching
+        out = (subprocess.call(cmd), None)
     
     if tmppath:
         f.close()
