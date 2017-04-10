@@ -16,7 +16,6 @@ except ImportError:
     logging.info("Pysolr not installed.")
 
 # UTILS
-
 SECREF = ['header', 'body', 'footer']
 
 
