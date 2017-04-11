@@ -1,6 +1,6 @@
 package:
   name: htrc-feature-reader
-  version: "1.82"
+  version: "1.90"
 
 source:
   path: ../..
@@ -8,6 +8,7 @@ source:
 build:
   # noarch_python: True
   # preserve_egg_dir: True
+  ignore_prefix_files: True
   entry_points:
     # Put any entry points (scripts to be generated automatically) here. The
     # syntax is module:function.  For example
