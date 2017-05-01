@@ -102,6 +102,10 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
         # Recommended use for 3.5+ is subprocess.run
         if not silent:
             sub_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        else:
+            devnull = open(os.devnull, 'w')
+            sub_kwargs = dict(stdout=devnull, stderr=devnull, universal_newlines=True)
+
         response = subprocess.run(cmd, check=True, **sub_kwargs)
         out = (response.returncode, response.stdout)
     else:
