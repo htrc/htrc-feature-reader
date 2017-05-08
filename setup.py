@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='htrc-feature-reader',
-      version='1.9',
+      version='1.90',
       description='Library for working with the HTRC Extracted Features dataset',
       classifiers=[
           'Development Status :: 5 - Production/Stable',
@@ -11,6 +11,7 @@ setup(name='htrc-feature-reader',
           'Programming Language :: Python :: 3.3',
           'Programming Language :: Python :: 3.4',
           'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
           'Natural Language :: English',
       ],
       keywords='hathitrust text-mining text-analysis features',
