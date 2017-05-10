@@ -1,11 +1,17 @@
 from __future__ import unicode_literals
-import bz2
+import sys
+PY3 = (sys.version_info[0] >= 3)
+
+
+
 from multiprocessing import Pool
 import logging
 import pandas as pd
 import numpy as np
-# Because python2's dict.iteritem is python3's dict.item
+from io import BytesIO
+
 from six import iteritems
+
 try:
     import ujson as json
 except ImportError:
@@ -14,6 +20,24 @@ try:
     import pysolr
 except ImportError:
     logging.info("Pysolr not installed.")
+
+
+if PY3:
+    from urllib.request import urlopen as _urlopen
+    from urllib.parse import urlparse as parse_url
+    from urllib.error import HTTPError
+else:
+    from urlparse import urlparse as parse_url
+    from urllib2 import urlopen as _urlopen
+    from urllib2 import HTTPError
+
+try:
+    import bz2file as bz2
+except ImportError:
+    import bz2
+    if not PY3:
+        logging.warn("Loading volumes from a URL will not work in Python 2 unless you install bz2file")
+
 
 # UTILS
 SECREF = ['header', 'body', 'footer']
@@ -132,16 +156,33 @@ def group_linechars(df, section='all', place='all'):
 
 
 class FeatureReader(object):
-    def __init__(self, paths, compressed=True):
+    DL_URL = "https://data.analytics.hathitrust.org/features/get?download-id={0}"
+    
+    def __init__(self, paths=None, compressed=True, ids=None):
         self.compressed = compressed
-        if type(paths) is list:
-            self.paths = paths
+        
+        if paths:
+            self._online = False
+            if type(paths) is list:
+                self.paths = paths
+            else:
+                self.paths = [paths]
         else:
-            self.paths = [paths]
+            self.paths = []
+
+        if ids:
+            if type(ids) is list:
+                self.paths += [self.DL_URL.format(id) for id in ids]
+            else:
+                self.paths.append(self.DL_URL.format(ids))
+
         self.index = 0
 
     def __iter__(self):
         return self.volumes()
+    
+    def __len__(self):
+        return len(self.paths)
 
     def __str__(self):
         return "HTRC Feature Reader with %d paths load" % (len(self.paths))
@@ -214,21 +255,33 @@ class FeatureReader(object):
         for path in self.paths:
             yield (self, path)
 
-    def _read_json(self, path, compressed=True, advanced_path=False):
-        ''' Load JSON for a path '''
+    def _read_json(self, path_or_url, compressed=True, advanced_path=False):
+        ''' Load JSON for a path. Allows remote files in addition to local ones. '''
+        if parse_url(path_or_url).scheme in ['http', 'https']:
+            try:
+                req = _urlopen(path_or_url)
+                filename_or_buffer = BytesIO(req.read())
+            except HTTPError:
+                logging.exception("HTTP Error with id %s" % path_or_url)
+                raise
+            compressed = True
+        else:
+            filename_or_buffer = path_or_url
+        
         try:
+            print(filename_or_buffer)
             if compressed:
-                f = bz2.BZ2File(path)
+                f = bz2.BZ2File(filename_or_buffer)
             else:
-                f = open(path, 'r+')
+                f = open(filename_or_buffer, 'r+')
             rawjson = f.readline()
             f.close()
         except IOError:
             logging.exception("Can't read %s. Did you pass the incorrect "
-                              "'compressed=' argument?", path)
+                              "'compressed=' argument?", path_or_url)
             raise
         except:
-            logging.exception("Can't open %s", path)
+            logging.exception("Can't open %s", path_or_url)
             raise
 
         # This is a bandaid for schema version 2.0, not over-engineered
@@ -243,12 +296,13 @@ class FeatureReader(object):
         except:
             logging.exception("Problem reading JSON for %s. One common reason"
                               " for this error is an incorrect compressed= "
-                              "argument", path)
+                              "argument", path_or_url)
             raise
         return volumejson
 
     def _volume(self, path, compressed=True, advanced_path=False):
         ''' Read a path into a volume.'''
+        
         volumejson = self._read_json(path, compressed)
         if advanced_path:
             advanced = self._read_json(advanced_path, compressed)

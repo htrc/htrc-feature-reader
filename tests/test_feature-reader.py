@@ -11,10 +11,17 @@ def paths():
             os.path.join('tests', 'data',
                          'frankenstein-15pages.json.bz2')]
 
+@pytest.fixture(scope="module")
+def ids():
+    return ["uc2.ark:/13960/t1xd0sc6x", "hvd.hn6ltf"]
+    
+@pytest.fixture(scope="module")
+def titles():
+    return ['Anne of Green Gables / L.M. Montgomery.',
+              'Frankenstein : or, The modern Prometheus.']
+
 
 class TestFeatureReader():
-    TITLES = ['Anne of Green Gables / L.M. Montgomery.',
-              'Frankenstein : or, The modern Prometheus.']
 
     def test_single_path_load(self, paths):
         path = paths[0]
@@ -22,14 +29,30 @@ class TestFeatureReader():
         vol = next(feature_reader.volumes())
         assert type(vol) == htrc_features.feature_reader.Volume
 
-    def test_list_load(self, paths):
+    def test_list_load(self, paths, titles):
         feature_reader = FeatureReader(paths)
         vol = next(feature_reader.volumes())
         assert type(vol) == htrc_features.feature_reader.Volume
 
         for i, vol in enumerate(feature_reader):
             assert type(vol) == htrc_features.feature_reader.Volume
-            assert vol.title == self.TITLES[i]
+            assert vol.title == titles[i]
+            
+    def test_id_remote_load(self, ids):
+        id = ids[0]
+        feature_reader = FeatureReader(ids=id)
+        vol = next(feature_reader.volumes())
+        assert type(vol) == htrc_features.feature_reader.Volume
+
+    def test_id_list_remote_load(self, ids, titles):
+        feature_reader = FeatureReader(ids=ids)
+        vol = next(feature_reader.volumes())
+        assert type(vol) == htrc_features.feature_reader.Volume
+
+        for i, vol in enumerate(feature_reader):
+            assert type(vol) == htrc_features.feature_reader.Volume
+            assert vol.title == titles[i]
+
 
     def test_json_only_load(self, paths):
         path = paths[0]
@@ -46,18 +69,18 @@ class TestFeatureReader():
         for vol in feature_reader.volumes():
             assert type(vol) == htrc_features.feature_reader.Volume
 
-    def test_first(self, paths):
+    def test_first(self, paths, titles):
         feature_reader = FeatureReader(paths)
         vol = feature_reader.first()
         assert type(vol) == htrc_features.feature_reader.Volume
-        assert vol.title == self.TITLES[0]
+        assert vol.title == titles[0]
 
-    def test_uncompressed(self, paths):
+    def test_uncompressed(self, paths, titles):
         paths = [path.replace('.bz2', '') for path in paths]
         feature_reader = FeatureReader(paths, compressed=False)
         for i, vol in enumerate(feature_reader):
             assert type(vol) == htrc_features.feature_reader.Volume
-            assert vol.title == self.TITLES[i]
+            assert vol.title == titles[i]
 
     def test_compress_error(self, paths):
         feature_reader = FeatureReader(paths, compressed=False)
