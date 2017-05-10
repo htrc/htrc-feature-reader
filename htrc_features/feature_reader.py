@@ -156,7 +156,7 @@ def group_linechars(df, section='all', place='all'):
 
 
 class FeatureReader(object):
-    DL_URL = "https://bedrock.resnet.cms.waikato.ac.nz/vol-checker/VolumeCheck?download-id={0}"
+    DL_URL = "https://data.analytics.hathitrust.org/features/get?download-id={0}"
     
     def __init__(self, paths=None, compressed=True, ids=None):
         self.compressed = compressed
