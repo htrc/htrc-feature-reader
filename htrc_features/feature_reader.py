@@ -269,7 +269,6 @@ class FeatureReader(object):
             filename_or_buffer = path_or_url
         
         try:
-            print(filename_or_buffer)
             if compressed:
                 f = bz2.BZ2File(filename_or_buffer)
             else:
