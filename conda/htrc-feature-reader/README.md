@@ -19,7 +19,7 @@ Since the HTRC Feature Reader is pure Python, it can easily be converted to vers
 Remember to update the version number!
 
 ```
-parallel -j3 conda build --python {} ::: 2.7 3.5 3.6
+parallel -j3 conda build --python {} . ::: 2.7 3.5 3.6
 cd packages
 # -p all seems to have a bug with the current conda-convert (04/17)
 parallel -j1 conda convert /home/organisciak/miniconda3/conda-bld/linux-64/htrc-feature-reader-{1}-py{2}_0.tar.bz2 -p {3} ::: 1.90 ::: 27 35 36 ::: osx-64 linux-32 linux-64 win-32 win-64

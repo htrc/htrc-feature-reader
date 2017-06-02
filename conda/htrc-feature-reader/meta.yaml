@@ -1,6 +1,6 @@
 package:
   name: htrc-feature-reader
-  version: "1.90"
+  version: "1.94"
 
 source:
   path: ../..
@@ -32,6 +32,7 @@ requirements:
     - numpy
     - pysolr
     - ujson
+    - bz2file
 
   run:
     - python
@@ -40,6 +41,7 @@ requirements:
     - numpy
     - pysolr
     - ujson
+    - bz2file
 
 test:
   # Python imports
@@ -49,7 +51,7 @@ test:
   commands:
     # You can put test commands to be run here.  Use this to test that the
     # entry points work.
-    - htid2rsync --help
+    #- htid2rsync --help
 
   # You can also put a file called run_test.py in the recipe that will be run
   # at test time.
