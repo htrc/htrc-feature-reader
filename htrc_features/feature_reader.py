@@ -221,40 +221,6 @@ class FeatureReader(object):
     def create_volume(self, path, **kwargs):
         return self._volume(path, **kwargs)
 
-    def multiprocessing(self, map_func, callback=None):
-        '''
-        Pass a function to perform on each volume of the feature reader, using
-        multiprocessing (map), then process the combined outputs (reduce).
-
-        map_func
-
-        Function to run on each individual volume. Takes as input a tuple
-        containing a feature_reader and volume path, from which a volume can be
-        created. Returns a (key, value) tuple.
-
-        def do_something_on_vol(args):
-            fr, path = args
-            vol = fr.create_volume(path)
-            # Do something with 'vol'
-            return (key, value)
-
-        '''
-        # Match process count to cpu count
-        p = Pool()
-        # f = self._wrap_func(func)
-        results = p.map(map_func, self._mp_paths(), chunksize=5)
-        # , callback=callback)
-        p.close()
-        p.join()
-        return results
-
-    def _mp_paths(self):
-        '''
-        Package self with paths, so subprocesses can access it
-        '''
-        for path in self.paths:
-            yield (self, path)
-
     def _read_json(self, path_or_url, compressed=True, advanced_path=False):
         ''' Load JSON for a path. Allows remote files in addition to local ones. '''
         if parse_url(path_or_url).scheme in ['http', 'https']:
