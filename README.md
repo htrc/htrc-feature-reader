@@ -46,7 +46,7 @@ Optional: [installing the development version](#Installing-the-development-versi
 
 ### Reading feature files
 
-The easiest way to start using this library is to use the [FeatureReader](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.FeatureReader) interface, which takes a list of paths.
+The easiest way to start using this library is to use the [FeatureReader](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.FeatureReader) interface, which takes a list to Extracted Features files.
 
 
 ```python
@@ -61,9 +61,9 @@ for vol in fr.volumes():
 ```
 
     hvd.32044010273894 - The ballet dancer, and On guard,
-    njp.32101068970662 - Seven years, and other tales / by Julia Kavanagh.
-    nyp.33433074811310 - June / by Edith Barnard Delano ; with illustrations.
-    nyp.33433075749246 - You never know your luck; being the story of a matrimonial deserter, by Gilbert Parker ... illustrated by W.L. Jacobs.
+    hvd.hwquxe - The man from Glengarry : a tale of the Ottawa / by Ralph Connor.
+    hvd.hwrevu - The lady with the dog, and other stories,
+    hvd.hwrqs8 - Mr. Rutherford's children. By the authors of "The wide, wide world," "Queechy,", "Dollars and cents," etc., etc.
     mdp.39015028036104 - Russian short stories, ed. for school use,
 
 
@@ -74,9 +74,6 @@ _Woe to whomever tries `list(FeatureReader.volumes())`_.
 
 The method for creating a path list with 'glob' is just one way to do so.
 For large sets, it's better to just have a text file of your paths, and read it line by line.
-
-The feature reader also has a useful method, `multiprocessing(map_func)`, for chunking a running functions across multiple processes.
-This is an advanced feature, but extremely helpful for any large-scale processing.
 
 In addition to iterating on `feature_reader.volumes()`, there is a convenient function to grab the first volume in a feature reader. This helps in testing code, and is what we'll do to continue this introduction:
 
@@ -89,9 +86,45 @@ vol
 
 
 
-    <htrc_features.feature_reader.Volume at 0x1d2ffc52240>
+    <htrc_features.feature_reader.Volume at 0x24d7b8b7390>
 
 
+
+### Online downloading by volume id (new in v.1.90)
+
+The FeatureReader can also download files at read time, by reference to a HathiTrust volume id. For example, if I want [both of volumes of Pride and Prejudice](https://catalog.hathitrust.org/Record/100323335), I can see that the URLs are babel.hathitrust.org/cgi/pt?id=__hvd.32044013656053__ and babel.hathitrust.org/cgi/pt?id=__hvd.32044013656061__. In the FeatureReader, these can be called with the `ids=[]` argument, as follows:
+
+
+```python
+fr = FeatureReader(ids=["hvd.32044013656053", "hvd.32044013656061"])
+
+for vol in fr:
+    print(vol.title)
+```
+
+    Pride and prejudice.
+    Pride and prejudice.
+
+
+This downloads the file temporarily, using the HTRC's web-based download link (e.g. https://data.analytics.hathitrust.org/features/get?download-id={{URL}}). One good pairing with this feature is the [HTRC Python SDK](https://github.com/htrc/HTRC-PythonSDK)'s functionality for downloading collections. 
+
+For example, I have a small collection of knitting-related books at https://babel.hathitrust.org/cgi/mb?a=listis&c=1174943610. To read the feature files for those books:
+
+
+```python
+from htrc import workset
+volids = workset.load_hathitrust_collection('https://babel.hathitrust.org/cgi/mb?a=listis&c=1174943610')
+FeatureReader(ids=volids).first().title
+```
+
+
+
+
+    'A good yarn / Debbie Macomber.'
+
+
+
+Remember that for large jobs, it is faster to download your dataset beforehand, using the `rsync` method.
 
 ### Volume
 
@@ -412,35 +445,55 @@ print(a.loc[10:11,['the','and','is', 'he', 'she']])
     11     22.0  7.0  4.0  0.0  0.0
 
 
+
+```python
+data/da
+```
+
 Volume.term_page_freqs provides a wide DataFrame resembling a matrix, where terms are listed as columns, pages are listed as rows, and the values correspond to the term frequency (or page page frequency with `page_freq=true`).
 Volume.term_volume_freqs() simply sums these.
  
 ### Multiprocessing
 
-For faster processing, you can write a mapping function for acting on volumes, then pass it to `FeatureReader.multiprocessing`.
-This sends out the function to a different process per volume, spawning (CPU_CORES-1) processes at a time.
-The map function receives the feature_reader and a volume path as a tuple, and needs to initialize the volume.
+For large jobs, you'll want to use multiprocessing or multithreading to speed up your process. This is left up to your preferred method, either within Python or by spawning multiple scripts from the command line. Here are two approaches that I like.
 
-Here's a simple example that returns the term counts for each volume (take note of the first two lines of the function):
+#### Dask
+
+Dask offers easy multithreading (shared resources) and multiprocessing (separate processes) in Python, and is particularly convenient because it includes a subset of Pandas DataFrames.
+
+Here is a minimal example, that lazily loads token frequencies from a list of volume IDs, and counts them up by part of speech tag.
 
 ```python
-def printTokenList(args):
-    fr, path = args
-    vol = fr.create_volume(path)
-    return ('tokens', vol.tokens)
+import dask.dataframe as dd
+from dask import delayed
 
-fr  = FeatureReader(paths)
-all_tokens = []
-mapper = fr.multiprocessing(printTokenList)
-for key, result in mapper:
-    all_tokens = all_tokens + result
-set(all_tokens)
+def get_tokenlist(vol):
+    ''' Load a one volume feature reader, get that volume, and return its tokenlist '''
+    return FeatureReader(ids=[volid]).first().tokenlist()
+
+delayed_dfs = [delayed(get_tokenlist)(volid) for volid in volids]
+
+# Create a dask
+ddf = (dd.from_delayed(delayed_dfs)
+         .reset_index()
+         .groupby('pos')[['count']]
+         .sum()
+      )
+
+# Run processing
+ddf.compute()
 ```
 
-Some rules: results must be serializeable, and the map_func must be accessible from __main__ (basically: no dynamic functions: they should be written plainly in your script).
+Here is an example of 78 volumes being processed in 24 seconds with 31 threads:
 
-The results are collected and returned together, so you don't want a feature reader with all 4.8 million files, because the results will be too much memory (depending on how big your result is).
-Instead, it easier to initialize feature readers for smaller batches.
+![Counting POS in 78 books about knitting](data/dask-progress.png)
+
+This example used multithreading. Due to the nature of Python, certain functions won't parallelize well. In our case, the part where the JSON is read from the file and converted to a DataFrame (the light green parts of the graphic) won't speed up because Python dicts lock the Global Interpreter Lock (GIL). However, because Pandas releases the GIL, nearly everything you do after parsing the JSON will be very quick.
+
+To better understand what happens when `ddf.compute()`, here is a graph for 4 volumes:
+
+![](data/dask-graph.png)
+
 
 #### GNU Parallel
 As an alternative to multiprocessing in Python, my preference is to have simpler Python scripts and to use GNU Parallel on the command line. To do this, you can set up your Python script to take variable length arguments of feature file paths, and to print to stdout.
