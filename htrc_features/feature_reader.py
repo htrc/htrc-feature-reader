@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+
 import sys
 PY3 = (sys.version_info[0] >= 3)
 
@@ -287,6 +288,17 @@ class FeatureReader(object):
             vol = self._volume(path)
             func(vol)
         return new_func
+    
+    def __repr__(self):
+        if len(self.paths) > 1:
+            return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
+        elif len(self.paths) == 1:
+            return "<Empty FeatureReader>"
+        else:
+            return "<FeatureReader for %s>" % self.paths[0]
+        
+    def __str__(self):
+        return "<%d path FeatureReader>" % (len(self.paths))
 
 
 class Volume(object):
@@ -627,6 +639,14 @@ class Volume(object):
                                               'place', 'char'])
         df.sortlevel(inplace=True)
         return df
+        
+    def __str__(self):
+        def truncate(s, maxlen):
+            if len(s) > maxlen:
+                return s[:maxlen].strip() + "..."
+            else:
+                return s.strip()
+        return "<Volume: %s (%s) by %s>" % (truncate(self.title, 30), self.year, truncate(self.author[0], 40))
 
 
 class Page:
