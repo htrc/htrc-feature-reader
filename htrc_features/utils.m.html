@@ -1038,6 +1038,7 @@ table {
     <li class="set"><h3><a href="#header-functions">Functions</a></h3>
       
   <ul>
+    <li class="mono"><a href="#htrc_features.utils.download_file">download_file</a></li>
     <li class="mono"><a href="#htrc_features.utils.htid2rsync_cmd">htid2rsync_cmd</a></li>
     <li class="mono"><a href="#htrc_features.utils.id2path">id2path</a></li>
     <li class="mono"><a href="#htrc_features.utils.id_encode">id_encode</a></li>
@@ -1065,27 +1066,130 @@ table {
   <div id="source-htrc_features.utils" class="source">
     <div class="codehilite"><pre><span class="kn">import</span> <span class="nn">logging</span>
 
-<span class="k">try</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">pairtree</span> <span class="kn">import</span> <span class="n">id2path</span><span class="p">,</span> <span class="n">id_encode</span>
-<span class="k">except</span><span class="p">:</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Falling back on custom functions to replace pairtree.&quot;</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">id_encode</span><span class="p">(</span><span class="nb">id</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">id</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;:&quot;</span><span class="p">,</span> <span class="s">&quot;+&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;/&quot;</span><span class="p">,</span> <span class="s">&quot;=&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="s">&quot;,&quot;</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">id2path</span><span class="p">(</span><span class="nb">id</span><span class="p">):</span>
-        <span class="n">clean_id</span> <span class="o">=</span> <span class="n">id_encode</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
-        <span class="n">path</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">clean_id</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="n">val</span><span class="p">,</span> <span class="n">clean_id</span> <span class="o">=</span> <span class="n">clean_id</span><span class="p">[:</span><span class="mi">2</span><span class="p">],</span> <span class="n">clean_id</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
-            <span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
-        <span class="k">return</span> <span class="s">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">id_encode</span><span class="p">(</span><span class="nb">id</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">id</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;:&quot;</span><span class="p">,</span> <span class="s">&quot;+&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;/&quot;</span><span class="p">,</span> <span class="s">&quot;=&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;.&quot;</span><span class="p">,</span> <span class="s">&quot;,&quot;</span><span class="p">)</span>
 
 
+<span class="k">def</span> <span class="nf">id2path</span><span class="p">(</span><span class="nb">id</span><span class="p">):</span>
+    <span class="n">clean_id</span> <span class="o">=</span> <span class="n">id_encode</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">clean_id</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">val</span><span class="p">,</span> <span class="n">clean_id</span> <span class="o">=</span> <span class="n">clean_id</span><span class="p">[:</span><span class="mi">2</span><span class="p">],</span> <span class="n">clean_id</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
+        <span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+    <span class="k">return</span> <span class="s">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">download_file</span><span class="p">(</span><span class="n">htids</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="s">&#39;./&#39;</span><span class="p">,</span> <span class="n">keep_dirs</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">silent</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    A function for downloading one or more Extracted Features files by ID.</span>
+<span class="sd">    </span>
+<span class="sd">    This uses a subprocess call to &#39;rsync&#39;, so will only work if rsync is available</span>
+<span class="sd">    on your system and accessible in the same environment as Python.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns (return code, stdout) tuple.</span>
+<span class="sd">    </span>
+<span class="sd">    htids:</span>
+<span class="sd">        A string or list of strings, comprising HathiTrust identifiers.</span>
+<span class="sd">        </span>
+<span class="sd">    outdir:</span>
+<span class="sd">        Location to save the file(s). Defaults to current directory.</span>
+<span class="sd">        </span>
+<span class="sd">    keep_dirs:</span>
+<span class="sd">        Whether to keep the remote pairtree file structure or save just the files to outdir.</span>
+<span class="sd">        Defaults to False (flattening).</span>
+<span class="sd">        </span>
+<span class="sd">    silent:</span>
+<span class="sd">        If False, return the rsync stdout.</span>
+<span class="sd">        </span>
+<span class="sd">     </span>
+<span class="sd">    Usage</span>
+<span class="sd">    -------</span>
+<span class="sd">    </span>
+<span class="sd">    Download one file to the current directory:</span>
+<span class="sd">    </span>
+<span class="sd">    ```</span>
+<span class="sd">    utils.download_file(htids=&#39;nyp.33433042068894&#39;)</span>
+<span class="sd">    ```</span>
+<span class="sd">    </span>
+<span class="sd">    Download multiple files to the current directory:</span>
+<span class="sd">    </span>
+<span class="sd">    ```</span>
+<span class="sd">    ids = [&#39;nyp.33433042068894&#39;, &#39;nyp.33433074943592&#39;, &#39;nyp.33433074943600&#39;]</span>
+<span class="sd">    utils.download_file(htids=ids)</span>
+<span class="sd">    ```</span>
+<span class="sd">    </span>
+<span class="sd">    Download file to `/tmp`:</span>
+<span class="sd">    ```</span>
+<span class="sd">    utils.download_file(htids=&#39;nyp.33433042068894&#39;, outdir=&#39;/tmp&#39;)</span>
+<span class="sd">    ```</span>
+<span class="sd">    </span>
+<span class="sd">    Download file to current directory, keeping pairtree directory structure;</span>
+<span class="sd">    i.e. &#39;./nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2&#39;:</span>
+<span class="sd">    </span>
+<span class="sd">    ```</span>
+<span class="sd">    utils.download_file(htids=&#39;nyp.33433042068894&#39;, keep_dirs=True)</span>
+<span class="sd">    ```</span>
+<span class="sd">    </span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="kn">import</span> <span class="nn">subprocess</span>
+    <span class="kn">import</span> <span class="nn">tempfile</span>
+    <span class="kn">import</span> <span class="nn">os</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">string_types</span>
+
+    <span class="n">tmppath</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">sub_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">outdir</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s">&quot;/&quot;</span><span class="p">):</span>
+        <span class="n">outdir</span> <span class="o">+=</span> <span class="s">&quot;/&quot;</span>
+    
+    <span class="k">if</span> <span class="n">keep_dirs</span><span class="p">:</span>
+        <span class="n">relative</span> <span class="o">=</span> <span class="s">&#39;--relative&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">relative</span> <span class="o">=</span> <span class="s">&#39;--no-relative&#39;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">htids</span><span class="p">,</span> <span class="n">string_types</span><span class="p">):</span>
+        <span class="c"># Download a single file</span>
+        <span class="n">dest_file</span> <span class="o">=</span> <span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htids</span><span class="p">)</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;data.analytics.hathitrust.org::features/&quot;</span> <span class="o">+</span> <span class="n">dest_file</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c"># Download a list of files</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">)</span> <span class="k">for</span> <span class="n">htid</span> <span class="ow">in</span> <span class="n">htids</span><span class="p">]</span>
+        
+        <span class="n">fdescrip</span><span class="p">,</span> <span class="n">tmppath</span> <span class="o">=</span>  <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">()</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">tmppath</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">paths</span><span class="p">))</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;--files-from=</span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">tmppath</span><span class="p">,</span> <span class="s">&quot;data.analytics.hathitrust.org::features/&quot;</span><span class="p">]</span>
+
+    <span class="n">cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;rsync&quot;</span><span class="p">,</span> <span class="n">relative</span><span class="p">,</span> <span class="s">&quot;-a&quot;</span><span class="p">,</span><span class="s">&quot;-v&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">args</span> <span class="o">+</span> <span class="p">[</span><span class="n">outdir</span><span class="p">]</span>
+    
+    <span class="n">major</span><span class="p">,</span> <span class="n">minor</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">major</span> <span class="o">&gt;=</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">minor</span> <span class="o">&gt;=</span><span class="mi">5</span><span class="p">):</span>
+        <span class="c"># Recommended use for 3.5+ is subprocess.run</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">silent</span><span class="p">:</span>
+            <span class="n">sub_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">universal_newlines</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">devnull</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">devnull</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span>
+            <span class="n">sub_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">stdout</span><span class="o">=</span><span class="n">devnull</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">devnull</span><span class="p">,</span> <span class="n">universal_newlines</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="o">**</span><span class="n">sub_kwargs</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">returncode</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c"># Support older Python, currently without error catching</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="n">cmd</span><span class="p">),</span> <span class="bp">None</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">tmppath</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fdescrip</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">tmppath</span><span class="p">)</span>
+        
+    <span class="k">return</span> <span class="n">out</span>
+
+    
 <span class="k">def</span> <span class="nf">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Take an HTRC id and convert it to an Rsync location for syncing Extracted</span>
-<span class="sd">    Features</span>
+<span class="sd">    Features.</span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="k">if</span> <span class="s">&#39;kind&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;The basic/advanced split with extracted features files &quot;</span>
@@ -1172,6 +1276,154 @@ table {
     <h2 class="section-title" id="header-functions">Functions</h2>
       
   <div class="item">
+    <div class="name def" id="htrc_features.utils.download_file">
+    <p>def <span class="ident">download_file</span>(</p><p>htids, outdir=&#39;./&#39;, keep_dirs=False, silent=True)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>A function for downloading one or more Extracted Features files by ID.</p>
+<p>This uses a subprocess call to 'rsync', so will only work if rsync is available
+on your system and accessible in the same environment as Python.</p>
+<p>Returns (return code, stdout) tuple.</p>
+<p>htids:
+    A string or list of strings, comprising HathiTrust identifiers.</p>
+<p>outdir:
+    Location to save the file(s). Defaults to current directory.</p>
+<p>keep_dirs:
+    Whether to keep the remote pairtree file structure or save just the files to outdir.
+    Defaults to False (flattening).</p>
+<p>silent:
+    If False, return the rsync stdout.</p>
+<h2>Usage</h2>
+<p>Download one file to the current directory:</p>
+<p><code>utils.download_file(htids='nyp.33433042068894')</code></p>
+<p>Download multiple files to the current directory:</p>
+<p><code>ids = ['nyp.33433042068894', 'nyp.33433074943592', 'nyp.33433074943600']
+utils.download_file(htids=ids)</code></p>
+<p>Download file to <code>/tmp</code>:
+<code>utils.download_file(htids='nyp.33433042068894', outdir='/tmp')</code></p>
+<p>Download file to current directory, keeping pairtree directory structure;
+i.e. './nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2':</p>
+<p><code>utils.download_file(htids='nyp.33433042068894', keep_dirs=True)</code></p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.utils.download_file', this);">Show source &equiv;</a></p>
+  <div id="source-htrc_features.utils.download_file" class="source">
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">download_file</span><span class="p">(</span><span class="n">htids</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="s">&#39;./&#39;</span><span class="p">,</span> <span class="n">keep_dirs</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">silent</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    A function for downloading one or more Extracted Features files by ID.</span>
+<span class="sd">    </span>
+<span class="sd">    This uses a subprocess call to &#39;rsync&#39;, so will only work if rsync is available</span>
+<span class="sd">    on your system and accessible in the same environment as Python.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns (return code, stdout) tuple.</span>
+<span class="sd">    </span>
+<span class="sd">    htids:</span>
+<span class="sd">        A string or list of strings, comprising HathiTrust identifiers.</span>
+<span class="sd">        </span>
+<span class="sd">    outdir:</span>
+<span class="sd">        Location to save the file(s). Defaults to current directory.</span>
+<span class="sd">        </span>
+<span class="sd">    keep_dirs:</span>
+<span class="sd">        Whether to keep the remote pairtree file structure or save just the files to outdir.</span>
+<span class="sd">        Defaults to False (flattening).</span>
+<span class="sd">        </span>
+<span class="sd">    silent:</span>
+<span class="sd">        If False, return the rsync stdout.</span>
+<span class="sd">        </span>
+<span class="sd">     </span>
+<span class="sd">    Usage</span>
+<span class="sd">    -------</span>
+<span class="sd">    </span>
+<span class="sd">    Download one file to the current directory:</span>
+<span class="sd">    </span>
+<span class="sd">    ```</span>
+<span class="sd">    utils.download_file(htids=&#39;nyp.33433042068894&#39;)</span>
+<span class="sd">    ```</span>
+<span class="sd">    </span>
+<span class="sd">    Download multiple files to the current directory:</span>
+<span class="sd">    </span>
+<span class="sd">    ```</span>
+<span class="sd">    ids = [&#39;nyp.33433042068894&#39;, &#39;nyp.33433074943592&#39;, &#39;nyp.33433074943600&#39;]</span>
+<span class="sd">    utils.download_file(htids=ids)</span>
+<span class="sd">    ```</span>
+<span class="sd">    </span>
+<span class="sd">    Download file to `/tmp`:</span>
+<span class="sd">    ```</span>
+<span class="sd">    utils.download_file(htids=&#39;nyp.33433042068894&#39;, outdir=&#39;/tmp&#39;)</span>
+<span class="sd">    ```</span>
+<span class="sd">    </span>
+<span class="sd">    Download file to current directory, keeping pairtree directory structure;</span>
+<span class="sd">    i.e. &#39;./nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2&#39;:</span>
+<span class="sd">    </span>
+<span class="sd">    ```</span>
+<span class="sd">    utils.download_file(htids=&#39;nyp.33433042068894&#39;, keep_dirs=True)</span>
+<span class="sd">    ```</span>
+<span class="sd">    </span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="kn">import</span> <span class="nn">subprocess</span>
+    <span class="kn">import</span> <span class="nn">tempfile</span>
+    <span class="kn">import</span> <span class="nn">os</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">string_types</span>
+
+    <span class="n">tmppath</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">sub_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">outdir</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s">&quot;/&quot;</span><span class="p">):</span>
+        <span class="n">outdir</span> <span class="o">+=</span> <span class="s">&quot;/&quot;</span>
+    
+    <span class="k">if</span> <span class="n">keep_dirs</span><span class="p">:</span>
+        <span class="n">relative</span> <span class="o">=</span> <span class="s">&#39;--relative&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">relative</span> <span class="o">=</span> <span class="s">&#39;--no-relative&#39;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">htids</span><span class="p">,</span> <span class="n">string_types</span><span class="p">):</span>
+        <span class="c"># Download a single file</span>
+        <span class="n">dest_file</span> <span class="o">=</span> <span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htids</span><span class="p">)</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;data.analytics.hathitrust.org::features/&quot;</span> <span class="o">+</span> <span class="n">dest_file</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c"># Download a list of files</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">)</span> <span class="k">for</span> <span class="n">htid</span> <span class="ow">in</span> <span class="n">htids</span><span class="p">]</span>
+        
+        <span class="n">fdescrip</span><span class="p">,</span> <span class="n">tmppath</span> <span class="o">=</span>  <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">()</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">tmppath</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">paths</span><span class="p">))</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;--files-from=</span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">tmppath</span><span class="p">,</span> <span class="s">&quot;data.analytics.hathitrust.org::features/&quot;</span><span class="p">]</span>
+
+    <span class="n">cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;rsync&quot;</span><span class="p">,</span> <span class="n">relative</span><span class="p">,</span> <span class="s">&quot;-a&quot;</span><span class="p">,</span><span class="s">&quot;-v&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">args</span> <span class="o">+</span> <span class="p">[</span><span class="n">outdir</span><span class="p">]</span>
+    
+    <span class="n">major</span><span class="p">,</span> <span class="n">minor</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">major</span> <span class="o">&gt;=</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">minor</span> <span class="o">&gt;=</span><span class="mi">5</span><span class="p">):</span>
+        <span class="c"># Recommended use for 3.5+ is subprocess.run</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">silent</span><span class="p">:</span>
+            <span class="n">sub_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">universal_newlines</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">devnull</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">devnull</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span>
+            <span class="n">sub_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">stdout</span><span class="o">=</span><span class="n">devnull</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">devnull</span><span class="p">,</span> <span class="n">universal_newlines</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="o">**</span><span class="n">sub_kwargs</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">returncode</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c"># Support older Python, currently without error catching</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="n">cmd</span><span class="p">),</span> <span class="bp">None</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">tmppath</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fdescrip</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">tmppath</span><span class="p">)</span>
+        
+    <span class="k">return</span> <span class="n">out</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+      
+  <div class="item">
     <div class="name def" id="htrc_features.utils.htid2rsync_cmd">
     <p>def <span class="ident">htid2rsync_cmd</span>(</p><p>)</p>
     </div>
@@ -1252,14 +1504,14 @@ table {
     
   
     <div class="desc"><p>Take an HTRC id and convert it to an Rsync location for syncing Extracted
-Features</p></div>
+Features.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.utils.id_to_rsync', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.utils.id_to_rsync" class="source">
     <div class="codehilite"><pre><span class="k">def</span> <span class="nf">id_to_rsync</span><span class="p">(</span><span class="n">htid</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Take an HTRC id and convert it to an Rsync location for syncing Extracted</span>
-<span class="sd">    Features</span>
+<span class="sd">    Features.</span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="k">if</span> <span class="s">&#39;kind&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;The basic/advanced split with extracted features files &quot;</span>

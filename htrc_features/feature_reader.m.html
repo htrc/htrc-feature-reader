@@ -1037,6 +1037,7 @@ table {
     <li class="set"><h3><a href="#header-variables">Module variables</a></h3>
       
   <ul>
+    <li class="mono"><a href="#htrc_features.feature_reader.PY3">PY3</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.SECREF">SECREF</a></li>
   </ul>
 
@@ -1062,7 +1063,6 @@ table {
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.create_volume">create_volume</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.first">first</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.jsons">jsons</a></li>
-    <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.multiprocessing">multiprocessing</a></li>
     <li class="mono"><a href="#htrc_features.feature_reader.FeatureReader.volumes">volumes</a></li>
   </ul>
 
@@ -1130,13 +1130,20 @@ table {
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.feature_reader" class="source">
     <div class="codehilite"><pre><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">unicode_literals</span>
-<span class="kn">import</span> <span class="nn">bz2</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="n">PY3</span> <span class="o">=</span> <span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">)</span>
+
+
+
 <span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Pool</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
-<span class="c"># Because python2&#39;s dict.iteritem is python3&#39;s dict.item</span>
+<span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">BytesIO</span>
+
 <span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span>
+
 <span class="k">try</span><span class="p">:</span>
     <span class="kn">import</span> <span class="nn">ujson</span> <span class="kn">as</span> <span class="nn">json</span>
 <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
@@ -1146,8 +1153,25 @@ table {
 <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Pysolr not installed.&quot;</span><span class="p">)</span>
 
-<span class="c"># UTILS</span>
 
+<span class="k">if</span> <span class="n">PY3</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">urllib.request</span> <span class="kn">import</span> <span class="n">urlopen</span> <span class="k">as</span> <span class="n">_urlopen</span>
+    <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">urlparse</span> <span class="k">as</span> <span class="n">parse_url</span>
+    <span class="kn">from</span> <span class="nn">urllib.error</span> <span class="kn">import</span> <span class="n">HTTPError</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">urlparse</span> <span class="kn">import</span> <span class="n">urlparse</span> <span class="k">as</span> <span class="n">parse_url</span>
+    <span class="kn">from</span> <span class="nn">urllib2</span> <span class="kn">import</span> <span class="n">urlopen</span> <span class="k">as</span> <span class="n">_urlopen</span>
+    <span class="kn">from</span> <span class="nn">urllib2</span> <span class="kn">import</span> <span class="n">HTTPError</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">bz2file</span> <span class="kn">as</span> <span class="nn">bz2</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">bz2</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">PY3</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;Loading volumes from a URL will not work in Python 2 unless you install bz2file&quot;</span><span class="p">)</span>
+
+
+<span class="c"># UTILS</span>
 <span class="n">SECREF</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;header&#39;</span><span class="p">,</span> <span class="s">&#39;body&#39;</span><span class="p">,</span> <span class="s">&#39;footer&#39;</span><span class="p">]</span>
 
 
@@ -1264,16 +1288,33 @@ table {
 
 
 <span class="k">class</span> <span class="nc">FeatureReader</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="n">DL_URL</span> <span class="o">=</span> <span class="s">&quot;https://data.analytics.hathitrust.org/features/get?download-id={0}&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">ids</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">compressed</span> <span class="o">=</span> <span class="n">compressed</span>
-        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="n">paths</span>
+        
+        <span class="k">if</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_online</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="n">paths</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">paths</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">paths</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">ids</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">+=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">DL_URL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">DL_URL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ids</span><span class="p">))</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
 
     <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">volumes</span><span class="p">()</span>
+    
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="s">&quot;HTRC Feature Reader with </span><span class="si">%d</span><span class="s"> paths load&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
@@ -1312,55 +1353,32 @@ table {
     <span class="k">def</span> <span class="nf">create_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">multiprocessing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_func</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        Pass a function to perform on each volume of the feature reader, using</span>
-<span class="sd">        multiprocessing (map), then process the combined outputs (reduce).</span>
-
-<span class="sd">        map_func</span>
-
-<span class="sd">        Function to run on each individual volume. Takes as input a tuple</span>
-<span class="sd">        containing a feature_reader and volume path, from which a volume can be</span>
-<span class="sd">        created. Returns a (key, value) tuple.</span>
-
-<span class="sd">        def do_something_on_vol(args):</span>
-<span class="sd">            fr, path = args</span>
-<span class="sd">            vol = fr.create_volume(path)</span>
-<span class="sd">            # Do something with &#39;vol&#39;</span>
-<span class="sd">            return (key, value)</span>
-
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="c"># Match process count to cpu count</span>
-        <span class="n">p</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
-        <span class="c"># f = self._wrap_func(func)</span>
-        <span class="n">results</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">map_func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mp_paths</span><span class="p">(),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-        <span class="c"># , callback=callback)</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">results</span>
-
-    <span class="k">def</span> <span class="nf">_mp_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        Package self with paths, so subprocesses can access it</span>
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
-            <span class="k">yield</span> <span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">_read_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39; Load JSON for a path &#39;&#39;&#39;</span>
+    <span class="k">def</span> <span class="nf">_read_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path_or_url</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Load JSON for a path. Allows remote files in addition to local ones. &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">parse_url</span><span class="p">(</span><span class="n">path_or_url</span><span class="p">)</span><span class="o">.</span><span class="n">scheme</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;http&#39;</span><span class="p">,</span> <span class="s">&#39;https&#39;</span><span class="p">]:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">req</span> <span class="o">=</span> <span class="n">_urlopen</span><span class="p">(</span><span class="n">path_or_url</span><span class="p">)</span>
+                <span class="n">filename_or_buffer</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">(</span><span class="n">req</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+            <span class="k">except</span> <span class="n">HTTPError</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;HTTP Error with id </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">path_or_url</span><span class="p">)</span>
+                <span class="k">raise</span>
+            <span class="n">compressed</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">filename_or_buffer</span> <span class="o">=</span> <span class="n">path_or_url</span>
+        
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">compressed</span><span class="p">:</span>
-                <span class="n">f</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">BZ2File</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">BZ2File</span><span class="p">(</span><span class="n">filename_or_buffer</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;r+&#39;</span><span class="p">)</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename_or_buffer</span><span class="p">,</span> <span class="s">&#39;r+&#39;</span><span class="p">)</span>
             <span class="n">rawjson</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
             <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
         <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;Can&#39;t read </span><span class="si">%s</span><span class="s">. Did you pass the incorrect &quot;</span>
-                              <span class="s">&quot;&#39;compressed=&#39; argument?&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                              <span class="s">&quot;&#39;compressed=&#39; argument?&quot;</span><span class="p">,</span> <span class="n">path_or_url</span><span class="p">)</span>
             <span class="k">raise</span>
         <span class="k">except</span><span class="p">:</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;Can&#39;t open </span><span class="si">%s</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;Can&#39;t open </span><span class="si">%s</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">path_or_url</span><span class="p">)</span>
             <span class="k">raise</span>
 
         <span class="c"># This is a bandaid for schema version 2.0, not over-engineered</span>
@@ -1375,12 +1393,13 @@ table {
         <span class="k">except</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;Problem reading JSON for </span><span class="si">%s</span><span class="s">. One common reason&quot;</span>
                               <span class="s">&quot; for this error is an incorrect compressed= &quot;</span>
-                              <span class="s">&quot;argument&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                              <span class="s">&quot;argument&quot;</span><span class="p">,</span> <span class="n">path_or_url</span><span class="p">)</span>
             <span class="k">raise</span>
         <span class="k">return</span> <span class="n">volumejson</span>
 
     <span class="k">def</span> <span class="nf">_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Read a path into a volume.&#39;&#39;&#39;</span>
+        
         <span class="n">volumejson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">advanced_path</span><span class="p">:</span>
             <span class="n">advanced</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">advanced_path</span><span class="p">,</span> <span class="n">compressed</span><span class="p">)</span>
@@ -1400,6 +1419,17 @@ table {
             <span class="n">vol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
             <span class="n">func</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">new_func</span>
+    
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&quot;&lt;</span><span class="si">%d</span><span class="s"> path FeatureReader (</span><span class="si">%s</span><span class="s"> to </span><span class="si">%s</span><span class="s">)&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&quot;&lt;Empty FeatureReader&gt;&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&quot;&lt;FeatureReader for </span><span class="si">%s</span><span class="s">&gt;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&quot;&lt;</span><span class="si">%d</span><span class="s"> path FeatureReader&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
 
 
 <span class="k">class</span> <span class="nc">Volume</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -1670,8 +1700,6 @@ table {
         <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">        Returns a Pandas dataframe of:</span>
 <span class="sd">            page / section / place(i.e. begin/end) / char / count</span>
-
-<span class="sd">        Provide an array of pages that hold beginLineChars and endLineChars.</span>
 <span class="sd">        &#39;&#39;&#39;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span> <span class="o">==</span> <span class="s">&#39;1.0&#39;</span><span class="p">:</span>
             <span class="n">tname</span> <span class="o">=</span> <span class="s">&#39;tokens&#39;</span>
@@ -1681,7 +1709,7 @@ table {
         <span class="c"># Make structured numpy array</span>
         <span class="c"># Because it is typed, this approach is ~40x faster than earlier</span>
         <span class="c"># methods</span>
-        <span class="n">m</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pages</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2000</span>  <span class="c"># Pages * oversized estimate for tokens/page</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">page</span><span class="p">[</span><span class="s">&#39;tokenCount&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">])</span>
         <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">[(</span><span class="nb">str</span><span class="p">(</span><span class="s">&#39;page&#39;</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="s">&#39;u8&#39;</span><span class="p">)),</span>
                                  <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="s">&#39;section&#39;</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="s">&#39;U6&#39;</span><span class="p">)),</span>
                                  <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="s">&#39;U64&#39;</span><span class="p">)),</span>
@@ -1742,6 +1770,14 @@ table {
                                               <span class="s">&#39;place&#39;</span><span class="p">,</span> <span class="s">&#39;char&#39;</span><span class="p">])</span>
         <span class="n">df</span><span class="o">.</span><span class="n">sortlevel</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">df</span>
+        
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">truncate</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">maxlen</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">maxlen</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">s</span><span class="p">[:</span><span class="n">maxlen</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">+</span> <span class="s">&quot;...&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">return</span> <span class="s">&quot;&lt;Volume: </span><span class="si">%s</span><span class="s"> (</span><span class="si">%s</span><span class="s">) by </span><span class="si">%s</span><span class="s">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">truncate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="mi">30</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">truncate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">author</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">40</span><span class="p">))</span>
 
 
 <span class="k">class</span> <span class="nc">Page</span><span class="p">:</span>
@@ -1936,6 +1972,14 @@ table {
   <section id="section-items">
     <h2 class="section-title" id="header-variables">Module variables</h2>
       <div class="item">
+      <p id="htrc_features.feature_reader.PY3" class="name">var <span class="ident">PY3</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
+      <div class="item">
       <p id="htrc_features.feature_reader.SECREF" class="name">var <span class="ident">SECREF</span></p>
       
   
@@ -2109,16 +2153,33 @@ on a page. Defaults to false.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.FeatureReader', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.feature_reader.FeatureReader" class="source">
     <div class="codehilite"><pre><span class="k">class</span> <span class="nc">FeatureReader</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="n">DL_URL</span> <span class="o">=</span> <span class="s">&quot;https://data.analytics.hathitrust.org/features/get?download-id={0}&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">ids</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">compressed</span> <span class="o">=</span> <span class="n">compressed</span>
-        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="n">paths</span>
+        
+        <span class="k">if</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_online</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="n">paths</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">paths</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">paths</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">ids</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">+=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">DL_URL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">DL_URL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ids</span><span class="p">))</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
 
     <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">volumes</span><span class="p">()</span>
+    
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="s">&quot;HTRC Feature Reader with </span><span class="si">%d</span><span class="s"> paths load&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
@@ -2157,55 +2218,32 @@ on a page. Defaults to false.</p></div>
     <span class="k">def</span> <span class="nf">create_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">multiprocessing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_func</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        Pass a function to perform on each volume of the feature reader, using</span>
-<span class="sd">        multiprocessing (map), then process the combined outputs (reduce).</span>
-
-<span class="sd">        map_func</span>
-
-<span class="sd">        Function to run on each individual volume. Takes as input a tuple</span>
-<span class="sd">        containing a feature_reader and volume path, from which a volume can be</span>
-<span class="sd">        created. Returns a (key, value) tuple.</span>
-
-<span class="sd">        def do_something_on_vol(args):</span>
-<span class="sd">            fr, path = args</span>
-<span class="sd">            vol = fr.create_volume(path)</span>
-<span class="sd">            # Do something with &#39;vol&#39;</span>
-<span class="sd">            return (key, value)</span>
-
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="c"># Match process count to cpu count</span>
-        <span class="n">p</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
-        <span class="c"># f = self._wrap_func(func)</span>
-        <span class="n">results</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">map_func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mp_paths</span><span class="p">(),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-        <span class="c"># , callback=callback)</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-        <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">results</span>
-
-    <span class="k">def</span> <span class="nf">_mp_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        Package self with paths, so subprocesses can access it</span>
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
-            <span class="k">yield</span> <span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">_read_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39; Load JSON for a path &#39;&#39;&#39;</span>
+    <span class="k">def</span> <span class="nf">_read_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path_or_url</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Load JSON for a path. Allows remote files in addition to local ones. &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">parse_url</span><span class="p">(</span><span class="n">path_or_url</span><span class="p">)</span><span class="o">.</span><span class="n">scheme</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;http&#39;</span><span class="p">,</span> <span class="s">&#39;https&#39;</span><span class="p">]:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">req</span> <span class="o">=</span> <span class="n">_urlopen</span><span class="p">(</span><span class="n">path_or_url</span><span class="p">)</span>
+                <span class="n">filename_or_buffer</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">(</span><span class="n">req</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+            <span class="k">except</span> <span class="n">HTTPError</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;HTTP Error with id </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">path_or_url</span><span class="p">)</span>
+                <span class="k">raise</span>
+            <span class="n">compressed</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">filename_or_buffer</span> <span class="o">=</span> <span class="n">path_or_url</span>
+        
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">compressed</span><span class="p">:</span>
-                <span class="n">f</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">BZ2File</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">BZ2File</span><span class="p">(</span><span class="n">filename_or_buffer</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;r+&#39;</span><span class="p">)</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename_or_buffer</span><span class="p">,</span> <span class="s">&#39;r+&#39;</span><span class="p">)</span>
             <span class="n">rawjson</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
             <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
         <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;Can&#39;t read </span><span class="si">%s</span><span class="s">. Did you pass the incorrect &quot;</span>
-                              <span class="s">&quot;&#39;compressed=&#39; argument?&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                              <span class="s">&quot;&#39;compressed=&#39; argument?&quot;</span><span class="p">,</span> <span class="n">path_or_url</span><span class="p">)</span>
             <span class="k">raise</span>
         <span class="k">except</span><span class="p">:</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;Can&#39;t open </span><span class="si">%s</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;Can&#39;t open </span><span class="si">%s</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">path_or_url</span><span class="p">)</span>
             <span class="k">raise</span>
 
         <span class="c"># This is a bandaid for schema version 2.0, not over-engineered</span>
@@ -2220,12 +2258,13 @@ on a page. Defaults to false.</p></div>
         <span class="k">except</span><span class="p">:</span>
             <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s">&quot;Problem reading JSON for </span><span class="si">%s</span><span class="s">. One common reason&quot;</span>
                               <span class="s">&quot; for this error is an incorrect compressed= &quot;</span>
-                              <span class="s">&quot;argument&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                              <span class="s">&quot;argument&quot;</span><span class="p">,</span> <span class="n">path_or_url</span><span class="p">)</span>
             <span class="k">raise</span>
         <span class="k">return</span> <span class="n">volumejson</span>
 
     <span class="k">def</span> <span class="nf">_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">advanced_path</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
         <span class="sd">&#39;&#39;&#39; Read a path into a volume.&#39;&#39;&#39;</span>
+        
         <span class="n">volumejson</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">advanced_path</span><span class="p">:</span>
             <span class="n">advanced</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">advanced_path</span><span class="p">,</span> <span class="n">compressed</span><span class="p">)</span>
@@ -2245,6 +2284,17 @@ on a page. Defaults to false.</p></div>
             <span class="n">vol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_volume</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
             <span class="n">func</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">new_func</span>
+    
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&quot;&lt;</span><span class="si">%d</span><span class="s"> path FeatureReader (</span><span class="si">%s</span><span class="s"> to </span><span class="si">%s</span><span class="s">)&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&quot;&lt;Empty FeatureReader&gt;&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&quot;&lt;FeatureReader for </span><span class="si">%s</span><span class="s">&gt;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&quot;&lt;</span><span class="si">%d</span><span class="s"> path FeatureReader&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
 </pre></div>
 
   </div>
@@ -2257,6 +2307,17 @@ on a page. Defaults to false.</p></div>
           <li><a href="#htrc_features.feature_reader.FeatureReader">FeatureReader</a></li>
           <li>__builtin__.object</li>
           </ul>
+          <h3>Class variables</h3>
+            <div class="item">
+            <p id="htrc_features.feature_reader.FeatureReader.DL_URL" class="name">var <span class="ident">DL_URL</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
           <h3>Instance variables</h3>
             <div class="item">
             <p id="htrc_features.feature_reader.FeatureReader.compressed" class="name">var <span class="ident">compressed</span></p>
@@ -2282,7 +2343,7 @@ on a page. Defaults to false.</p></div>
             
   <div class="item">
     <div class="name def" id="htrc_features.feature_reader.FeatureReader.__init__">
-    <p>def <span class="ident">__init__</span>(</p><p>self, paths, compressed=True)</p>
+    <p>def <span class="ident">__init__</span>(</p><p>self, paths=None, compressed=True, ids=None)</p>
     </div>
     
 
@@ -2291,12 +2352,22 @@ on a page. Defaults to false.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.FeatureReader.__init__', this);">Show source &equiv;</a></p>
   <div id="source-htrc_features.feature_reader.FeatureReader.__init__" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">ids</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">compressed</span> <span class="o">=</span> <span class="n">compressed</span>
-    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="n">paths</span>
+    
+    <span class="k">if</span> <span class="n">paths</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_online</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="n">paths</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">paths</span><span class="p">]</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">paths</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">ids</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">+=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">DL_URL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">DL_URL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ids</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
 </pre></div>
 
@@ -2381,58 +2452,6 @@ are not needed.</p></div>
             <span class="k">yield</span> <span class="p">(</span><span class="n">basicjson</span><span class="p">,</span> <span class="n">advjson</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">compressed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compressed</span><span class="p">)</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="htrc_features.feature_reader.FeatureReader.multiprocessing">
-    <p>def <span class="ident">multiprocessing</span>(</p><p>self, map_func, callback=None)</p>
-    </div>
-    
-
-    
-  
-    <div class="desc"><p>Pass a function to perform on each volume of the feature reader, using
-multiprocessing (map), then process the combined outputs (reduce).</p>
-<p>map_func</p>
-<p>Function to run on each individual volume. Takes as input a tuple
-containing a feature_reader and volume path, from which a volume can be
-created. Returns a (key, value) tuple.</p>
-<p>def do_something_on_vol(args):
-    fr, path = args
-    vol = fr.create_volume(path)
-    # Do something with 'vol'
-    return (key, value)</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-htrc_features.feature_reader.FeatureReader.multiprocessing', this);">Show source &equiv;</a></p>
-  <div id="source-htrc_features.feature_reader.FeatureReader.multiprocessing" class="source">
-    <div class="codehilite"><pre><span class="k">def</span> <span class="nf">multiprocessing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_func</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">    Pass a function to perform on each volume of the feature reader, using</span>
-<span class="sd">    multiprocessing (map), then process the combined outputs (reduce).</span>
-<span class="sd">    map_func</span>
-<span class="sd">    Function to run on each individual volume. Takes as input a tuple</span>
-<span class="sd">    containing a feature_reader and volume path, from which a volume can be</span>
-<span class="sd">    created. Returns a (key, value) tuple.</span>
-<span class="sd">    def do_something_on_vol(args):</span>
-<span class="sd">        fr, path = args</span>
-<span class="sd">        vol = fr.create_volume(path)</span>
-<span class="sd">        # Do something with &#39;vol&#39;</span>
-<span class="sd">        return (key, value)</span>
-<span class="sd">    &#39;&#39;&#39;</span>
-    <span class="c"># Match process count to cpu count</span>
-    <span class="n">p</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
-    <span class="c"># f = self._wrap_func(func)</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">map_func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mp_paths</span><span class="p">(),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-    <span class="c"># , callback=callback)</span>
-    <span class="n">p</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-    <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
-    <span class="k">return</span> <span class="n">results</span>
 </pre></div>
 
   </div>
@@ -3369,8 +3388,6 @@ header/footer information is not included.</p></div>
         <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">        Returns a Pandas dataframe of:</span>
 <span class="sd">            page / section / place(i.e. begin/end) / char / count</span>
-
-<span class="sd">        Provide an array of pages that hold beginLineChars and endLineChars.</span>
 <span class="sd">        &#39;&#39;&#39;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span> <span class="o">==</span> <span class="s">&#39;1.0&#39;</span><span class="p">:</span>
             <span class="n">tname</span> <span class="o">=</span> <span class="s">&#39;tokens&#39;</span>
@@ -3380,7 +3397,7 @@ header/footer information is not included.</p></div>
         <span class="c"># Make structured numpy array</span>
         <span class="c"># Because it is typed, this approach is ~40x faster than earlier</span>
         <span class="c"># methods</span>
-        <span class="n">m</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pages</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2000</span>  <span class="c"># Pages * oversized estimate for tokens/page</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">page</span><span class="p">[</span><span class="s">&#39;tokenCount&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span><span class="p">])</span>
         <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">[(</span><span class="nb">str</span><span class="p">(</span><span class="s">&#39;page&#39;</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="s">&#39;u8&#39;</span><span class="p">)),</span>
                                  <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="s">&#39;section&#39;</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="s">&#39;U6&#39;</span><span class="p">)),</span>
                                  <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="s">&#39;token&#39;</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="s">&#39;U64&#39;</span><span class="p">)),</span>
@@ -3441,6 +3458,14 @@ header/footer information is not included.</p></div>
                                               <span class="s">&#39;place&#39;</span><span class="p">,</span> <span class="s">&#39;char&#39;</span><span class="p">])</span>
         <span class="n">df</span><span class="o">.</span><span class="n">sortlevel</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">df</span>
+        
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">truncate</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">maxlen</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">maxlen</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">s</span><span class="p">[:</span><span class="n">maxlen</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">+</span> <span class="s">&quot;...&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">return</span> <span class="s">&quot;&lt;Volume: </span><span class="si">%s</span><span class="s"> (</span><span class="si">%s</span><span class="s">) by </span><span class="si">%s</span><span class="s">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">truncate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="mi">30</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">truncate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">author</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">40</span><span class="p">))</span>
 </pre></div>
 
   </div>
