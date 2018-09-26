@@ -178,20 +178,26 @@ print(page)
 
 If you want to pass arguments to page initialization, such as changing the page's default section from 'body' to 'group' (which returns header+footer+body), it can be done with `for page in vol.pages(default_section='group')`.
      
-Finally, if the minimal metadata included with the extracted feature files is insufficient, you can fetch the HTRC's metadata record from the Solr Proxy with `vol.metadata`.
-Remember that this calls the HTRC servers for each volume, so can add considerable overhead.
+Finally, if the minimal metadata included with the extracted feature files is insufficient, you can fetch HT's metadata record from the Bib API with `vol.metadata`.
+Remember that this calls the HTRC servers for each volume, so can add considerable overhead. The result is a MARC file, returns as a [pymarc](https://github.com/edsu/pymarc) record object. For example, to get the publisher information from field `260`:
 
 
 ```python
 for vol in fr.volumes():
-    print(vol.metadata['published'][0])
+    print(vol.metadata['260'].value())
 ```
 
-    New York, and London, Harper & brothers, 1901
-    London : Hurst and Blackett, 1860
-    Boston ; New York : Houghton Mifflin Company, 1916 (Cambridge : The Riverside Press)
-    New York, George H. Doran Company [1914]
-    Chicago, New York, Scott, Foresman and company [c1919]
+
+    ---------------------------------------------------------------------------
+
+    KeyError                                  Traceback (most recent call last)
+
+    <ipython-input-7-8bc5f5c0f945> in <module>()
+          1 for vol in fr.volumes():
+    ----> 2     print(vol.metadata['published'][0])
+    
+
+    KeyError: 'published'
 
 
 

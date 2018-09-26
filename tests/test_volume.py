@@ -87,9 +87,10 @@ class TestVolume():
         assert volume.page_count == metadata['pageCount']
 
     def test_metadata_api(self, volume):
+        import pymarc
         # For now, test for a valid response.
         metadata = volume.metadata
-        assert type(metadata) == dict
+        assert type(metadata) == pymarc.record.Record
 
     def test_token_stats(self, volume):
         assert volume.tokens()[:600:100] == ['/', 'her', 'but', "'re",

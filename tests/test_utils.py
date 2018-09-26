@@ -14,6 +14,15 @@ def volume_paths():
 
 class TestUtils():
 
+    def test_file_available(self, volume_ids):
+        fake_ids = ['fake_url1', 'fake_url2']
+        idcheck = utils.files_available(fake_ids + volume_ids)
+        for id in volume_ids:
+            assert idcheck[id] is True
+        for id in fake_ids:
+            assert idcheck[id] is False
+
+
     def test_id_to_rsync(self, volume_ids, volume_paths):
         for i, volume_id in enumerate(volume_ids):
                 assert utils.id_to_rsync(volume_id) == volume_paths[i]

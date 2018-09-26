@@ -1,11 +1,46 @@
 import logging
 
-def id_encode(id):
+EF_CHECK_URL= "https://data.analytics.hathitrust.org/features/get?ids={}"
+
+def _id_encode(id):
+    '''
+    :param id: A Pairtree ID. If it's a Hathitrust ID, this is the part about the library
+                code.
+    :return: A sanitized id.
+    '''
     return id.replace(":", "+").replace("/", "=").replace(".", ",")
 
+def files_available(ids):
+    """
+    Check for EF files matching a list of volume IDs.
 
-def id2path(id):
-    clean_id = id_encode(id)
+    :param ids: List of HathiTrust IDs
+    :return: Dictionary of boolean matches for whether the corresponding file exists in
+        the Extract Features Dataset.
+    """
+    import requests
+
+    url = EF_CHECK_URL.format(",".join(ids))
+    result = requests.get(url).json()
+    return result
+
+def clean_htid(htid):
+    '''
+    :param htid: A HathiTrust ID of form lib.vol; e.g. mdp.1234
+    :return: A sanitized version of the HathiTrust ID, appropriate for filename use.
+    '''
+    libid, volid = htid.split('.', 1)
+    volid_clean = _id_encode(volid)
+    return '.'.join([libid, volid_clean])
+
+
+def _id2path(id):
+    '''
+    :param id: Pairtree ID. For HathiTrust, only the volume id of the lib.vol id format.
+    :type id: str
+    :return: A corresponding file path for the id.
+    '''
+    clean_id = _id_encode(id)
     path = []
     while len(clean_id) > 0:
         val, clean_id = clean_id[:2], clean_id[2:]
@@ -126,7 +161,7 @@ def id_to_rsync(htid, **kwargs):
     Features.
     '''
     if 'kind' in kwargs:
-        logging.warn("The basic/advanced split with extracted features files "
+        logging.warning("The basic/advanced split with extracted features files "
                      "was removed in schema version 3.0. This function only "
                      "supports the current format for Rsync URLs, if you "
                      "would like to see the legacy 2.0 format, see Github: "
@@ -134,9 +169,9 @@ def id_to_rsync(htid, **kwargs):
                      "9ea45317443ae05f43a188b12afe2e69a/htrc_features/utils.py"
                      )
     libid, volid = htid.split('.', 1)
-    volid_clean = id_encode(volid)
-    filename = '.'.join([libid, volid_clean, 'json.bz2'])
-    path = '/'.join([libid, 'pairtree_root', id2path(volid).replace('\\', '/'),
+    volid_clean = _id_encode(volid)
+    filename = clean_htid(htid) + '.json.bz2'
+    path = '/'.join([libid, 'pairtree_root', _id2path(volid).replace('\\', '/'),
                      volid_clean, filename])
     return path
 
@@ -146,10 +181,10 @@ def htid2rsync_cmd():
     import sys
     parser = _htid2rsync_argparser()
     _htid2rsync_parse_args(parser, sys.argv[1:])
-    
+
 def _htid2rsync_argparser():
     '''
-    Return arg parser. Separated from htid2rsync_cmd For easier testing. 
+    Return arg parser. Separated from htid2rsync_cmd For easier testing.
     '''
     import argparse
     import sys

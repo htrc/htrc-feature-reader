@@ -3,24 +3,17 @@ from __future__ import unicode_literals
 import sys
 PY3 = (sys.version_info[0] >= 3)
 
-
-
-from multiprocessing import Pool
 import logging
 import pandas as pd
 import numpy as np
-from io import BytesIO
-
-from six import iteritems
+import pymarc
+from six import iteritems, StringIO, BytesIO
 
 try:
     import ujson as json
 except ImportError:
     import json
-try:
-    import pysolr
-except ImportError:
-    logging.info("Pysolr not installed.")
+import requests
 
 
 if PY3:
@@ -38,7 +31,6 @@ except ImportError:
     import bz2
     if not PY3:
         logging.warn("Loading volumes from a URL will not work in Python 2 unless you install bz2file")
-
 
 # UTILS
 SECREF = ['header', 'body', 'footer']
@@ -347,7 +339,7 @@ class Volume(object):
         # Verify schema version
         self._schema = obj['features']['schemaVersion']
         if self._schema not in self.SUPPORTED_SCHEMA:
-            logging.warn('Schema version of imported (%s) file does not match '
+            logging.warning('Schema version of imported (%s) file does not match '
                          'the supported version (%s)' %
                          (obj['features']['schemaVersion'],
                           self.SUPPORTED_SCHEMA))
@@ -371,7 +363,7 @@ class Volume(object):
 
         if advanced:
             if self._schema != '2.0':
-                logging.warn("Only schema 2.0 supports advanced files."
+                logging.warning("Only schema 2.0 supports advanced files."
                              "Ignoring")
             else:
                 self._has_advanced = True
@@ -379,7 +371,7 @@ class Volume(object):
                 self._line_chars = self._make_line_char_df(advanced['pages'])
                 
         if (self._schema in ['2.0', '3.0']) and (self.language in ['jpn', 'chi']):
-            logging.warn("This version of the EF dataset has a tokenization bug for Chinese and Japanese."
+            logging.warning("This version of the EF dataset has a tokenization bug for Chinese and Japanese."
                          "See https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
 
 
@@ -387,7 +379,17 @@ class Volume(object):
         return self.pages()
 
     def __str__(self):
-        return "<HTRC Volume: %s>" % self.id
+        try:
+            return "<HTRC Volume: %s - %s (%s)>" % (self.id, self.title, self.year)
+        except:
+            return "<HTRC Volume: %s>" % self.id
+
+    def _repr_html_(self):
+        html_template = "<strong><a href='%s'>%s</a></strong> by <em>%s</em> (%s, %s pages) - <code>%s</code>"
+        try:
+            return html_template % (self.handle_url, self.title, ",".join(self.author), self.year, self.page_count, self.id)
+        except:
+            return "<strong><a href='%s'>%s</a></strong>" % (self.handle_url, self.title)
 
     @property
     def year(self):
@@ -401,20 +403,26 @@ class Volume(object):
 
     @property
     def metadata(self):
-        if not pysolr:
-            logging.error("Cannot retrieve metadata. Pysolr not installed.")
+        """
+        Fetch additional information about a volume from the HathITrust Bibliographic API.
+
+        See: https://www.hathitrust.org/bib_api
+
+        :return: A `pymarc` record. See pymarc's documentation for details on using it.
+        """
         if not self._metadata:
             logging.debug("Looking up full metadata for {0}".format(self.id))
-            solr = pysolr.Solr('http://chinkapin.pti.indiana.edu:9994'
-                               '/solr/meta', timeout=10)
-            results = solr.search('id:"{0}"'.format(self.id))
-            if len(results) != 1:
-                logging.error('Unexpected: there were {0} results for {1} '
-                              'instead of 1.'.format(
-                                  len(results), self.id)
-                              )
-            result = list(results)[0]
-            self._metadata = result
+            data = requests.get(self.ht_bib_url).json()
+
+            record_id = data['items'][0]['fromRecord']
+            marc = data['records'][record_id]['marc-xml']
+
+            # Pymarc only reads a file, so stream the text as if it was one
+            xml_stream = StringIO(marc)
+            xml_record = pymarc.parse_xml_to_array(xml_stream)[0]
+            xml_stream.close()
+
+            self._metadata = xml_record
         return self._metadata
 
     def tokens(self, section='default', case=True):
@@ -600,7 +608,7 @@ class Volume(object):
         # Create a DataFrame
         df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
                                               'token', 'pos'])
-        df.sortlevel(inplace=True)
+        df.sort_index(inplace=True, level=0, sort_remaining=True)
         return df
 
     def _make_line_char_df(self, pages):

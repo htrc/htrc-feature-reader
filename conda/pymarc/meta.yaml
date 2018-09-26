@@ -1,0 +1,40 @@
+{% set name = "pymarc" %}
+{% set version = "3.1.10" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 8e1d0271477daab89a373251180f4f1927d5147f35ce52a8a46f95a9d90c6979
+
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
+
+requirements:
+  host:
+    - pip
+    - python
+    - six >=1.9.0
+  run:
+    - python
+    - six >=1.9.0
+
+test:
+  imports:
+    - pymarc
+
+about:
+  home: http://github.com/edsu/pymarc
+  license: BSD
+  license_family: BSD
+  license_file: 
+  summary: Read, write and modify MARC bibliographic data
+  doc_url: 
+  dev_url: 
+
+extra:
+  recipe-maintainers:
+    - your-github-id-here
