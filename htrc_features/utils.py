@@ -1,5 +1,7 @@
 import logging
 
+EF_CHECK_URL= "https://data.analytics.hathitrust.org/features/get?ids={}"
+
 def _id_encode(id):
     '''
     :param id: A Pairtree ID. If it's a Hathitrust ID, this is the part about the library
@@ -8,6 +10,19 @@ def _id_encode(id):
     '''
     return id.replace(":", "+").replace("/", "=").replace(".", ",")
 
+def files_available(ids):
+    """
+    Check for EF files matching a list of volume IDs.
+
+    :param ids: List of HathiTrust IDs
+    :return: Dictionary of boolean matches for whether the corresponding file exists in
+        the Extract Features Dataset.
+    """
+    import requests
+
+    url = EF_CHECK_URL.format(",".join(ids))
+    result = requests.get(url).json()
+    return result
 
 def clean_htid(htid):
     '''
