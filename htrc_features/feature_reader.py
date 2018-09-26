@@ -10,10 +10,7 @@ try:
     import ujson as json
 except ImportError:
     import json
-try:
-    import pysolr
-except ImportError:
-    logging.info("Pysolr not installed.")
+import requests
 
 # UTILS
 SECREF = ['header', 'body', 'footer']
@@ -369,20 +366,24 @@ class Volume(object):
         return self.names
 
     @property
-    def metadata(self):
-        if not pysolr:
-            logging.error("Cannot retrieve metadata. Pysolr not installed.")
+    def metadata(self, scope='brief'):
+        """
+        Fetch additional information about a volume from the HathITrust Bibliographic API.
+
+        See: https://www.hathitrust.org/bib_api
+
+        :param scope: Size of record to Retrieve. 'brief' or 'full'
+        :return: Dictionary of information about items and records. The record is the
+            higher level grouping, while the items are the individual scans. Extracted
+            Features files are at the item level and this search is at that item level,
+            so the ['items'] key of the results should only have one item in the list.
+        """
+        BIB_TEMPLATE = 'http://catalog.hathitrust.org/api/volumes/%s/%s/%s.json'
+        id_type = 'htid'
+
         if not self._metadata:
             logging.debug("Looking up full metadata for {0}".format(self.id))
-            solr = pysolr.Solr('http://chinkapin.pti.indiana.edu:9994'
-                               '/solr/meta', timeout=10)
-            results = solr.search('id:"{0}"'.format(self.id))
-            if len(results) != 1:
-                logging.error('Unexpected: there were {0} results for {1} '
-                              'instead of 1.'.format(
-                                  len(results), self.id)
-                              )
-            result = list(results)[0]
+            result = requests.get(BIB_TEMPLATE % (scope, id_type, self.id)).json()
             self._metadata = result
         return self._metadata
 
