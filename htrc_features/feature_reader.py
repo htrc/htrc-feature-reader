@@ -570,7 +570,7 @@ class Volume(object):
         # Create a DataFrame
         df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
                                               'token', 'pos'])
-        df.sortlevel(inplace=True)
+        df.sort_index(inplace=True, level=0, sort_remaining=True)
         return df
 
     def _make_line_char_df(self, pages):
