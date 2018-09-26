@@ -314,7 +314,7 @@ class Volume(object):
         # Verify schema version
         self._schema = obj['features']['schemaVersion']
         if self._schema not in self.SUPPORTED_SCHEMA:
-            logging.warn('Schema version of imported (%s) file does not match '
+            logging.warning('Schema version of imported (%s) file does not match '
                          'the supported version (%s)' %
                          (obj['features']['schemaVersion'],
                           self.SUPPORTED_SCHEMA))
@@ -338,7 +338,7 @@ class Volume(object):
 
         if advanced:
             if self._schema != '2.0':
-                logging.warn("Only schema 2.0 supports advanced files."
+                logging.warning("Only schema 2.0 supports advanced files."
                              "Ignoring")
             else:
                 self._has_advanced = True
@@ -346,7 +346,7 @@ class Volume(object):
                 self._line_chars = self._make_line_char_df(advanced['pages'])
                 
         if (self._schema in ['2.0', '3.0']) and (self.language in ['jpn', 'chi']):
-            logging.warn("This version of the EF dataset has a tokenization bug for Chinese and Japanese."
+            logging.warning("This version of the EF dataset has a tokenization bug for Chinese and Japanese."
                          "See https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
 
 
@@ -354,7 +354,17 @@ class Volume(object):
         return self.pages()
 
     def __str__(self):
-        return "<HTRC Volume: %s>" % self.id
+        try:
+            return "<HTRC Volume: %s - %s (%s)>" % (self.id, self.title, self.year)
+        except:
+            return "<HTRC Volume: %s>" % self.id
+
+    def _repr_html_(self):
+        html_template = "<strong><a href='%s'>%s</a></strong> by <em>%s</em> (%s, %s pages) - <code>%s</code>"
+        try:
+            return html_template % (self.handle_url, self.title, ",".join(self.author), self.year, self.page_count, self.id)
+        except:
+            return "<strong><a href='%s'>%s</a></strong>" % (self.handle_url, self.title)
 
     @property
     def year(self):
