@@ -4,8 +4,9 @@ from multiprocessing import Pool
 import logging
 import pandas as pd
 import numpy as np
+import pymarc
 # Because python2's dict.iteritem is python3's dict.item
-from six import iteritems
+from six import iteritems, StringIO
 try:
     import ujson as json
 except ImportError:
@@ -366,25 +367,27 @@ class Volume(object):
         return self.names
 
     @property
-    def metadata(self, scope='brief'):
+    def metadata(self):
         """
         Fetch additional information about a volume from the HathITrust Bibliographic API.
 
         See: https://www.hathitrust.org/bib_api
 
-        :param scope: Size of record to Retrieve. 'brief' or 'full'
-        :return: Dictionary of information about items and records. The record is the
-            higher level grouping, while the items are the individual scans. Extracted
-            Features files are at the item level and this search is at that item level,
-            so the ['items'] key of the results should only have one item in the list.
+        :return: A `pymarc` record. See pymarc's documentation for details on using it.
         """
-        BIB_TEMPLATE = 'http://catalog.hathitrust.org/api/volumes/%s/%s/%s.json'
-        id_type = 'htid'
-
         if not self._metadata:
             logging.debug("Looking up full metadata for {0}".format(self.id))
-            result = requests.get(BIB_TEMPLATE % (scope, id_type, self.id)).json()
-            self._metadata = result
+            data = requests.get(self.ht_bib_url).json()
+
+            record_id = data['items'][0]['fromRecord']
+            marc = data['records'][record_id]['marc-xml']
+
+            # Pymarc only reads a file, so stream the text as if it was one
+            xml_stream = StringIO(marc)
+            xml_record = pymarc.parse_xml_to_array(xml_stream)[0]
+            xml_stream.close()
+
+            self._metadata = xml_record
         return self._metadata
 
     def tokens(self, section='default', case=True):
