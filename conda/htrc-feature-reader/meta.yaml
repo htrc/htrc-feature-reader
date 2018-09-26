@@ -1,6 +1,6 @@
 package:
   name: htrc-feature-reader
-  version: "1.82"
+  version: "1.83"
 
 source:
   path: ../..
@@ -29,7 +29,8 @@ requirements:
     - six
     - pandas
     - numpy
-    - pysolr
+    - pymarc
+    - requests
     - ujson
 
   run:
@@ -37,7 +38,8 @@ requirements:
     - six
     - pandas
     - numpy
-    - pysolr
+    - pymarc
+    - requests
     - ujson
 
 test:
