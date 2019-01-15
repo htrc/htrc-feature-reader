@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pymarc
 from six import iteritems, StringIO, BytesIO
+import codecs
 
 try:
     import ujson as json
@@ -149,8 +150,8 @@ def group_linechars(df, section='all', place='all'):
 
 
 class FeatureReader(object):
-    DL_URL = "https://data.analytics.hathitrust.org/features/get?download-id={0}"
-    
+    DL_URL = "https://data.analytics.hathitrust.org/htrc-ef-access/get?action=download-ids&id={0}&output=json"
+
     def __init__(self, paths=None, compressed=True, ids=None):
         self.compressed = compressed
         
@@ -221,9 +222,9 @@ class FeatureReader(object):
                 req = _urlopen(path_or_url)
                 filename_or_buffer = BytesIO(req.read())
             except HTTPError:
-                logging.exception("HTTP Error with id %s" % path_or_url)
+                logging.exception("HTTP Error accessing %s" % path_or_url)
                 raise
-            compressed = True
+            compressed = False
         else:
             filename_or_buffer = path_or_url
         
@@ -231,7 +232,10 @@ class FeatureReader(object):
             if compressed:
                 f = bz2.BZ2File(filename_or_buffer)
             else:
-                f = open(filename_or_buffer, 'r+')
+                if type(filename_or_buffer) != BytesIO:
+                    f = codecs.open(filename_or_buffer, 'r+', encoding="utf-8")
+                else:
+                    f = filename_or_buffer
             rawjson = f.readline()
             f.close()
         except IOError:
