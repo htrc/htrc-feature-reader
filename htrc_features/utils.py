@@ -1,6 +1,6 @@
 import logging
 
-EF_CHECK_URL= "https://data.analytics.hathitrust.org/htrc-ef-access/get?action=check-exists&ids={}"
+EF_CHECK_URL= "http://data.htrc.illinois.edu/htrc-ef-access/get?action=check-exists&ids={}"
 
 def _id_encode(id):
     '''
