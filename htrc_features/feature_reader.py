@@ -232,7 +232,7 @@ class FeatureReader(object):
             if compressed:
                 f = bz2.BZ2File(filename_or_buffer)
             else:
-                if (type(filename_or_buffer) != BytesIO) and PY3:
+                if (type(filename_or_buffer) != BytesIO) and not isinstance(filename_or_buffer, StringIO):
                     f = codecs.open(filename_or_buffer, 'r+', encoding="utf-8")
                 else:
                     f = filename_or_buffer
@@ -253,7 +253,7 @@ class FeatureReader(object):
 
         try:
             # For Python3 compatibility, decode to str object
-            if type(rawjson) != str:
+            if PY3 and (type(rawjson) != str):
                 rawjson = rawjson.decode()
             volumejson = json.loads(rawjson)
         except:
