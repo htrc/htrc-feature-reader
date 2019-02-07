@@ -18,10 +18,9 @@ Since the HTRC Feature Reader is pure Python, it can easily be converted to vers
 
 ```
 mkdir packages
-parallel -j3 conda build --python {} . ::: 2.7 3.5 3.6 3.7
+parallel -j4 conda build --python {} . ::: 2.7 3.5 3.6 3.7
 cd packages
 ls ~/anaconda3/conda-bld/linux-64/htrc-feature-reader* | parallel conda convert {} -p all
 find . -type f | parallel -n1 anaconda upload --user htrc {}
-rm -rf packages
-conda build purge
+cd .. && rm -rf packages && conda build purge
 ```
