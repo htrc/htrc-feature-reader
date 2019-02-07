@@ -1,6 +1,6 @@
 package:
   name: htrc-feature-reader
-  version: "1.97"
+  version: "1.98"
 
 source:
   path: ../..

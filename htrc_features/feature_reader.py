@@ -232,7 +232,7 @@ class FeatureReader(object):
             if compressed:
                 f = bz2.BZ2File(filename_or_buffer)
             else:
-                if type(filename_or_buffer) != BytesIO:
+                if (type(filename_or_buffer) != BytesIO) and PY3:
                     f = codecs.open(filename_or_buffer, 'r+', encoding="utf-8")
                 else:
                     f = filename_or_buffer
@@ -243,6 +243,7 @@ class FeatureReader(object):
                               "'compressed=' argument?", path_or_url)
             raise
         except:
+            print(compressed, type(filename_or_buffer))
             logging.exception("Can't open %s", path_or_url)
             raise
 
