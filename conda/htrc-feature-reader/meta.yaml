@@ -1,12 +1,12 @@
 package:
   name: htrc-feature-reader
-  version: "1.96"
+  version: "1.97"
 
 source:
   path: ../..
 
 build:
-  # noarch_python: True
+  noarch: python # Only needs one build
   # preserve_egg_dir: True
   ignore_prefix_files: True
   entry_points:
