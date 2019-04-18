@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pymarc
 from six import iteritems, StringIO, BytesIO
+import codecs
 
 try:
     import ujson as json
@@ -30,7 +31,7 @@ try:
 except ImportError:
     import bz2
     if not PY3:
-        logging.warn("Loading volumes from a URL will not work in Python 2 unless you install bz2file")
+        logging.warning("Loading volumes from a URL will not work in Python 2 unless you install bz2file")
 
 # UTILS
 SECREF = ['header', 'body', 'footer']
@@ -149,8 +150,8 @@ def group_linechars(df, section='all', place='all'):
 
 
 class FeatureReader(object):
-    DL_URL = "https://data.analytics.hathitrust.org/features/get?download-id={0}"
-    
+    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
+
     def __init__(self, paths=None, compressed=True, ids=None):
         self.compressed = compressed
         
@@ -221,9 +222,9 @@ class FeatureReader(object):
                 req = _urlopen(path_or_url)
                 filename_or_buffer = BytesIO(req.read())
             except HTTPError:
-                logging.exception("HTTP Error with id %s" % path_or_url)
+                logging.exception("HTTP Error accessing %s" % path_or_url)
                 raise
-            compressed = True
+            compressed = False
         else:
             filename_or_buffer = path_or_url
         
@@ -231,7 +232,10 @@ class FeatureReader(object):
             if compressed:
                 f = bz2.BZ2File(filename_or_buffer)
             else:
-                f = open(filename_or_buffer, 'r+')
+                if (type(filename_or_buffer) != BytesIO) and not isinstance(filename_or_buffer, StringIO):
+                    f = codecs.open(filename_or_buffer, 'r+', encoding="utf-8")
+                else:
+                    f = filename_or_buffer
             rawjson = f.readline()
             f.close()
         except IOError:
@@ -239,6 +243,7 @@ class FeatureReader(object):
                               "'compressed=' argument?", path_or_url)
             raise
         except:
+            print(compressed, type(filename_or_buffer))
             logging.exception("Can't open %s", path_or_url)
             raise
 
@@ -248,7 +253,7 @@ class FeatureReader(object):
 
         try:
             # For Python3 compatibility, decode to str object
-            if type(rawjson) != str:
+            if PY3 and (type(rawjson) != str):
                 rawjson = rawjson.decode()
             volumejson = json.loads(rawjson)
         except:
@@ -470,7 +475,7 @@ class Volume(object):
                 for page in self.pages()]
 
     def cap_alpha_seq(self, section='body'):
-        logging.warn("At the volume-level, use Volume.cap_alpha_seqs()")
+        logging.warning("At the volume-level, use Volume.cap_alpha_seqs()")
         return self.cap_alpha_seqs(section)
 
     def cap_alpha_seqs(self, section='body'):
@@ -479,7 +484,7 @@ class Volume(object):
         header/footer information is not included.
         '''
         if section != 'body':
-            logging.warn("cap_alpha_seq only includes counts for the body "
+            logging.warning("cap_alpha_seq only includes counts for the body "
                          "section of pages.")
         return [page.cap_alpha_seq() for page in self.pages()]
 
@@ -619,7 +624,7 @@ class Volume(object):
         Provide an array of pages that hold beginLineChars and endLineChars.
         '''
         if self._schema == '3.0':
-            logging.warn("Adapted to erroneous key names in schema 3.0.")
+            logging.warning("Adapted to erroneous key names in schema 3.0.")
             place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
         else:
             place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
@@ -645,7 +650,7 @@ class Volume(object):
         # Create a DataFrame
         df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
                                               'place', 'char'])
-        df.sortlevel(inplace=True)
+        df.sort_index(inplace=True)
         return df
         
     def __str__(self):
@@ -714,7 +719,7 @@ class Page:
         header/footer information is not included.
         '''
         if section != 'body':
-            logging.warn("cap_alpha_seq only includes counts for the body "
+            logging.warning("cap_alpha_seq only includes counts for the body "
                          "section of pages.")
         return self._get_basic_stat('body', 'capAlphaSeq')
 
