@@ -598,7 +598,6 @@ class Volume(object):
         chunkname = 1
         page_collector = []
         chunk_collector = []
-        print(chunk_target, overflow, max_adjust, overflow/nchunks, edgeadjust)
 
         groups = tl.groupby(level='page')
 
