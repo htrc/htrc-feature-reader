@@ -575,7 +575,14 @@ class Volume(object):
         
         tokens_per_page = self.tokens_per_page()
         ntokens = tokens_per_page.sum(axis=0).values[0]
+
+        if ntokens < chunk_target:
+            # Avoid division by zero errors.
+            chunk_target = ntokens
+            
         nchunks = int(ntokens/chunk_target)
+
+        
         overflow = (ntokens % chunk_target)
         avg_page_n = ntokens / self.page_count
 
@@ -592,6 +599,7 @@ class Volume(object):
             overflow = np.sign(overflow)*max_adjust
         else:
             edgeadjust = 0
+
         chunk_target += int(overflow / nchunks)
         
         counter = 0
@@ -620,8 +628,9 @@ class Volume(object):
                 counter = 0
 
         # Finally
-        chunk = fold_pages(page_collector, chunkname)
-        chunk_collector.append(chunk)
+        if len(page_collector):
+            chunk = fold_pages(page_collector, chunkname)
+            chunk_collector.append(chunk)
 
         chunked_tl = pd.concat(chunk_collector)
         return chunked_tl
