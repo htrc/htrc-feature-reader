@@ -573,6 +573,11 @@ class Volume(object):
         kwargs['pages'] = True
         tl = self.tokenlist(**kwargs)
         
+        if tl.empty:
+            tl = tl.copy()
+            tl.columns = [col if col != 'page' else 'chunk'  for col in tl.columns]
+            return tl
+
         tokens_per_page = self.tokens_per_page()
         ntokens = tokens_per_page.sum(axis=0).values[0]
 
