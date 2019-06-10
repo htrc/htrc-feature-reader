@@ -2,11 +2,11 @@ import numpy as np
 
 def chunk_to_wem(chunk_tl, model, vocab=None, stop=True, log=True, min_ncount=10):
     ''' Take a file that has ['token', 'count'] data and convert to a WEM vector'''
-        
+    
     if 'token' in chunk_tl.columns and not 'token' in chunk_tl.index.names:
-        chunk_tl = chunk_tl.set_index('token')['counts']
+        chunk_tl = chunk_tl.set_index('token')[['count']]
     elif 'lowercase' in chunk_tl.columns and not 'lowercase' in chunk_tl.index.names:
-        chunk_tl = chunk_tl.set_index('lowercase')['counts']
+        chunk_tl = chunk_tl.set_index('lowercase')[['count']]
 
     n_dim = 300
     placeholder = np.array(n_dim * [None])
