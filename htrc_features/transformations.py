@@ -27,7 +27,7 @@ def chunk_to_wem(chunk_tl, model, vocab=None, stop=True, log=True, min_ncount=10
     joint_vocab = list(vocab.intersection(doc_vocab))
 
     if len(joint_vocab) <= min_ncount:
-        raise BaseException("Too few words")
+        return placeholder
 
     all_vecs = model[joint_vocab]
 
