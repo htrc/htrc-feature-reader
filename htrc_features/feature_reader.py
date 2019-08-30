@@ -183,26 +183,14 @@ class FeatureReader(object):
     def volumes(self):
         ''' Generator for returning Volume objects '''
         for path in self.paths:
-            if type(path) == tuple:
-                basic, advanced = path
-                yield self._volume(basic, advanced_path=advanced,
-                                   compressed=self.compressed)
-            else:
-                yield self._volume(path, compressed=self.compressed)
+            yield self._volume(path, compressed=self.compressed)
 
     def jsons(self):
         ''' Generator for returning decompressed, parsed json dictionaries
         for volumes. Convenience function for when the FeatureReader objects
         are not needed. '''
         for path in self.paths:
-            # If path is a tuple, assume that the advanced path was also given
-            if type(path) == tuple:
-                basic, advanced = path
-                basicjson = self._read_json(basic, compressed=self.compressed)
-                advjson = self._read_json(advanced, compressed=self.compressed)
-                yield (basicjson, advjson)
-            else:
-                yield self._read_json(path, compressed=self.compressed)
+            yield self._read_json(path, compressed=self.compressed)
 
     def first(self):
         ''' Return first volume from Feature Reader. This is a convenience
@@ -213,7 +201,7 @@ class FeatureReader(object):
     def create_volume(self, path, **kwargs):
         return self._volume(path, **kwargs)
 
-    def _read_json(self, path_or_url, compressed=True, advanced_path=False):
+    def _read_json(self, path_or_url, compressed=True):
         ''' Load JSON for a path. Allows remote files in addition to local ones. '''
         if parse_url(path_or_url).scheme in ['http', 'https']:
             try:
