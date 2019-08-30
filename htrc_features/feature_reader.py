@@ -183,7 +183,6 @@ class FeatureReader(object):
     def volumes(self):
         ''' Generator for returning Volume objects '''
         for path in self.paths:
-            # If path is a tuple, assume that the advanced path was also given
             if type(path) == tuple:
                 basic, advanced = path
                 yield self._volume(basic, advanced_path=advanced,
@@ -242,10 +241,6 @@ class FeatureReader(object):
             logging.exception("Can't open %s", path_or_url)
             raise
 
-        # This is a bandaid for schema version 2.0, not over-engineered
-        # since upcoming releases of the extracted features
-        # dataset won't keep the basic/advanced split
-
         try:
             # For Python3 compatibility, decode to str object
             if type(rawjson) != str:
@@ -258,16 +253,11 @@ class FeatureReader(object):
             raise
         return volumejson
 
-    def _volume(self, path, compressed=True, advanced_path=False):
+    def _volume(self, path, compressed=True):
         ''' Read a path into a volume.'''
         
         volumejson = self._read_json(path, compressed)
-        if advanced_path:
-            advanced = self._read_json(advanced_path, compressed)
-            advanced = advanced['features']
-        else:
-            advanced = False
-        return Volume(volumejson, advanced=advanced)
+        return Volume(volumejson)
 
     def _wrap_func(self, func):
         '''
@@ -292,9 +282,8 @@ class FeatureReader(object):
     def __str__(self):
         return "<%d path FeatureReader>" % (len(self.paths))
 
-
-class Volume(object):
-    SUPPORTED_SCHEMA = ['2.0', '3.0']
+class jsonVolumeReader(object):
+    SUPPORTED_SCHEMA = ['3.0']
     METADATA_FIELDS = [('schemaVersion', 'schema_version'),
                        ('dateCreated', 'date_created'),
                        ('title', 'title'),
@@ -326,27 +315,32 @@ class Volume(object):
                        ("lastUpdateDate", "last_update_date")
                       ]
     ''' List of metadata fields, with their pythonic name mapping. '''
-
+    
     BASIC_FIELDS = [('pageCount', 'page_count')]
     ''' List of fields which return primitive values in the schema, as tuples
     with (CamelCase, lower_with_under) mapping.
     '''
-    _metadata = None
-    _tokencounts = pd.DataFrame()
-    _line_chars = pd.DataFrame()
-
-    def __init__(self, obj, advanced=False, default_page_section='body'):
+    
+    def __init__(self, obj, default_page_section='body'):
         # Verify schema version
         self._schema = obj['features']['schemaVersion']
+
         if self._schema not in self.SUPPORTED_SCHEMA:
             logging.warning('Schema version of imported (%s) file does not match '
-                         'the supported version (%s)' %
+                         'the supported versions (%s). Update your files or use an older '
+                         'version of the library' %
                          (obj['features']['schemaVersion'],
                           self.SUPPORTED_SCHEMA))
+            
         self.id = obj['id']
         self._pages = obj['features']['pages']
-        self.default_page_section = default_page_section
-
+        
+        # Info to keep internal
+        #  self._pages
+        #  self._schema
+        # Info to send to Volume
+        #  self.id
+        
         # Expand basic values to properties
         for key, pythonkey in self.METADATA_FIELDS:
             if key in obj['metadata']:
@@ -354,26 +348,26 @@ class Volume(object):
         for key, pythonkey in self.BASIC_FIELDS:
             if key in obj['features']:
                 setattr(self, pythonkey, obj['features'][key])
+                
+        if (self._schema in ['2.0', '3.0']) and (self.language in ['jpn', 'chi']):
+            logging.warning("This version of the EF dataset has a tokenization bug "
+                            "for Chinese and Japanese. See " "https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
+
+class parquetVolumeReader(object):
+    pass
+    
+class Volume(object):
+    _metadata = None
+    _tokencounts = pd.DataFrame()
+    _line_chars = pd.DataFrame()
+
+    def __init__(self, obj, default_page_section='body'):
+
+        self.default_page_section = default_page_section
 
         if (hasattr(self, 'genre') and 
             obj['metadata']['schemaVersion'] in ["1.0", "2.0"]):
             self.genre = self.genre.split(", ")
-
-        self._has_advanced = False
-
-        if advanced:
-            if self._schema != '2.0':
-                logging.warning("Only schema 2.0 supports advanced files."
-                             "Ignoring")
-            else:
-                self._has_advanced = True
-                # Create an internal dataframe for lineChar counts
-                self._line_chars = self._make_line_char_df(advanced['pages'])
-                
-        if (self._schema in ['2.0', '3.0']) and (self.language in ['jpn', 'chi']):
-            logging.warning("This version of the EF dataset has a tokenization bug for Chinese and Japanese."
-                         "See https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
-
 
     def __iter__(self):
         return self.pages()
@@ -555,19 +549,11 @@ class Volume(object):
         '''
         Interface for all begin/end of line character information.
         '''
-        if self._schema == '2.0' and not self._has_advanced:
-            logging.error("For schema version 2.0, you need load the "
-                          "'advanced' file for begin/endLineChars")
-            return
 
         if section == 'default':
             section = self.default_page_section
 
-        if self._line_chars.empty and self._has_advanced:
-            logging.error("Something went wrong. Expected Advanced features"
-                          " to already be processed")
-            return
-        elif self._line_chars.empty and not self._has_advanced:
+        if self._line_chars.empty:
             self._line_chars = self._make_line_char_df(self._pages)
 
         df = self._line_chars
@@ -655,8 +641,7 @@ class Volume(object):
             else:
                 return s.strip()
         return "<Volume: %s (%s) by %s>" % (truncate(self.title, 30), self.year, truncate(self.author[0], 40))
-
-
+    
 class Page:
 
     _tokencounts = pd.DataFrame()
