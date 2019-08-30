@@ -340,7 +340,101 @@ class jsonVolumeReader(object):
         if (self._schema in ['2.0', '3.0']) and (self.language in ['jpn', 'chi']):
             logging.warning("This version of the EF dataset has a tokenization bug "
                             "for Chinese and Japanese. See " "https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
+    
+    @property
+    def token_freqs(self):
+        ''' Returns a dataframe of page / section /count '''
+        if not self._token_freqs:
+            d = [{'page': int(page['seq']), 'section': sec,
+              'count':page[sec]['tokenCount']}
+             for page in self._pages for sec in SECREF]
+            self._token_freqs = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
+        return self._token_freqs
+        
+    def _make_tokencount_df(self, pages=False):
+        '''
+        Returns a Pandas dataframe of:
+            page / section / place(i.e. begin/end) / char / count
+            
+        If no page JSON is provided, internal representation will be used.
+        '''
+        if not pages:
+            pages = self._pages
 
+        tname = 'tokenPosCount'
+
+        # Make structured numpy array
+        # Because it is typed, this approach is ~40x faster than earlier
+        # methods
+        m = sum([page['tokenCount'] for page in pages])
+        arr = np.zeros(m, dtype=[(str('page'), str('u8')),
+                                 (str('section'), str('U6')),
+                                 (str('token'), str('U64')),
+                                 (str('pos'), str('U6')),
+                                 (str('count'), str('u4'))])
+        i = 0
+        for page in pages:
+            for sec in ['header', 'body', 'footer']:
+                for token, posvalues in iteritems(page[sec][tname]):
+                    for pos, value in iteritems(posvalues):
+                        arr[i] = (page['seq'], sec, token, pos, value)
+                        i += 1
+                        if (i > m+1):
+                            logging.error("This volume has more token info "
+                                          "than the internal representation "
+                                          "allows. Email organisciak@gmail.com"
+                                          "to let the library author know!")
+
+        # Create a DataFrame
+        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
+                                              'token', 'pos'])
+        df.sort_index(inplace=True, level=0, sort_remaining=True)
+        return df
+    
+    def pages(self, **kwargs):
+        for page in self._pages:
+            yield Page(page, self, **kwargs)
+    
+    # TODO fix references to this
+    # TODO remove need to specific pages
+    # TODO 
+    def _make_line_char_df(self, pages):
+        '''
+        Returns a Pandas dataframe of:
+            page / section / place(i.e. begin/end) / char / count
+
+        Provide an array of pages that hold beginLineChars and endLineChars.
+        '''
+        if self._schema == '3.0':
+            logging.warn("Adapted to erroneous key names in schema 3.0.")
+            place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
+        else:
+            place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
+           
+        
+        # Make structured numpy array
+        # Because it is typed, this approach is ~40x faster than earlier
+        # methods
+        m = len(pages) * 3 * 2  # Pages * section types * places
+        arr = np.zeros(int(m*100), dtype=[(str('page'), str('u8')),
+                                          (str('section'), str('U6')),
+                                          (str('place'), str('U5')),
+                                          (str('char'), str('U1')),
+                                          (str('count'), str('u8'))])
+        i = 0
+        for page in pages:
+            for sec in ['header', 'body', 'footer']:
+                for place, json_key in  place_key:
+                    for char, value in iteritems(page[sec][json_key]):
+                        arr[i] = (page['seq'], sec, place, char, value)
+                        i += 1
+
+        # Create a DataFrame
+        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
+                                              'place', 'char'])
+        df.sortlevel(inplace=True)
+        return df
+    
 class parquetVolumeReader(object):
     pass
     
@@ -350,12 +444,7 @@ class Volume(object):
     _line_chars = pd.DataFrame()
 
     def __init__(self, obj, default_page_section='body'):
-
         self.default_page_section = default_page_section
-
-        if (hasattr(self, 'genre') and 
-            obj['metadata']['schemaVersion'] in ["1.0", "2.0"]):
-            self.genre = self.genre.split(", ")
 
     def __iter__(self):
         return self.pages()
@@ -417,8 +506,8 @@ class Volume(object):
             return tokens.str.lower().unique().tolist()
 
     def pages(self, **kwargs):
-        for page in self._pages:
-            yield Page(page, self, **kwargs)
+        for Page in self._reader.pages(**kwargs):
+            yield Page
 
     def tokens_per_page(self, **kwargs):
         '''
@@ -428,11 +517,8 @@ class Volume(object):
             section = self.default_page_section
         else:
             section = kwargs['section']
-
-        d = [{'page': int(page['seq']), 'section': sec,
-              'count':page[sec]['tokenCount']}
-             for page in self._pages for sec in SECREF]
-        df = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
+        
+        df = self._reader.token_freqs
 
         if section in SECREF:
             return df.loc[(slice(None), section), ].reset_index('section',
@@ -496,7 +582,7 @@ class Volume(object):
         # Create the internal representation if it does not already
         # exist. This will only need to exist once
         if self._tokencounts.empty:
-            self._tokencounts = self._make_tokencount_df(self._pages)
+            self._tokencounts = self._reader._make_tokencount_df()
 
         return group_tokenlist(self._tokencounts, pages=pages, section=section,
                                case=case, pos=pos, page_freq=page_freq)
@@ -546,81 +632,6 @@ class Volume(object):
 
         df = self._line_chars
         return group_linechars(df, section=section, place=place)
-
-    def _make_tokencount_df(self, pages):
-        '''
-        Returns a Pandas dataframe of:
-            page / section / place(i.e. begin/end) / char / count
-        '''
-        if self._schema == '1.0':
-            tname = 'tokens'
-        else:
-            tname = 'tokenPosCount'
-
-        # Make structured numpy array
-        # Because it is typed, this approach is ~40x faster than earlier
-        # methods
-        m = sum([page['tokenCount'] for page in pages])
-        arr = np.zeros(m, dtype=[(str('page'), str('u8')),
-                                 (str('section'), str('U6')),
-                                 (str('token'), str('U64')),
-                                 (str('pos'), str('U6')),
-                                 (str('count'), str('u4'))])
-        i = 0
-        for page in pages:
-            for sec in ['header', 'body', 'footer']:
-                for token, posvalues in iteritems(page[sec][tname]):
-                    for pos, value in iteritems(posvalues):
-                        arr[i] = (page['seq'], sec, token, pos, value)
-                        i += 1
-                        if (i > m+1):
-                            logging.error("This volume has more token info "
-                                          "than the internal representation "
-                                          "allows. Email organisciak@gmail.com"
-                                          "to let the library author know!")
-
-        # Create a DataFrame
-        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
-                                              'token', 'pos'])
-        df.sort_index(inplace=True, level=0, sort_remaining=True)
-        return df
-
-    def _make_line_char_df(self, pages):
-        '''
-        Returns a Pandas dataframe of:
-            page / section / place(i.e. begin/end) / char / count
-
-        Provide an array of pages that hold beginLineChars and endLineChars.
-        '''
-        if self._schema == '3.0':
-            logging.warn("Adapted to erroneous key names in schema 3.0.")
-            place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
-        else:
-            place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
-           
-        
-        # Make structured numpy array
-        # Because it is typed, this approach is ~40x faster than earlier
-        # methods
-        m = len(pages) * 3 * 2  # Pages * section types * places
-        arr = np.zeros(int(m*100), dtype=[(str('page'), str('u8')),
-                                          (str('section'), str('U6')),
-                                          (str('place'), str('U5')),
-                                          (str('char'), str('U1')),
-                                          (str('count'), str('u8'))])
-        i = 0
-        for page in pages:
-            for sec in ['header', 'body', 'footer']:
-                for place, json_key in  place_key:
-                    for char, value in iteritems(page[sec][json_key]):
-                        arr[i] = (page['seq'], sec, place, char, value)
-                        i += 1
-
-        # Create a DataFrame
-        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
-                                              'place', 'char'])
-        df.sortlevel(inplace=True)
-        return df
         
     def __str__(self):
         def truncate(s, maxlen):
