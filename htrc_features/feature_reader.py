@@ -314,7 +314,9 @@ class jsonVolumeReader(object):
     with (CamelCase, lower_with_under) mapping.
     '''
     
-    def __init__(self, obj, default_page_section='body'):
+    def __init__(self, obj):
+        self._line_chars = pd.DataFrame()
+        
         # Verify schema version
         self._schema = obj['features']['schemaVersion']
 
@@ -325,7 +327,6 @@ class jsonVolumeReader(object):
                          (obj['features']['schemaVersion'],
                           self.SUPPORTED_SCHEMA))
             
-        self.id = obj['id']
         self._pages = obj['features']['pages']
         
         # Info to keep internal
@@ -334,16 +335,18 @@ class jsonVolumeReader(object):
         # Info to send to Volume
         #  self.id
         
+        self.meta = dict(id=obj['id'])
         # Expand basic values to properties
         for key, pythonkey in self.METADATA_FIELDS:
             if key in obj['metadata']:
-                setattr(self, pythonkey, obj['metadata'][key])
+                self.meta[pythonkey] = obj['metadata'][key]
         for key, pythonkey in self.BASIC_FIELDS:
             if key in obj['features']:
-                setattr(self, pythonkey, obj['features'][key])
-                
-        if (self._schema in ['2.0', '3.0']) and (self.language in ['jpn', 'chi']):
-            logging.warning("This version of the EF dataset has a tokenization bug "
+                self.meta[pythonkey] = obj['features'][key]
+        
+        if 'language' in self.meta:
+            if (self._schema in ['2.0', '3.0']) and (self.meta['language'] in ['jpn', 'chi']):
+                logging.warning("This version of the EF dataset has a tokenization bug "
                             "for Chinese and Japanese. See " "https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
     
     @property
@@ -351,10 +354,16 @@ class jsonVolumeReader(object):
         ''' Returns a dataframe of page / section /count '''
         if not self._token_freqs:
             d = [{'page': int(page['seq']), 'section': sec,
-              'count':page[sec]['tokenCount']}
-             for page in self._pages for sec in SECREF]
+                 'count':page[sec]['tokenCount']} for page 
+                 in self._pages for sec in SECREF]
             self._token_freqs = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
         return self._token_freqs
+    
+    @property
+    def line_chars(self):
+        if self._line_chars.empty:
+            self._line_chars = self._make_line_char_df()
+        return self._line_chars
         
     def _make_tokencount_df(self, pages=False):
         '''
@@ -399,17 +408,17 @@ class jsonVolumeReader(object):
     def pages(self, **kwargs):
         for page in self._pages:
             yield Page(page, self, **kwargs)
-    
-    # TODO fix references to this
-    # TODO remove need to specific pages
-    # TODO 
-    def _make_line_char_df(self, pages):
+
+    def _make_line_char_df(self, pages=False):
         '''
         Returns a Pandas dataframe of:
             page / section / place(i.e. begin/end) / char / count
 
         Provide an array of pages that hold beginLineChars and endLineChars.
         '''
+        if not pages:
+            pages = self._pages
+
         if self._schema == '3.0':
             logging.warn("Adapted to erroneous key names in schema 3.0.")
             place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
@@ -437,7 +446,7 @@ class jsonVolumeReader(object):
         # Create a DataFrame
         df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
                                               'place', 'char'])
-        df.sortlevel(inplace=True)
+        df.sort_index(0, inplace=True)
         return df
     
 class parquetVolumeReader(object):
@@ -446,10 +455,21 @@ class parquetVolumeReader(object):
 class Volume(object):
     _metadata = None
     _tokencounts = pd.DataFrame()
-    _line_chars = pd.DataFrame()
 
-    def __init__(self, obj, default_page_section='body'):
+    def __init__(self, obj, parser='json', default_page_section='body'):
         self.default_page_section = default_page_section
+        
+        if parser == 'json':
+            self._reader = jsonVolumeReader(obj)
+            
+        self._update_meta_attrs()
+    
+    def _update_meta_attrs(self):
+        ''' Takes metadata from the reader's metadata variable and assigns it
+            to attributes in the Volume '''
+        # TODO add allowable fields
+        for k, v in self._reader.meta.items():
+            setattr(self, k, v)
 
     def __iter__(self):
         return self.pages()
@@ -561,7 +581,7 @@ class Volume(object):
         return [page.sentence_count(section=section) for page in self.pages()]
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
-                  page_freq=False):
+                  page_freq=False, page_select=False):
         ''' Get or set tokencounts DataFrame
 
         pages[bool]: Keep page-level info if true, else fold.
@@ -580,6 +600,10 @@ class Volume(object):
 
         page_freq[bool] : Whether to count page frequency (1 if it occurs on
         the page, else 0) or a term frequency (counts for the term, per page)
+        
+        page_select[int] : Page sequence number for optionally choosing just one
+            page.
+        
         '''
         if section == 'default':
             section = self.default_page_section
@@ -588,9 +612,20 @@ class Volume(object):
         # exist. This will only need to exist once
         if self._tokencounts.empty:
             self._tokencounts = self._reader._make_tokencount_df()
+        
+        if page_select:
+            try:
+                df = self._tokencounts.xs(self.seq, level='page', drop_level=False)
+            except KeyError:
+                # Empty tokenlist
+                return self._tokencounts.iloc[0:0]
+        else:
+            df = self._tokencounts
 
-        return group_tokenlist(self._tokencounts, pages=pages, section=section,
+        return group_tokenlist(df, pages=pages, section=section,
                                case=case, pos=pos, page_freq=page_freq)
+        
+        
 
     def term_page_freqs(self, page_freq=True, case=True):
         ''' Return a term frequency x page matrix, or optionally a
@@ -632,11 +667,7 @@ class Volume(object):
         if section == 'default':
             section = self.default_page_section
 
-        if self._line_chars.empty:
-            self._line_chars = self._make_line_char_df(self._pages)
-
-        df = self._line_chars
-        return group_linechars(df, section=section, place=place)
+        return group_linechars(self._reader.line_chars, section=section, place=place)
         
     def __str__(self):
         def truncate(s, maxlen):
@@ -645,7 +676,9 @@ class Volume(object):
             else:
                 return s.strip()
         return "<Volume: %s (%s) by %s>" % (truncate(self.title, 30), self.year, truncate(self.author[0], 40))
-    
+
+# TODO remove all JSON-specific code in Page. Likely, best to move as much info to volume
+# and just call from above
 class Page:
 
     _tokencounts = pd.DataFrame()
@@ -658,8 +691,9 @@ class Page:
                       'capAlphaSeq']
     ''' Fields that are counted by section.'''
 
-    def __init__(self, pageobj, volume, default_section='body'):
-        self.volume = volume
+    def __init__(self, pageobj, reader, default_section='body'):
+        self.reader = reader
+        self.volume = reader.volume
         self.default_section = default_section
         self._json = pageobj
 
@@ -726,7 +760,7 @@ class Page:
             return self._basic_stats.loc[:, stat].sum()
 
     def tokenlist(self, section='default', case=True, pos=True):
-        ''' Get or set tokencounts DataFrame
+        ''' Get tokencounts DataFrame
 
         section[string]: Which part of the page to return. In addition to
             'header', 'body', and 'footer', 'all' will return a DataFrame with
@@ -744,38 +778,9 @@ class Page:
                     or simply by word
         '''
         section = self.default_section if section == 'default' else section
-
-        # If there are no tokens, return an empty dataframe
-        if self._token_count == 0:
-            emptycols = ['page']
-            if section in SECREF + ['all']:
-                emptycols.append('section')
-            emptycols.append('token' if case else 'lowercase')
-            if pos:
-                emptycols.append('pos')
-            emptycols.append('count')
-            return pd.DataFrame([], columns=emptycols)
-
-        # If there's a volume-level representation, simply pull from that
-        elif not self.volume._tokencounts.empty:
-            try:
-                df = self.volume._tokencounts.loc[([int(self.seq)]), ]
-            except:
-                logging.error("Error subsetting volume DF for seq:{}".format(
-                              self.seq))
-                return
-
-        # Create the internal representation if it does not already
-        # This will only need to be created once
-        elif self._tokencounts.empty:
-            # Using the DF building method from Volume
-            self._tokencounts = self.volume._make_tokencount_df([self._json])
-            df = self._tokencounts
-        else:
-            df = self._tokencounts
-
-        return group_tokenlist(df, pages=True, section=section, case=case,
-                               pos=pos)
+        return self.volume.tokenlist(section=section, case=case,
+                                     pos=pos,
+                                     page_select=int(self.seq))
 
     def end_line_chars(self, section='default'):
         return self.line_chars(section=section, place='end')
