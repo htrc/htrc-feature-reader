@@ -147,13 +147,27 @@ def group_linechars(df, section='all', place='all'):
         return df.groupby(groups).sum()[['count']]
 
 # CLASSES
-
-
 class FeatureReader(object):
-    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
 
-    def __init__(self, paths=None, compressed=True, ids=None):
-        self.compressed = compressed
+    def __init__(self, paths=None, ids=None, parser="json", **kwargs):
+        '''
+        A reader for Extracted Features Dataset files.
+        
+        parser: a VolumeParser class, or a string for a built in class (e.g.'json' or
+        'parquet').
+        
+        paths: Filepaths to dataset files. The format will depend on 
+        
+        ids: HathiTrust IDs referred to files. Alternative to `paths`. By default will download
+            json files behind the scenes.
+        
+        The other args depend on the parser. For the default jsonVolumeParser, allowable args
+        are: `compressed`.
+        '''
+        
+        # only one of paths or ids can be selected - otherwise it's not clear what to iterate
+        # over. 
+        assert (paths or ids) and not (paths and ids)
         
         if paths:
             self._online = False
@@ -162,15 +176,26 @@ class FeatureReader(object):
             else:
                 self.paths = [paths]
         else:
-            self.paths = []
+            self.paths = False
 
         if ids:
             if type(ids) is list:
-                self.paths += [self.DL_URL.format(id) for id in ids]
+                self.ids += [self.DL_URL.format(id) for id in ids]
             else:
-                self.paths.append(self.DL_URL.format(ids))
+                self.ids.append(self.DL_URL.format(ids))
+        else:
+            self.ids = False
 
         self.index = 0
+        
+        if parser == 'json':
+            self.parser_class = jsonVolumeParser
+        elif issubclass(parser, htrc_features.baseVolumeParser)
+            self.parser_class = parser
+        else:
+            raise Exception("No valid parser defined.")
+        
+        self.parser_kwargs = kwargs
 
     def __iter__(self):
         return self.volumes()
@@ -179,12 +204,18 @@ class FeatureReader(object):
         return len(self.paths)
 
     def __str__(self):
-        return "HTRC Feature Reader with %d paths load" % (len(self.paths))
+        return "HTRC Feature Reader with %d paths loaded" % (len(self.paths))
 
     def volumes(self):
         ''' Generator for returning Volume objects '''
-        for path in self.paths:
-            yield self._volume(path, compressed=self.compressed)
+        if self.ids:
+            for id in self.ids:
+                yield Volume(path=False, id=id, parser=self.parser_class, **self.parser_kwargs)
+        elif self.paths:
+            for path in self.paths:
+                yield Volume(path, id=False, parser=self.parser_class, **self.parser_kwargs)
+        else:
+            raise
 
     def jsons(self):
         ''' Generator for returning decompressed, parsed json dictionaries
@@ -198,12 +229,98 @@ class FeatureReader(object):
         feature for single volume imports or to quickly get a volume for
         testing.'''
         return next(self.volumes())
+    
+    def __repr__(self):
+        if len(self.paths) > 1:
+            return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
+        elif len(self.paths) == 1:
+            return "<Empty FeatureReader>"
+        else:
+            return "<FeatureReader for %s>" % self.paths[0]
+        
+    def __str__(self):
+        return "<%d path FeatureReader>" % (len(self.paths))
 
-    def create_volume(self, path, **kwargs):
-        return self._volume(path, **kwargs)
-
-    def _read_json(self, path_or_url, compressed=True):
-        ''' Load JSON for a path. Allows remote files in addition to local ones. '''
+class baseVolumeParser(object):
+    
+    def __init__(self, path=False, id=False, **kwargs):
+        ''' Base class for volume reading.'''
+        self.meta = dict(id=None)
+        
+        # Example init process
+        output = self.read(path, id, **kwargs)
+        self.parse(output)
+    
+    def read(self):
+        ''' Args can be dependent on individual parser.'''
+        pass
+    
+    def parse(self):
+        ''' Save any info that needs to be held at init time for parsing. In some cases,
+        little needs to be saved before methods like _make_tokencount_df need to be run.
+        '''
+        pass
+    
+    def _make_tokencount_df(self):
+        pass
+    
+    def _make_line_char_df(self):
+        pass
+    
+    def _parse_meta(self):
+        pass
+        
+        
+class jsonVolumeParser(baseVolumeParser):
+    SUPPORTED_SCHEMA = ['3.0']
+    METADATA_FIELDS = [('schemaVersion', 'schema_version'), ('dateCreated', 'date_created'),
+                       ('title', 'title'), ('pubDate', 'pub_date'), ('language', 'language'),
+                       ('htBibUrl', 'ht_bib_url'), ('handleUrl', 'handle_url'),
+                       ('oclc', 'oclc'), ('imprint', 'imprint'), ('names', 'names'),
+                       ('classification', 'classification'),
+                       ('typeOfResource', 'type_of_resource'), ('issuance', 'issuance'),
+                       ('genre', 'genre'), ("bibliographicFormat", "bibliographic_format"),
+                       ("pubPlace", "pub_place"), ("governmentDocument", "government_document"),
+                       ("sourceInstitution", "source_institution"),
+                       ("enumerationChronology", "enumeration_chronology"),
+                       ("hathitrustRecordNumber", "hathitrust_record_number"),
+                       ("rightsAttributes", "rights_attributes"),
+                       ("accessProfile", "access_profile"),
+                       ("volumeIdentifier", "volume_identifier"),
+                       ("sourceInstitutionRecordNumber", "source_institution_record_number"),
+                       ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"),
+                       ("lastUpdateDate", "last_update_date")
+                      ]
+    ''' List of metadata fields, with their pythonic name mapping. '''
+    
+    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
+    
+    BASIC_FIELDS = [('pageCount', 'page_count')]
+    ''' List of fields which return primitive values in the schema, as tuples
+    with (CamelCase, lower_with_under) mapping.
+    '''
+    
+    PAGE_FIELDS =  ['seq', 'languages']
+    SECTION_FIELDS =  ['tokenCount', 'lineCount', 'emptyLineCount',
+                             'capAlphaSeq', 'sentenceCount']
+    
+    def __init__(self, path=False, id=False, compressed=True, **kwargs):
+        self.meta = dict(id=None)
+        self._schema = None
+        self._pages = None
+        
+        assert (path or id) and not (path and id)
+        
+        if id:
+            path = self.DL_URL.format(id)
+        
+        obj = self.read(path, compressed, **kwargs)
+        self.parse(obj)
+    
+    def read(self, path_or_url, compressed=True, **kwargs):
+        ''' Load JSON for a path. Allows remote files in addition to local ones. 
+            Returns: JSON object.
+        '''
         if parse_url(path_or_url).scheme in ['http', 'https']:
             try:
                 req = _urlopen(path_or_url)
@@ -245,104 +362,6 @@ class FeatureReader(object):
                               "argument", path_or_url)
             raise
         return volumejson
-
-    def _volume(self, path, compressed=True):
-        ''' Read a path into a volume.'''
-        
-        volumejson = self._read_json(path, compressed)
-        return Volume(volumejson)
-
-    def _wrap_func(self, func):
-        '''
-        Convert a volume path to a volume and run func(vol). For
-        multiprocessing.
-        TODO: Closures won't work, this is a useless function.
-        Remove this after consideration...
-        '''
-        def new_func(path):
-            vol = self._volume(path)
-            func(vol)
-        return new_func
-    
-    def __repr__(self):
-        if len(self.paths) > 1:
-            return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
-        elif len(self.paths) == 1:
-            return "<Empty FeatureReader>"
-        else:
-            return "<FeatureReader for %s>" % self.paths[0]
-        
-    def __str__(self):
-        return "<%d path FeatureReader>" % (len(self.paths))
-
-class baseVolumeReader(object):
-    
-    def __init__(self):
-        ''' An Example template for volume reading'''
-        self.meta = dict(id=None)
-    
-    def read(self):
-        pass
-    
-    def parse(self):
-        ''' Save any info that needs to be held at init time for parsing. In some cases,
-        little needs to be saved before methods like _make_tokencount_df need to be run.
-        '''
-        pass
-    
-    def _make_tokencount_df(self):
-        pass
-    
-    def _make_line_char_df(self):
-        pass
-    
-    def _parse_meta(self):
-        pass
-        
-        
-class jsonVolumeReader(object):
-    SUPPORTED_SCHEMA = ['3.0']
-    METADATA_FIELDS = [('schemaVersion', 'schema_version'), ('dateCreated', 'date_created'),
-                       ('title', 'title'), ('pubDate', 'pub_date'), ('language', 'language'),
-                       ('htBibUrl', 'ht_bib_url'), ('handleUrl', 'handle_url'),
-                       ('oclc', 'oclc'), ('imprint', 'imprint'), ('names', 'names'),
-                       ('classification', 'classification'),
-                       ('typeOfResource', 'type_of_resource'), ('issuance', 'issuance'),
-                       ('genre', 'genre'), ("bibliographicFormat", "bibliographic_format"),
-                       ("pubPlace", "pub_place"), ("governmentDocument", "government_document"),
-                       ("sourceInstitution", "source_institution"),
-                       ("enumerationChronology", "enumeration_chronology"),
-                       ("hathitrustRecordNumber", "hathitrust_record_number"),
-                       ("rightsAttributes", "rights_attributes"),
-                       ("accessProfile", "access_profile"),
-                       ("volumeIdentifier", "volume_identifier"),
-                       ("sourceInstitutionRecordNumber", "source_institution_record_number"),
-                       ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"),
-                       ("lastUpdateDate", "last_update_date")
-                      ]
-    ''' List of metadata fields, with their pythonic name mapping. '''
-    
-    BASIC_FIELDS = [('pageCount', 'page_count')]
-    ''' List of fields which return primitive values in the schema, as tuples
-    with (CamelCase, lower_with_under) mapping.
-    '''
-    
-    PAGE_FIELDS =  ['seq', 'languages']
-    SECTION_FIELDS =  ['tokenCount', 'lineCount', 'emptyLineCount',
-                             'capAlphaSeq', 'sentenceCount']
-    
-    def __init__(self, obj):
-        self.meta = dict(id=None)
-        self._schema = None
-        self._pages = None
-        
-        # 
-        self.read()
-        self.parse(obj)
-    
-    def read(self):
-        '''Read File From Disk'''
-        pass
     
     def parse(self, obj):
         self._schema = obj['features']['schemaVersion']
@@ -378,7 +397,6 @@ class jsonVolumeReader(object):
         pass
     
     def _make_page_feature_df(self):
-        # TODO save in vol, only keep parsing here
         # Parse basic page features
         # saves a DF to self.page_features where the index is the seq
         # number and the columns are the values of PAGE_FIELDS
@@ -497,17 +515,40 @@ class jsonVolumeReader(object):
         df.sort_index(0, inplace=True)
         return df
     
-class parquetVolumeReader(object):
-    pass
+class parquetVolumeParser(baseVolumeParser):
+    
+    def __init__(self, path=False, id=False, **kwargs):
+        self.meta = dict(id=None)
+        
+        # Example init process
+        output = self.read(path, id, **kwargs)
+        self.parse(output)
+    
+    def read(self):
+        ''' Nothing needs to be premptively read. Files should already '''
+        pass
+    
+    def parse(self):
+        ''' Nothing needs to be '''
+        pass
+    
+    def _make_tokencount_df(self):
+        pass
+    
+    def _make_line_char_df(self):
+        pass
+    
+    def _parse_meta(self):
+        pass
     
 class Volume(object):
 
-    def __init__(self, obj, parser='json', default_page_section='body'):
+    def __init__(self, path=False, id=False, parser='json', default_page_section='body', **kwargs):
         '''
         The Volume allows simplified, Pandas-based access to the HTRC
         Extracted Features files.
         
-        This class recruits a VolumeReader class to read its data and parse
+        This class recruits a VolumeParser class to read its data and parse
         it to up to four dataframes:
             - tokencounts : Case-sensitive, POS-tagged token counts,
             per section (body/header/footer) and page.
@@ -531,14 +572,20 @@ class Volume(object):
         self.default_page_section = default_page_section
         
         if parser == 'json':
-            self.reader = jsonVolumeReader(obj)
+            self.parser = jsonVolumeParser(path, id, **kwargs)
+        elif parser == 'parquet':
+            self.parser = parquetVolumeParser(path, id, **kwargs)
+        elif issubclass(parser, htrc_features.baseVolumeParser)
+            self.parser = parser(path, id, **kwargs)
+        else:
+            raise Exception("No valid parser defined.")
             
         self._update_meta_attrs()
     
     def _update_meta_attrs(self):
-        ''' Takes metadata from the reader's metadata variable and 
+        ''' Takes metadata from the parser's metadata variable and 
         assigns it to attributes in the Volume '''
-        for k, v in self.reader.meta.items():
+        for k, v in self.parser.meta.items():
             setattr(self, k, v)
 
     def __iter__(self):
@@ -559,13 +606,13 @@ class Volume(object):
 
     def page_features(self, feature='all', page_select=False):
         if self._page_features.empty:
-            self._page_features = self.reader._make_page_feature_df()
+            self._page_features = self.parser._make_page_feature_df()
             
         return self._get_basic_feature(self._page_features, section='all', feature=feature, page_select=page_select)
     
     def section_features(self, feature='all', section='default', page_select=False):
         if self._section_features.empty:
-            self._section_features = self.reader._make_section_feature_df()
+            self._section_features = self.parser._make_section_feature_df()
         return self._get_basic_feature(self._section_features, section=section, feature=feature, page_select=page_select)
 
     def _get_basic_feature(self, df, feature='all', section='default', page_select=False):
@@ -637,7 +684,7 @@ class Volume(object):
             This is mostly a convenience these days - logic exists in
             the Volume class.
         '''
-        for seq in self.reader.seqs:
+        for seq in self.parser.seqs:
             yield Page(seq, self, **kwargs)
 
     def tokens_per_page(self, **kwargs):
@@ -707,7 +754,7 @@ class Volume(object):
         # Create the internal representation if it does not already
         # exist. This will only need to exist once
         if self._tokencounts.empty:
-            self._tokencounts = self.reader._make_tokencount_df()
+            self._tokencounts = self.parser._make_tokencount_df()
         
         if page_select:
             try:
@@ -762,7 +809,7 @@ class Volume(object):
 
         # Create the internal representation
         if self._line_chars.empty:
-            self._line_chars = self.reader._make_line_char_df()
+            self._line_chars = self.parser._make_line_char_df()
         
         df = self._line_chars
         if page_select:

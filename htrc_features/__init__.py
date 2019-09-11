@@ -1,4 +1,4 @@
-from htrc_features.feature_reader import FeatureReader, Volume, Page
+from htrc_features.feature_reader import *
 
 __doc__ = '''The HTRC Feature Reader
 =========================
