@@ -86,17 +86,14 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
         logging.error("Invalid section argument: {}".format(section))
         return
 
-    # Add lowercase column. Previously, this was saved internally. However,
-    # DataFrame.str.lower() is reasonably fast and the need to call it
-    # repeatedly is low, so it is no longer saved.
-    # This makes the internal representation more predictable, hopefully
-    # avoiding unexpected bugs.
-    if not case:
+    if not case and 'lowercase' not in in_df.index.names:
         # Replace our df reference to a copy.
         df = df.copy()
         logging.debug('Adding lowercase column')
         df.insert(len(df.columns), 'lowercase',
                   df.index.get_level_values('token').str.lower())
+    elif case:
+        assert 'token' in in_df.index.names
 
     # Check if we need to group anything
     if groups == in_df.index.names:
