@@ -53,11 +53,19 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
     '''
     groups = []
     if pages:
+        assert 'page' in in_df.index.names
         groups.append('page')
-    if section in ['all'] + SECREF:
+
+    if section == 'all' and ('section' in in_df.index.names):
         groups.append('section')
+    elif section in SECREF:
+        assert 'section' in in_df.index.names
+        groups.append('section')
+        
     groups.append('token' if case else 'lowercase')
+
     if pos:
+        assert 'pos' in in_df.index.names
         groups.append('pos')
 
     if in_df.empty:
@@ -91,7 +99,7 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
                   df.index.get_level_values('token').str.lower())
 
     # Check if we need to group anything
-    if groups == ['page', 'section', 'token', 'pos']:
+    if groups == in_df.index.names:
         if page_freq:
             pd.options.mode.chained_assignment = None
             df['count'] = 1
@@ -774,6 +782,15 @@ class Volume(object):
         # exist. This will only need to exist once
         if self._tokencounts.empty:
             self._tokencounts = self.parser._make_tokencount_df()
+        
+        assert(('token' in self._tokencounts.index.names) or ('lower' in self._tokencounts.index.names))
+        
+        # Allow incomplete internal representations, as long as the args don't want the missing
+        # data
+        for arg, column in [(page, 'page'), (page_select, 'page'), (case, 'case'), (pos, 'pos')]:
+            if arg and column not in self._tokencounts.index.names:
+                raise Exception("Your internal tokenlist representation does not have enough "
+                                "information for the current args. Missing column: %s" % column)
         
         if page_select:
             try:
