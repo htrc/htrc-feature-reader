@@ -190,7 +190,7 @@ class FeatureReader(object):
         
         if parser == 'json':
             self.parser_class = jsonVolumeParser
-        elif issubclass(parser, htrc_features.baseVolumeParser)
+        elif issubclass(parser, htrc_features.baseVolumeParser):
             self.parser_class = parser
         else:
             raise Exception("No valid parser defined.")
@@ -267,6 +267,12 @@ class baseVolumeParser(object):
     def _make_line_char_df(self):
         pass
     
+    def _make_section_feature_df(self):
+        pass
+    
+    def _make_page_feature_df(self):
+        pass
+    
     def _parse_meta(self):
         pass
         
@@ -305,7 +311,7 @@ class jsonVolumeParser(baseVolumeParser):
                              'capAlphaSeq', 'sentenceCount']
     
     def __init__(self, path=False, id=False, compressed=True, **kwargs):
-        self.meta = dict(id=None)
+        self.meta = dict(id=None, handle_url=None)
         self._schema = None
         self._pages = None
         
@@ -518,26 +524,39 @@ class jsonVolumeParser(baseVolumeParser):
 class parquetVolumeParser(baseVolumeParser):
     
     def __init__(self, path=False, id=False, **kwargs):
-        self.meta = dict(id=None)
+        self.meta = dict(id=None, handle_url=None)
         
-        # Example init process
-        output = self.read(path, id, **kwargs)
-        self.parse(output)
+        # TEMPORARY: assume only tokencount DF input
+        self.tokencount_path = path
+        
+        if id:
+            raise Exception("id not currently supported in parquetVolumeParser")
+        
+        self.read(path, **kwargs)
     
-    def read(self):
-        ''' Nothing needs to be premptively read. Files should already '''
-        pass
+    def read(self, path):
+        import pandas as pd
+        df = pd.read_parquet(path)
+        indcols = [col for col in ['page', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
+        self._tokencount_df = df.set_index(indcols)
+        return self._tokencount_df
     
     def parse(self):
-        ''' Nothing needs to be '''
         pass
     
     def _make_tokencount_df(self):
-        pass
+        ''' Dummy: data already read at init and cached.'''
+        return self._tokencount_df
     
     def _make_line_char_df(self):
-        pass
+        raise Exception("parquet parser doesn't support line_char features")
+        
+    def _make_section_feature_df(self):
+        raise Exception("parquet parser doesn't support section features")
     
+    def _make_page_feature_df(self):
+        raise Exception("parquet parser doesn't support non-token page features")
+
     def _parse_meta(self):
         pass
     
@@ -575,7 +594,7 @@ class Volume(object):
             self.parser = jsonVolumeParser(path, id, **kwargs)
         elif parser == 'parquet':
             self.parser = parquetVolumeParser(path, id, **kwargs)
-        elif issubclass(parser, htrc_features.baseVolumeParser)
+        elif issubclass(parser, baseVolumeParser):
             self.parser = parser(path, id, **kwargs)
         else:
             raise Exception("No valid parser defined.")
@@ -855,10 +874,10 @@ class Page:
         return self.volume.tokens(page_select=self.seq, **kwargs)
 
     def line_count(self, section='default'):
-        return self._get_basic_stat(section, 'lineCount')
+        return self.volume.section_features(page_select=self.seq, feature='lineCount').values[0]
 
     def empty_line_count(self, section='default'):
-        return self._get_basic_stat(section, 'emptyLineCount')
+        return self.volume.section_features(page_select=self.seq, feature='emptyLineCount').values[0]
 
     def cap_alpha_seq(self, section='body'):
         ''' Return the longest length of consecutive capital letters starting a
@@ -880,10 +899,10 @@ class Page:
         return self.volume.tokenlist(page_select=self.seq, **kwargs)
 
     def end_line_chars(self, **kwargs):
-        return self.line_chars(place='end', page_select=self.seq, **kwargs)
+        return self.line_chars(place='end', **kwargs)
 
     def begin_line_chars(self, **kwargs):
-        return self.line_chars(place='begin', page_select=self.seq, **kwargs)
+        return self.line_chars(place='begin', **kwargs)
 
     def line_chars(self, **kwargs):
         '''
