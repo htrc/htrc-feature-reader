@@ -10,6 +10,13 @@ def _id_encode(id):
     '''
     return id.replace(":", "+").replace("/", "=").replace(".", ",")
 
+def _id_decode(id):
+    '''
+    :param id: An Hathitrust ID, decoded from a sanitized pairtree ID.
+    :return: A hathitrust id.
+    '''
+    return id.replace("+", ":").replace("=", "/").replace(",", ".")
+
 def files_available(ids):
     """
     Check for EF files matching a list of volume IDs.

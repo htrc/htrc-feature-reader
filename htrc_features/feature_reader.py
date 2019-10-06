@@ -529,7 +529,7 @@ class jsonVolumeParser(baseVolumeParser):
 class parquetVolumeParser(baseVolumeParser):
     
     def __init__(self, path=False, id=False, **kwargs):
-        self.meta = dict(id=None, handle_url=None)
+        self.meta = dict(id=None, handle_url=None, title=None)
         
         # TEMPORARY: assume only tokencount DF input
         self.tokencount_path = path
@@ -538,6 +538,7 @@ class parquetVolumeParser(baseVolumeParser):
             raise Exception("id not currently supported in parquetVolumeParser")
         
         self.read(path, **kwargs)
+        self.parse()
     
     def read(self, path):
         import pandas as pd
@@ -547,7 +548,17 @@ class parquetVolumeParser(baseVolumeParser):
         return self._tokencount_df
     
     def parse(self):
-        pass
+        import os
+        if not self.meta['id']:
+            # Parse from filename
+            filename = os.path.split(self.tokencount_path)[-1]
+            self.meta['id'] = os.path.splitext(filename)[0].replace("+", ":").replace("=", "/").replace(",", ".")
+        
+        if not self.meta['handle_url']:
+            self.meta['handle_url'] = "http://hdl.handle.net/2027/%s" % self.meta['id']
+            
+        if not self.meta['title']:
+            self.meta['title'] = self.meta['id']
     
     def _make_tokencount_df(self):
         ''' Dummy: data already read at init and cached.'''
