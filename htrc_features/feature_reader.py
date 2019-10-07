@@ -527,8 +527,35 @@ class jsonVolumeParser(baseVolumeParser):
         return df
     
 class parquetVolumeParser(baseVolumeParser):
+    '''
+        This Volume parser allows for Feature Reader data to be loaded from a
+        parquet format, which allows JSON decompression, parsing, and processing
+        to be avoided.
+        
+        The FeatureReader files that can be loaded are the same ones used internally:
+        metadata (as JSON), token counts, line character counts, page-level features, and
+        page+section level features.
+        
+        These are essentially what is held internally in a Volume (vol.parser.meta,
+        vol._tokencounts, vol._line_chars, vol._page_features, vol._section_features) so 
+        this parser doesn't provide much fanciness beyond loading.
+        
+        TO LOAD DATA
+        By default, the loading enforces a filename convention, and the path provided
+        to the parser should avoid the file extension. The filename convention is
+            - ../{htid}.meta.json
+            - ../{htid}.tokens.parquet
+            - ../{htid}.chars.parquet
+            - ../{htid}.page.parquet
+            - ../{htid}.section.parquet
+        
+        If assume_filenames is False, you won't need to follow the filename convention, and
+        instead provide a tuple of the filenames. This is not currently implemented.
+    '''
+        
     
-    def __init__(self, path=False, id=False, **kwargs):
+    def __init__(self, path=False, id=False, assume_filenames=True, **kwargs):
+
         self.meta = dict(id=None, handle_url=None, title=None)
         
         # TEMPORARY: assume only tokencount DF input
@@ -536,6 +563,9 @@ class parquetVolumeParser(baseVolumeParser):
         
         if id:
             raise Exception("id not currently supported in parquetVolumeParser")
+        if not assume_filenames:
+            raise Exception("assume_filenames currently cannot be false. See docstring ""
+                            "for parquetVolumeParser")
         
         self.read(path, **kwargs)
         self.parse()
