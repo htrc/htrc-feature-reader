@@ -1,6 +1,7 @@
 import pytest
-from htrc_features import FeatureReader
+from htrc_features import FeatureReader, Volume
 import os
+import htrc_features
 
 
 # TestFeatureReader already tested loading, so we'll load a common volume
@@ -16,7 +17,6 @@ def volume(paths):
     paths = paths[0]
     feature_reader = FeatureReader(paths, compressed=False)
     return next(feature_reader.volumes())
-
 
 class TestVolume():
 
@@ -35,6 +35,12 @@ class TestVolume():
             passed = time.time() - start
             tokenlist_times.append(passed)
         assert 2*tokenlist_times[0] > sum(tokenlist_times[1:])
+        
+    def test_direct_loading(self, paths):
+        import time
+        # Load new volume specifically for this test
+        vol = Volume(paths[0], compressed=False)
+        assert type(vol) == htrc_features.feature_reader.Volume
 
     def test_included_metadata(self, volume):
         import re
@@ -117,25 +123,11 @@ class TestVolume():
         import pandas
         # Test default settings
         tokencounts1 = volume.tokens_per_page()
-        counts1 = {'count': {2: 0, 3: 2, 4: 4, 5: 4, 6: 63, 51: 229, 52: 298,
+        counts1 = {2: 0, 3: 2, 4: 4, 5: 4, 6: 63, 51: 229, 52: 298,
                    53: 344, 54: 316, 55: 295, 56: 327, 57: 383, 58: 341,
-                   59: 187, 60: 277, 61: 341}}
-        assert type(tokencounts1) == pandas.core.frame.DataFrame
+                   59: 187, 60: 277, 61: 341}
+        assert type(tokencounts1) == pandas.core.frame.Series
         assert tokencounts1.to_dict() == counts1
-
-        # Changing sections involved in count
-        tokencounts2 = volume.tokens_per_page(section='group')
-        counts2 = {'count': {2: 0, 3: 2, 4: 4, 5: 4, 6: 63, 51: 233, 52: 303,
-                   53: 349, 54: 321, 55: 300, 56: 332, 57: 388, 58: 346,
-                   59: 192, 60: 277, 61: 345}}
-        assert type(tokencounts2) == pandas.core.frame.DataFrame
-        assert tokencounts2.to_dict() == counts2
-
-        # section='all' keeps section info
-        tokencounts3 = volume.tokens_per_page(section='all')
-        assert tokencounts3.loc[61].to_dict() == {'count': {'body': 341,
-                                                            'footer': 0,
-                                                            'header': 4}}
 
     def test_tokenlist_folding(self, volume):
         tl1 = volume.tokenlist()

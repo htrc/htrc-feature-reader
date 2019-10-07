@@ -187,12 +187,12 @@ class FeatureReader(object):
                 self.paths = [paths]
         else:
             self.paths = False
-
+        
         if ids:
             if type(ids) is list:
-                self.ids += [self.DL_URL.format(id) for id in ids]
+                self.ids = ids
             else:
-                self.ids.append(self.DL_URL.format(ids))
+                self.ids = [ids]
         else:
             self.ids = False
 
@@ -231,8 +231,12 @@ class FeatureReader(object):
         ''' Generator for returning decompressed, parsed json dictionaries
         for volumes. Convenience function for when the FeatureReader objects
         are not needed. '''
+        if 'compressed' in self.parser_kwargs:
+            compressed = self.parser_kwargs['compressed']
+        else:
+            compressed = True
         for path in self.paths:
-            yield self._read_json(path, compressed=self.compressed)
+            yield jsonVolumeParser.read(None, path_or_url = path, compressed=compressed)
 
     def first(self):
         ''' Return first volume from Feature Reader. This is a convenience
@@ -241,15 +245,23 @@ class FeatureReader(object):
         return next(self.volumes())
     
     def __repr__(self):
-        if len(self.paths) > 1:
-            return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
-        elif len(self.paths) == 1:
-            return "<Empty FeatureReader>"
-        else:
-            return "<FeatureReader for %s>" % self.paths[0]
+        if self.paths:
+            if len(self.paths) > 1:
+                return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
+            elif len(self.paths) == 0:
+                return "<Empty FeatureReader>"
+            else:
+                return "<FeatureReader for %s>" % self.paths[0]
+        elif self.ids:
+            if len(self.ids) > 1:
+                return "<%d path FeatureReader (%s to %s)>" % (len(self.ids), self.ids[0], self.ids[-1])
+            elif len(self.ids) == 0:
+                return "<Empty FeatureReader>"
+            else:
+                return "<FeatureReader for %s>" % self.ids[0]
         
     def __str__(self):
-        return "<%d path FeatureReader>" % (len(self.paths))
+        return "<%d path FeatureReader>" % (len(self.ids))
 
 class baseVolumeParser(object):
     
@@ -309,8 +321,6 @@ class jsonVolumeParser(baseVolumeParser):
                       ]
     ''' List of metadata fields, with their pythonic name mapping. '''
     
-    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
-    
     BASIC_FIELDS = [('pageCount', 'page_count')]
     ''' List of fields which return primitive values in the schema, as tuples
     with (CamelCase, lower_with_under) mapping.
@@ -319,6 +329,7 @@ class jsonVolumeParser(baseVolumeParser):
     PAGE_FIELDS =  ['seq', 'languages']
     SECTION_FIELDS =  ['tokenCount', 'lineCount', 'emptyLineCount',
                              'capAlphaSeq', 'sentenceCount']
+    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
     
     def __init__(self, path=False, id=False, compressed=True, **kwargs):
         self.meta = dict(id=None, handle_url=None)
@@ -502,7 +513,7 @@ class jsonVolumeParser(baseVolumeParser):
             pages = self._pages
 
         if self._schema == '3.0':
-            logging.warn("Adapted to erroneous key names in schema 3.0.")
+            logging.warning("Adapted to erroneous key names in schema 3.0.")
             place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
         else:
             place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
@@ -779,8 +790,7 @@ class Volume(object):
         '''
         Return a Series page lengths
         '''
-        df = self.tokenlist(**kwargs)
-        return df.groupby(level='page').sum()['count']
+        return self.section_features(feature='tokenCount')
 
     def line_counts(self, **kwargs):
         ''' Return a Series of line counts, per page '''
