@@ -9,6 +9,7 @@ import numpy as np
 import pymarc
 from six import iteritems, StringIO, BytesIO
 import codecs
+import os
 
 try:
     import ujson as json
@@ -533,11 +534,11 @@ class parquetVolumeParser(baseVolumeParser):
         to be avoided.
         
         The FeatureReader files that can be loaded are the same ones used internally:
-        metadata (as JSON), token counts, line character counts, page-level features, and
-        page+section level features.
+        metadata (as JSON), token counts, line character counts, and
+        page+section level features. The non-section specific features aren't supported.
         
         These are essentially what is held internally in a Volume (vol.parser.meta,
-        vol._tokencounts, vol._line_chars, vol._page_features, vol._section_features) so 
+        vol._tokencounts, vol._line_chars, vol._section_features) so 
         this parser doesn't provide much fanciness beyond loading.
         
         TO LOAD DATA
@@ -546,7 +547,6 @@ class parquetVolumeParser(baseVolumeParser):
             - ../{htid}.meta.json
             - ../{htid}.tokens.parquet
             - ../{htid}.chars.parquet
-            - ../{htid}.page.parquet
             - ../{htid}.section.parquet
         
         If assume_filenames is False, you won't need to follow the filename convention, and
@@ -556,29 +556,30 @@ class parquetVolumeParser(baseVolumeParser):
     
     def __init__(self, path=False, id=False, assume_filenames=True, **kwargs):
 
-        self.meta = dict(id=None, handle_url=None, title=None)
-        
-        # TEMPORARY: assume only tokencount DF input
-        self.tokencount_path = path
-        
         if id:
             raise Exception("id not currently supported in parquetVolumeParser")
         if not assume_filenames:
-            raise Exception("assume_filenames currently cannot be false. See docstring ""
+            raise Exception("assume_filenames currently cannot be false. See docstring "
                             "for parquetVolumeParser")
         
-        self.read(path, **kwargs)
+        self.meta_path = path + '.meta.json'
+        self.token_path = path + '.tokens.parquet'
+        self.char_path = path + '.chars.parquet'
+        self.section_path = path + '.section.parquet'
+        
+        if os.path.exists(self.meta_path):
+            with open(self.meta_path, mode='r') as f:
+                self.meta = json.load(f)
+        else:
+            self.meta = dict(id=None, handle_url=None, title=None)
+        
+        self.read()
         self.parse()
     
-    def read(self, path):
-        import pandas as pd
-        df = pd.read_parquet(path)
-        indcols = [col for col in ['page', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
-        self._tokencount_df = df.set_index(indcols)
-        return self._tokencount_df
+    def read(self):
+        pass
     
     def parse(self):
-        import os
         if not self.meta['id']:
             # Parse from filename
             filename = os.path.split(self.tokencount_path)[-1]
@@ -591,17 +592,35 @@ class parquetVolumeParser(baseVolumeParser):
             self.meta['title'] = self.meta['id']
     
     def _make_tokencount_df(self):
+        if not os.path.exists(self.token_path):
+            raise Exception("No token information available")
+            
+        df = pd.read_parquet(self.token_path)
+        indcols = [col for col in ['page', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
+        if len(indcols):
+            df = df.set_index(indcols)
+        return df
+        
+        return self._tokencount_df
         ''' Dummy: data already read at init and cached.'''
         return self._tokencount_df
     
     def _make_line_char_df(self):
-        raise Exception("parquet parser doesn't support line_char features")
+        if not os.path.exists(self.char_path):
+            raise Exception("No line char information available")
+            
+        df = pd.read_parquet(self.char_path)    
+        return df 
         
     def _make_section_feature_df(self):
-        raise Exception("parquet parser doesn't support section features")
+        if not os.path.exists(self.section_path):
+            raise Exception("No page+section information available")
+            
+        df = pd.read_parquet(self.section_path)    
+        return df 
     
     def _make_page_feature_df(self):
-        raise Exception("parquet parser doesn't support non-token page features")
+        raise Exception("parquet parser doesn't support non-token, non-section page features")
 
     def _parse_meta(self):
         pass
@@ -825,7 +844,8 @@ class Volume(object):
         
         # Allow incomplete internal representations, as long as the args don't want the missing
         # data
-        for arg, column in [(page, 'page'), (page_select, 'page'), (case, 'case'), (pos, 'pos')]:
+        for arg, column in [(pages, 'page'), (page_select, 'page'), (case, 'token'),
+                            (pos, 'pos')]:
             if arg and column not in self._tokencounts.index.names:
                 raise Exception("Your internal tokenlist representation does not have enough "
                                 "information for the current args. Missing column: %s" % column)
@@ -898,7 +918,46 @@ class Volume(object):
             section = self.default_page_section
 
         return group_linechars(df, section=section, place=place)
+    
+    def save_parquet(self, path, meta=True, tokens=True, chars=False, 
+                     section_features=False, compression='snappy'):
+        '''
+        Save the internal representations of feature data to parquet, and the metadata to json,
+        using the naming convention used by parquetVolumeParser.
         
+        The primary use is for converting the feature files to something more efficient. By default,
+        only metadata and tokencounts are saved.
+        
+        Saving page features is currently unsupported, as it's an ill-fit for parquet. This is currently
+        just the language-inferences for each page - everything else is in section features 
+        (page by body/header/footer).
+        '''
+        fname_root = os.path.join(path, self.id)
+        
+        if meta:
+            with open(fname_root + '.meta.json', mode='w') as f:
+                json.dump(self.parser.meta, f)
+        
+        if tokens:
+            try:
+                feats = self.tokenlist()
+            except:
+                # In the internal representation is incomplete, returning the above may fail,
+                # but the cache may have an acceptable dataset to return
+                feats = self._tokencounts
+            if not feats.empty:
+                feats.to_parquet(fname_root + '.tokens.parquet', compression=compression)
+            
+        if section_features:
+            feats = self.section_features(section='all')
+            if not feats.empty:
+                feats.to_parquet(fname_root + '.section.parquet', compression=compression)
+            
+        if chars:
+            feats = self.line_chars()
+            if not feats.empty:
+                feats.to_parquet(fname_root + '.chars.parquet', compression=compression)
+    
     def __str__(self):
         def truncate(s, maxlen):
             if len(s) > maxlen:
