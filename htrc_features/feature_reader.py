@@ -46,7 +46,8 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
         pages[bool]: If true, keep pages. If false, combine all pages.
         section[string]: 'header', 'body', 'footer' will only return those
             sections. 'all' will return all info, unfolded. 'group' combines
-            all sections info.
+            all sections info. If in_df has no section column,
+            this arg is ignored,
         case[bool]: If true, return case-sensitive token counts.
         pos[bool]: If true, return tokens facets by part-of-speech.
         page_freq[bool]: If true, will simply count whether or not a token is
@@ -57,7 +58,10 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
         assert 'page' in in_df.index.names
         groups.append('page')
 
-    if section == 'all' and ('section' in in_df.index.names):
+    if 'section' not in in_df.index.names:
+        section = 'ignore'
+
+    if section == 'all':
         groups.append('section')
     elif section in SECREF:
         assert 'section' in in_df.index.names
@@ -72,7 +76,7 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
     if in_df.empty:
         return pd.DataFrame([], columns=groups)
 
-    if section in ['all', 'group']:
+    if section in ['all', 'group', 'ignore']:
         df = in_df
     elif section in SECREF:
         idx = pd.IndexSlice
@@ -806,7 +810,7 @@ class Volume(object):
         return self.section_features(feature='sentenceCount', **kwargs)
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
-                  page_freq=False, page_select=False):
+                  page_freq=False, page_select=False, drop_section=False):
         ''' Get or set tokencounts DataFrame
 
         pages[bool]: Keep page-level info if true, else fold.
@@ -828,6 +832,8 @@ class Volume(object):
         
         page_select[int] : Page sequence number for optionally choosing just one
             page.
+            
+        drop_section[bool]: Whether to drop the index level refering to the section.
         
         '''
         if section == 'default':
@@ -860,8 +866,13 @@ class Volume(object):
         else:
             df = self._tokencounts
 
-        return group_tokenlist(df, pages=pages, section=section,
+        df = group_tokenlist(df, pages=pages, section=section,
                                case=case, pos=pos, page_freq=page_freq)
+        
+        if drop_section:
+            return df.droplevel('section')
+        else:
+            return df
         
 
     def term_page_freqs(self, page_freq=True, case=True):
@@ -920,7 +931,9 @@ class Volume(object):
         return group_linechars(df, section=section, place=place)
     
     def save_parquet(self, path, meta=True, tokens=True, chars=False, 
-                     section_features=False, compression='snappy'):
+                     section_features=False, compression='snappy',
+                     token_kwargs=dict(section='all', drop_section=False)
+                     ):
         '''
         Save the internal representations of feature data to parquet, and the metadata to json,
         using the naming convention used by parquetVolumeParser.
@@ -931,6 +944,11 @@ class Volume(object):
         Saving page features is currently unsupported, as it's an ill-fit for parquet. This is currently
         just the language-inferences for each page - everything else is in section features 
         (page by body/header/footer).
+        
+        Since Volumes partially support incomplete dataframes, you can pass Volume.tokenlist arguments
+        as a dict with token_kwargs. For example, if you want to save a representation with only body
+        information, drop the 'section' level of the index, and fold part-of-speech counts, you can pass
+        token_kwargs=dict(section='body', drop_section=True, pos=False).
         '''
         fname_root = os.path.join(path, self.id)
         
@@ -940,7 +958,7 @@ class Volume(object):
         
         if tokens:
             try:
-                feats = self.tokenlist()
+                feats = self.tokenlist(**token_kwargs)
             except:
                 # In the internal representation is incomplete, returning the above may fail,
                 # but the cache may have an acceptable dataset to return
