@@ -9,6 +9,7 @@ import numpy as np
 import pymarc
 from six import iteritems, StringIO, BytesIO
 import codecs
+import os
 
 try:
     import ujson as json
@@ -45,7 +46,8 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
         pages[bool]: If true, keep pages. If false, combine all pages.
         section[string]: 'header', 'body', 'footer' will only return those
             sections. 'all' will return all info, unfolded. 'group' combines
-            all sections info.
+            all sections info. If in_df has no section column,
+            this arg is ignored,
         case[bool]: If true, return case-sensitive token counts.
         pos[bool]: If true, return tokens facets by part-of-speech.
         page_freq[bool]: If true, will simply count whether or not a token is
@@ -53,17 +55,28 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
     '''
     groups = []
     if pages:
+        assert 'page' in in_df.index.names
         groups.append('page')
-    if section in ['all'] + SECREF:
+
+    if 'section' not in in_df.index.names:
+        section = 'ignore'
+
+    if section == 'all':
         groups.append('section')
+    elif section in SECREF:
+        assert 'section' in in_df.index.names
+        groups.append('section')
+        
     groups.append('token' if case else 'lowercase')
+
     if pos:
+        assert 'pos' in in_df.index.names
         groups.append('pos')
 
     if in_df.empty:
         return pd.DataFrame([], columns=groups)
 
-    if section in ['all', 'group']:
+    if section in ['all', 'group', 'ignore']:
         df = in_df
     elif section in SECREF:
         idx = pd.IndexSlice
@@ -78,20 +91,17 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
         logging.error("Invalid section argument: {}".format(section))
         return
 
-    # Add lowercase column. Previously, this was saved internally. However,
-    # DataFrame.str.lower() is reasonably fast and the need to call it
-    # repeatedly is low, so it is no longer saved.
-    # This makes the internal representation more predictable, hopefully
-    # avoiding unexpected bugs.
-    if not case:
+    if not case and 'lowercase' not in in_df.index.names:
         # Replace our df reference to a copy.
         df = df.copy()
         logging.debug('Adding lowercase column')
         df.insert(len(df.columns), 'lowercase',
                   df.index.get_level_values('token').str.lower())
+    elif case:
+        assert 'token' in in_df.index.names
 
     # Check if we need to group anything
-    if groups == ['page', 'section', 'token', 'pos']:
+    if groups == in_df.index.names:
         if page_freq:
             pd.options.mode.chained_assignment = None
             df['count'] = 1
@@ -147,13 +157,27 @@ def group_linechars(df, section='all', place='all'):
         return df.groupby(groups).sum()[['count']]
 
 # CLASSES
-
-
 class FeatureReader(object):
-    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
 
-    def __init__(self, paths=None, compressed=True, ids=None):
-        self.compressed = compressed
+    def __init__(self, paths=None, ids=None, parser="json", **kwargs):
+        '''
+        A reader for Extracted Features Dataset files.
+        
+        parser: a VolumeParser class, or a string for a built in class (e.g.'json' or
+        'parquet').
+        
+        paths: Filepaths to dataset files. The format will depend on 
+        
+        ids: HathiTrust IDs referred to files. Alternative to `paths`. By default will download
+            json files behind the scenes.
+        
+        The other args depend on the parser. For the default jsonVolumeParser, allowable args
+        are: `compressed`.
+        '''
+        
+        # only one of paths or ids can be selected - otherwise it's not clear what to iterate
+        # over. 
+        assert (paths or ids) and not (paths and ids)
         
         if paths:
             self._online = False
@@ -162,15 +186,26 @@ class FeatureReader(object):
             else:
                 self.paths = [paths]
         else:
-            self.paths = []
-
+            self.paths = False
+        
         if ids:
             if type(ids) is list:
-                self.paths += [self.DL_URL.format(id) for id in ids]
+                self.ids = ids
             else:
-                self.paths.append(self.DL_URL.format(ids))
+                self.ids = [ids]
+        else:
+            self.ids = False
 
         self.index = 0
+        
+        if parser == 'json':
+            self.parser_class = jsonVolumeParser
+        elif issubclass(parser, htrc_features.baseVolumeParser):
+            self.parser_class = parser
+        else:
+            raise Exception("No valid parser defined.")
+        
+        self.parser_kwargs = kwargs
 
     def __iter__(self):
         return self.volumes()
@@ -179,44 +214,140 @@ class FeatureReader(object):
         return len(self.paths)
 
     def __str__(self):
-        return "HTRC Feature Reader with %d paths load" % (len(self.paths))
+        return "HTRC Feature Reader with %d paths loaded" % (len(self.paths))
 
     def volumes(self):
         ''' Generator for returning Volume objects '''
-        for path in self.paths:
-            # If path is a tuple, assume that the advanced path was also given
-            if type(path) == tuple:
-                basic, advanced = path
-                yield self._volume(basic, advanced_path=advanced,
-                                   compressed=self.compressed)
-            else:
-                yield self._volume(path, compressed=self.compressed)
+        if self.ids:
+            for id in self.ids:
+                yield Volume(path=False, id=id, parser=self.parser_class, **self.parser_kwargs)
+        elif self.paths:
+            for path in self.paths:
+                yield Volume(path, id=False, parser=self.parser_class, **self.parser_kwargs)
+        else:
+            raise
 
     def jsons(self):
         ''' Generator for returning decompressed, parsed json dictionaries
         for volumes. Convenience function for when the FeatureReader objects
         are not needed. '''
+        if 'compressed' in self.parser_kwargs:
+            compressed = self.parser_kwargs['compressed']
+        else:
+            compressed = True
         for path in self.paths:
-            # If path is a tuple, assume that the advanced path was also given
-            if type(path) == tuple:
-                basic, advanced = path
-                basicjson = self._read_json(basic, compressed=self.compressed)
-                advjson = self._read_json(advanced, compressed=self.compressed)
-                yield (basicjson, advjson)
-            else:
-                yield self._read_json(path, compressed=self.compressed)
+            yield jsonVolumeParser.read(None, path_or_url = path, compressed=compressed)
 
     def first(self):
         ''' Return first volume from Feature Reader. This is a convenience
         feature for single volume imports or to quickly get a volume for
         testing.'''
         return next(self.volumes())
+    
+    def __repr__(self):
+        if self.paths:
+            if len(self.paths) > 1:
+                return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
+            elif len(self.paths) == 0:
+                return "<Empty FeatureReader>"
+            else:
+                return "<FeatureReader for %s>" % self.paths[0]
+        elif self.ids:
+            if len(self.ids) > 1:
+                return "<%d path FeatureReader (%s to %s)>" % (len(self.ids), self.ids[0], self.ids[-1])
+            elif len(self.ids) == 0:
+                return "<Empty FeatureReader>"
+            else:
+                return "<FeatureReader for %s>" % self.ids[0]
+        
+    def __str__(self):
+        return "<%d path FeatureReader>" % (len(self.ids))
 
-    def create_volume(self, path, **kwargs):
-        return self._volume(path, **kwargs)
-
-    def _read_json(self, path_or_url, compressed=True, advanced_path=False):
-        ''' Load JSON for a path. Allows remote files in addition to local ones. '''
+class baseVolumeParser(object):
+    
+    def __init__(self, path=False, id=False, **kwargs):
+        ''' Base class for volume reading.'''
+        self.meta = dict(id=None)
+        
+        # Example init process
+        output = self.read(path, id, **kwargs)
+        self.parse(output)
+    
+    def read(self):
+        ''' Args can be dependent on individual parser.'''
+        pass
+    
+    def parse(self):
+        ''' Save any info that needs to be held at init time for parsing. In some cases,
+        little needs to be saved before methods like _make_tokencount_df need to be run.
+        '''
+        pass
+    
+    def _make_tokencount_df(self):
+        pass
+    
+    def _make_line_char_df(self):
+        pass
+    
+    def _make_section_feature_df(self):
+        pass
+    
+    def _make_page_feature_df(self):
+        pass
+    
+    def _parse_meta(self):
+        pass
+        
+        
+class jsonVolumeParser(baseVolumeParser):
+    SUPPORTED_SCHEMA = ['3.0']
+    METADATA_FIELDS = [('schemaVersion', 'schema_version'), ('dateCreated', 'date_created'),
+                       ('title', 'title'), ('pubDate', 'pub_date'), ('language', 'language'),
+                       ('htBibUrl', 'ht_bib_url'), ('handleUrl', 'handle_url'),
+                       ('oclc', 'oclc'), ('imprint', 'imprint'), ('names', 'names'),
+                       ('classification', 'classification'),
+                       ('typeOfResource', 'type_of_resource'), ('issuance', 'issuance'),
+                       ('genre', 'genre'), ("bibliographicFormat", "bibliographic_format"),
+                       ("pubPlace", "pub_place"), ("governmentDocument", "government_document"),
+                       ("sourceInstitution", "source_institution"),
+                       ("enumerationChronology", "enumeration_chronology"),
+                       ("hathitrustRecordNumber", "hathitrust_record_number"),
+                       ("rightsAttributes", "rights_attributes"),
+                       ("accessProfile", "access_profile"),
+                       ("volumeIdentifier", "volume_identifier"),
+                       ("sourceInstitutionRecordNumber", "source_institution_record_number"),
+                       ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"),
+                       ("lastUpdateDate", "last_update_date")
+                      ]
+    ''' List of metadata fields, with their pythonic name mapping. '''
+    
+    BASIC_FIELDS = [('pageCount', 'page_count')]
+    ''' List of fields which return primitive values in the schema, as tuples
+    with (CamelCase, lower_with_under) mapping.
+    '''
+    
+    PAGE_FIELDS =  ['seq', 'languages']
+    SECTION_FIELDS =  ['tokenCount', 'lineCount', 'emptyLineCount',
+                             'capAlphaSeq', 'sentenceCount']
+    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
+    
+    def __init__(self, path=False, id=False, compressed=True, **kwargs):
+        self.meta = dict(id=None, handle_url=None)
+        self._schema = None
+        self._pages = None
+        
+        assert (path or id) and not (path and id)
+        
+        if id:
+            path = self.DL_URL.format(id)
+        
+        obj = self.read(path, compressed, **kwargs)
+        self.parse(obj)
+    
+    def read(self, path_or_url, compressed=True, **kwargs):
+        ''' Load JSON for a path. Allows remote files in addition to local ones. 
+            Returns: JSON object.
+        '''
         if parse_url(path_or_url).scheme in ['http', 'https']:
             try:
                 req = _urlopen(path_or_url)
@@ -247,10 +378,6 @@ class FeatureReader(object):
             logging.exception("Can't open %s", path_or_url)
             raise
 
-        # This is a bandaid for schema version 2.0, not over-engineered
-        # since upcoming releases of the extracted features
-        # dataset won't keep the basic/advanced split
-
         try:
             # For Python3 compatibility, decode to str object
             if PY3 and (type(rawjson) != str):
@@ -262,123 +389,303 @@ class FeatureReader(object):
                               "argument", path_or_url)
             raise
         return volumejson
-
-    def _volume(self, path, compressed=True, advanced_path=False):
-        ''' Read a path into a volume.'''
-        
-        volumejson = self._read_json(path, compressed)
-        if advanced_path:
-            advanced = self._read_json(advanced_path, compressed)
-            advanced = advanced['features']
-        else:
-            advanced = False
-        return Volume(volumejson, advanced=advanced)
-
-    def _wrap_func(self, func):
-        '''
-        Convert a volume path to a volume and run func(vol). For
-        multiprocessing.
-        TODO: Closures won't work, this is a useless function.
-        Remove this after consideration...
-        '''
-        def new_func(path):
-            vol = self._volume(path)
-            func(vol)
-        return new_func
     
-    def __repr__(self):
-        if len(self.paths) > 1:
-            return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
-        elif len(self.paths) == 1:
-            return "<Empty FeatureReader>"
-        else:
-            return "<FeatureReader for %s>" % self.paths[0]
-        
-    def __str__(self):
-        return "<%d path FeatureReader>" % (len(self.paths))
-
-
-class Volume(object):
-    SUPPORTED_SCHEMA = ['2.0', '3.0']
-    METADATA_FIELDS = [('schemaVersion', 'schema_version'),
-                       ('dateCreated', 'date_created'),
-                       ('title', 'title'),
-                       ('pubDate', 'pub_date'),
-                       ('language', 'language'),
-                       ('htBibUrl', 'ht_bib_url'),
-                       ('handleUrl', 'handle_url'),
-                       ('oclc', 'oclc'),
-                       ('imprint', 'imprint'),
-                       ('names', 'names'),
-                       ('classification', 'classification'),
-                       ('typeOfResource', 'type_of_resource'),
-                       ('issuance', 'issuance'),
-                       ('genre', 'genre'),
-                       ("bibliographicFormat", "bibliographic_format"),
-                       ("pubPlace", "pub_place"),
-                       ("governmentDocument", "government_document"),
-                       ("sourceInstitution", "source_institution"),
-                       ("enumerationChronology", "enumeration_chronology"),
-                       ("hathitrustRecordNumber", "hathitrust_record_number"),
-                       ("rightsAttributes", "rights_attributes"),
-                       ("accessProfile", "access_profile"),
-                       ("volumeIdentifier", "volume_identifier"),
-                       ("sourceInstitutionRecordNumber",
-                        "source_institution_record_number"),
-                       ("isbn", "isbn"),
-                       ("issn", "issn"),
-                       ("lccn", "lccn"),
-                       ("lastUpdateDate", "last_update_date")
-                      ]
-    ''' List of metadata fields, with their pythonic name mapping. '''
-
-    BASIC_FIELDS = [('pageCount', 'page_count')]
-    ''' List of fields which return primitive values in the schema, as tuples
-    with (CamelCase, lower_with_under) mapping.
-    '''
-    _metadata = None
-    _tokencounts = pd.DataFrame()
-    _line_chars = pd.DataFrame()
-
-    def __init__(self, obj, advanced=False, default_page_section='body'):
-        # Verify schema version
+    def parse(self, obj):
         self._schema = obj['features']['schemaVersion']
         if self._schema not in self.SUPPORTED_SCHEMA:
             logging.warning('Schema version of imported (%s) file does not match '
-                         'the supported version (%s)' %
+                         'the supported versions (%s). Update your files or use an older '
+                         'version of the library' %
                          (obj['features']['schemaVersion'],
                           self.SUPPORTED_SCHEMA))
-        self.id = obj['id']
+            
         self._pages = obj['features']['pages']
-        self.default_page_section = default_page_section
-
+        
+        # Anything in self.meta becomes an attribute in the volume
+        self.meta = dict(id=obj['id'])
+        
         # Expand basic values to properties
         for key, pythonkey in self.METADATA_FIELDS:
             if key in obj['metadata']:
-                setattr(self, pythonkey, obj['metadata'][key])
+                self.meta[pythonkey] = obj['metadata'][key]
         for key, pythonkey in self.BASIC_FIELDS:
             if key in obj['features']:
-                setattr(self, pythonkey, obj['features'][key])
+                self.meta[pythonkey] = obj['features'][key]
+        
+        if 'language' in self.meta:
+            if (self._schema in ['2.0', '3.0']) and (self.meta['language'] in ['jpn', 'chi']):
+                logging.warning("This version of the EF dataset has a tokenization bug "
+                            "for Chinese and Japanese. See " "https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
+        
+        # TODO collect while iterating earlier
+        self.seqs = [int(page['seq']) for page in self._pages]
+    
+    def _parse_meta(self):
+        pass
+    
+    def _make_page_feature_df(self):
+        # Parse basic page features
+        # saves a DF to self.page_features where the index is the seq
+        # number and the columns are the values of PAGE_FIELDS
+        page_features = pd.DataFrame([{k:v for k,v in page.items() 
+                                   if k in self.PAGE_FIELDS} 
+                                  for page in self._pages])
+        page_features['seq'] = pd.to_numeric(page_features['seq'])
+        page_features = page_features.rename(columns={'seq':'page'})
+        return page_features.set_index('page')
+        
+    def _make_section_feature_df(self):
+        # Parse non-token section-specific features
+        # saves a DF to self.section_features where the index is
+        # (seq, section) and the columns are the values of
+        # section_feature_list
+        collector = []
+        for page in self._pages:
+            for sec in SECREF:
+                row = { feat: page[sec][feat] 
+                       for feat in self.SECTION_FIELDS }
+                row['page'] = int(page['seq'])
+                row['section'] = sec
+                collector.append(row)
+        return pd.DataFrame(collector).set_index(['page', 'section'])
+    
+    @property
+    def token_freqs(self):
+        ''' Returns a dataframe of page / section /count '''
+        if not self._token_freqs:
+            d = [{'page': int(page['seq']), 'section': sec,
+                 'count':page[sec]['tokenCount']} for page 
+                 in self._pages for sec in SECREF]
+            self._token_freqs = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
+        return self._token_freqs
+        
+    def _make_tokencount_df(self, pages=False):
+        '''
+        Returns a Pandas dataframe of:
+            page / section / place(i.e. begin/end) / char / count
+            
+        If no page JSON is provided, internal representation will be used.
+        '''
+        if not pages:
+            pages = self._pages
 
-        if (hasattr(self, 'genre') and 
-            obj['metadata']['schemaVersion'] in ["1.0", "2.0"]):
-            self.genre = self.genre.split(", ")
+        tname = 'tokenPosCount'
 
-        self._has_advanced = False
+        # Make structured numpy array
+        # Because it is typed, this approach is ~40x faster than earlier
+        # methods
+        m = sum([page['tokenCount'] for page in pages])
+        arr = np.zeros(m, dtype=[(str('page'), str('u8')),
+                                 (str('section'), str('U6')),
+                                 (str('token'), str('U64')),
+                                 (str('pos'), str('U6')),
+                                 (str('count'), str('u4'))])
+        i = 0
+        for page in pages:
+            for sec in ['header', 'body', 'footer']:
+                for token, posvalues in iteritems(page[sec][tname]):
+                    for pos, value in iteritems(posvalues):
+                        arr[i] = (page['seq'], sec, token, pos, value)
+                        i += 1
+                        if (i > m+1):
+                            logging.error("This volume has more token info "
+                                          "than the internal representation "
+                                          "allows. Email organisciak@gmail.com"
+                                          "to let the library author know!")
 
-        if advanced:
-            if self._schema != '2.0':
-                logging.warning("Only schema 2.0 supports advanced files."
-                             "Ignoring")
-            else:
-                self._has_advanced = True
-                # Create an internal dataframe for lineChar counts
-                self._line_chars = self._make_line_char_df(advanced['pages'])
-                
-        if (self._schema in ['2.0', '3.0']) and (self.language in ['jpn', 'chi']):
-            logging.warning("This version of the EF dataset has a tokenization bug for Chinese and Japanese."
-                         "See https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
+        # Create a DataFrame
+        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
+                                              'token', 'pos'])
+        df.sort_index(inplace=True, level=0, sort_remaining=True)
+        return df
+            
+    def _make_line_char_df(self, pages=False):
+        '''
+        Returns a Pandas dataframe of:
+            page / section / place(i.e. begin/end) / char / count
 
+        Provide an array of pages that hold beginLineChars and endLineChars.
+        '''
+        
+        # Default to using the internal _pages json, but allow for
+        # Parsing function to be used independently
+        if not pages:
+            pages = self._pages
+
+        if self._schema == '3.0':
+            logging.warning("Adapted to erroneous key names in schema 3.0.")
+            place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
+        else:
+            place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
+           
+        
+        # Make structured numpy array
+        # Because it is typed, this approach is ~40x faster than earlier
+        # methods
+        m = len(pages) * 3 * 2  # Pages * section types * places
+        arr = np.zeros(int(m*100), dtype=[(str('page'), str('u8')),
+                                          (str('section'), str('U6')),
+                                          (str('place'), str('U5')),
+                                          (str('char'), str('U1')),
+                                          (str('count'), str('u8'))])
+        i = 0
+        for page in pages:
+            for sec in ['header', 'body', 'footer']:
+                for place, json_key in  place_key:
+                    for char, value in iteritems(page[sec][json_key]):
+                        arr[i] = (page['seq'], sec, place, char, value)
+                        i += 1
+
+        # Create a DataFrame
+        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
+                                              'place', 'char'])
+        df.sort_index(0, inplace=True)
+        return df
+    
+class parquetVolumeParser(baseVolumeParser):
+    '''
+        This Volume parser allows for Feature Reader data to be loaded from a
+        parquet format, which allows JSON decompression, parsing, and processing
+        to be avoided.
+        
+        The FeatureReader files that can be loaded are the same ones used internally:
+        metadata (as JSON), token counts, line character counts, and
+        page+section level features. The non-section specific features aren't supported.
+        
+        These are essentially what is held internally in a Volume (vol.parser.meta,
+        vol._tokencounts, vol._line_chars, vol._section_features) so 
+        this parser doesn't provide much fanciness beyond loading.
+        
+        TO LOAD DATA
+        By default, the loading enforces a filename convention, and the path provided
+        to the parser should avoid the file extension. The filename convention is
+            - ../{htid}.meta.json
+            - ../{htid}.tokens.parquet
+            - ../{htid}.chars.parquet
+            - ../{htid}.section.parquet
+        
+        If assume_filenames is False, you won't need to follow the filename convention, and
+        instead provide a tuple of the filenames. This is not currently implemented.
+    '''
+        
+    
+    def __init__(self, path=False, id=False, assume_filenames=True, **kwargs):
+
+        if id:
+            raise Exception("id not currently supported in parquetVolumeParser")
+        if not assume_filenames:
+            raise Exception("assume_filenames currently cannot be false. See docstring "
+                            "for parquetVolumeParser")
+        
+        self.meta_path = path + '.meta.json'
+        self.token_path = path + '.tokens.parquet'
+        self.char_path = path + '.chars.parquet'
+        self.section_path = path + '.section.parquet'
+        
+        if os.path.exists(self.meta_path):
+            with open(self.meta_path, mode='r') as f:
+                self.meta = json.load(f)
+        else:
+            self.meta = dict(id=None, handle_url=None, title=None)
+        
+        self.read()
+        self.parse()
+    
+    def read(self):
+        pass
+    
+    def parse(self):
+        if not self.meta['id']:
+            # Parse from filename
+            filename = os.path.split(self.tokencount_path)[-1]
+            self.meta['id'] = os.path.splitext(filename)[0].replace("+", ":").replace("=", "/").replace(",", ".")
+        
+        if not self.meta['handle_url']:
+            self.meta['handle_url'] = "http://hdl.handle.net/2027/%s" % self.meta['id']
+            
+        if not self.meta['title']:
+            self.meta['title'] = self.meta['id']
+    
+    def _make_tokencount_df(self):
+        if not os.path.exists(self.token_path):
+            raise Exception("No token information available")
+            
+        df = pd.read_parquet(self.token_path)
+        indcols = [col for col in ['page', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
+        if len(indcols):
+            df = df.set_index(indcols)
+        return df
+        
+        return self._tokencount_df
+        ''' Dummy: data already read at init and cached.'''
+        return self._tokencount_df
+    
+    def _make_line_char_df(self):
+        if not os.path.exists(self.char_path):
+            raise Exception("No line char information available")
+            
+        df = pd.read_parquet(self.char_path)    
+        return df 
+        
+    def _make_section_feature_df(self):
+        if not os.path.exists(self.section_path):
+            raise Exception("No page+section information available")
+            
+        df = pd.read_parquet(self.section_path)    
+        return df 
+    
+    def _make_page_feature_df(self):
+        raise Exception("parquet parser doesn't support non-token, non-section page features")
+
+    def _parse_meta(self):
+        pass
+    
+class Volume(object):
+
+    def __init__(self, path=False, id=False, parser='json', default_page_section='body', **kwargs):
+        '''
+        The Volume allows simplified, Pandas-based access to the HTRC
+        Extracted Features files.
+        
+        This class recruits a VolumeParser class to read its data and parse
+        it to up to four dataframes:
+            - tokencounts : Case-sensitive, POS-tagged token counts,
+            per section (body/header/footer) and page.
+            - metadata : Data about the book.
+            - page features : Features specific to a pages.
+            - section features : Features specific to sections
+            (body/header/footer) of each page.
+        
+        Most of the time, the parser with be the default json parser, which
+        deals with the format that HTRC distributes, but for various reasons
+        you may want to use or write alternative formats. e.g. perhaps you
+        just need a nice view into the metadata, or hope for quicker access
+        specifically to tokencounts.
+        '''
+        self._tokencounts = pd.DataFrame()
+        self._line_chars = pd.DataFrame()
+        self._page_features = pd.DataFrame()
+        self._section_features = pd.DataFrame()
+        
+        self._extra_metadata = None
+        self.default_page_section = default_page_section
+        
+        if parser == 'json':
+            self.parser = jsonVolumeParser(path, id, **kwargs)
+        elif parser == 'parquet':
+            self.parser = parquetVolumeParser(path, id, **kwargs)
+        elif issubclass(parser, baseVolumeParser):
+            self.parser = parser(path, id, **kwargs)
+        else:
+            raise Exception("No valid parser defined.")
+            
+        self._update_meta_attrs()
+    
+    def _update_meta_attrs(self):
+        ''' Takes metadata from the parser's metadata variable and 
+        assigns it to attributes in the Volume '''
+        for k, v in self.parser.meta.items():
+            setattr(self, k, v)
 
     def __iter__(self):
         return self.pages()
@@ -395,6 +702,38 @@ class Volume(object):
             return html_template % (self.handle_url, self.title, ",".join(self.author), self.year, self.page_count, self.id)
         except:
             return "<strong><a href='%s'>%s</a></strong>" % (self.handle_url, self.title)
+
+    def page_features(self, feature='all', page_select=False):
+        if self._page_features.empty:
+            self._page_features = self.parser._make_page_feature_df()
+            
+        return self._get_basic_feature(self._page_features, section='all', feature=feature, page_select=page_select)
+    
+    def section_features(self, feature='all', section='default', page_select=False):
+        if self._section_features.empty:
+            self._section_features = self.parser._make_section_feature_df()
+        return self._get_basic_feature(self._section_features, section=section, feature=feature, page_select=page_select)
+
+    def _get_basic_feature(self, df, feature='all', section='default', page_select=False):
+        '''Selects a basic feature from a page_features or section_features dataframe'''
+        
+        if section == 'default':
+            section = self.default_page_section
+        
+        if page_select:
+            df = df.xs(page_select, level='page', drop_level=False)
+        
+        if feature is not 'all':
+            df = df[feature]
+
+        if section in ['header', 'body', 'footer']:
+            return df.xs(section, level='section')
+        elif section == 'all':
+            return df
+        elif section == 'group':
+            return df.sum()
+        else:
+            raise Exception("Bad Section Arg")
 
     @property
     def year(self):
@@ -415,7 +754,7 @@ class Volume(object):
 
         :return: A `pymarc` record. See pymarc's documentation for details on using it.
         """
-        if not self._metadata:
+        if not self._extra_metadata:
             logging.debug("Looking up full metadata for {0}".format(self.id))
             data = requests.get(self.ht_bib_url).json()
 
@@ -427,73 +766,61 @@ class Volume(object):
             xml_record = pymarc.parse_xml_to_array(xml_stream)[0]
             xml_stream.close()
 
-            self._metadata = xml_record
-        return self._metadata
+            self._extra_metadata = xml_record
+        return self._extra_metadata
 
-    def tokens(self, section='default', case=True):
+    def tokens(self, section='default', case=True, page_select=False):
         ''' Get unique tokens '''
-        tokens = self.tokenlist(section=section).index\
-                     .get_level_values('token').to_series()
+        tokens = (self.tokenlist(section=section, page_select=page_select)
+                  .index.get_level_values('token').to_series())
         if case:
             return tokens.unique().tolist()
         else:
             return tokens.str.lower().unique().tolist()
 
     def pages(self, **kwargs):
-        for page in self._pages:
-            yield Page(page, self, **kwargs)
+        ''' Iterate through Page objects with a reference to this class.
+            This is mostly a convenience these days - logic exists in
+            the Volume class.
+        '''
+        for seq in self.parser.seqs:
+            yield Page(seq, self, **kwargs)
 
     def tokens_per_page(self, **kwargs):
         '''
-        Return a one dimension pd.DataFrame of page lengths
+        Return a Series page lengths
         '''
-        if 'section' not in kwargs or kwargs['section'] == 'default':
-            section = self.default_page_section
-        else:
-            section = kwargs['section']
+        return self.section_features(feature='tokenCount')
 
-        d = [{'page': int(page['seq']), 'section': sec,
-              'count':page[sec]['tokenCount']}
-             for page in self._pages for sec in SECREF]
-        df = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
+    def line_counts(self, **kwargs):
+        ''' Return a Series of line counts, per page '''
+        return self.section_features(feature='lineCount', **kwargs)
 
-        if section in SECREF:
-            return df.loc[(slice(None), section), ].reset_index('section',
-                                                                drop=True)
-        elif section == 'all':
-            return df
-        elif section == 'group':
-            return df.groupby(level='page').sum()
-
-    def line_counts(self, section='default'):
-        ''' Return a list of line counts, per page '''
-        return [page.line_count(section=section) for page in self.pages()]
-
-    def empty_line_counts(self, section='default'):
+    def empty_line_counts(self, section='default', **kwargs):
         ''' Return a list of empty line counts, per page '''
-        return [page.empty_line_count(section=section)
-                for page in self.pages()]
+        return self.section_features(feature='emptyLineCount', **kwargs)
 
-    def cap_alpha_seq(self, section='body'):
+    def cap_alpha_seq(self, **kwargs):
         logging.warning("At the volume-level, use Volume.cap_alpha_seqs()")
-        return self.cap_alpha_seqs(section)
+        return self.cap_alpha_seqs(**kwargs)
 
-    def cap_alpha_seqs(self, section='body'):
+    def cap_alpha_seqs(self, section='body', **kwargs):
         ''' Return the longest length of consecutive capital letters starting a
         line on the page. Returns a list for all pages. Only includes the body:
         header/footer information is not included.
         '''
-        if section != 'body':
+        if ('section' in kwargs) and kwargs['section'] != 'body':
             logging.warning("cap_alpha_seq only includes counts for the body "
                          "section of pages.")
-        return [page.cap_alpha_seq() for page in self.pages()]
+            kwargs['section'] = 'body'
+        return self.section_features(feature='capAlphaSeq', **kwargs)
 
-    def sentence_counts(self, section='default'):
+    def sentence_counts(self, **kwargs):
         ''' Return a list of sentence counts, per page '''
-        return [page.sentence_count(section=section) for page in self.pages()]
+        return self.section_features(feature='sentenceCount', **kwargs)
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
-                  page_freq=False):
+                  page_freq=False, page_select=False, drop_section=False):
         ''' Get or set tokencounts DataFrame
 
         pages[bool]: Keep page-level info if true, else fold.
@@ -512,17 +839,51 @@ class Volume(object):
 
         page_freq[bool] : Whether to count page frequency (1 if it occurs on
         the page, else 0) or a term frequency (counts for the term, per page)
+        
+        page_select[int] : Page sequence number for optionally choosing just one
+            page.
+            
+        drop_section[bool]: Whether to drop the index level refering to the section.
+        
         '''
         if section == 'default':
             section = self.default_page_section
+        
+        assert not (page_select and not pages)
 
         # Create the internal representation if it does not already
         # exist. This will only need to exist once
         if self._tokencounts.empty:
-            self._tokencounts = self._make_tokencount_df(self._pages)
+            self._tokencounts = self.parser._make_tokencount_df()
+        
+        assert(('token' in self._tokencounts.index.names) or ('lower' in self._tokencounts.index.names))
+        
+        # Allow incomplete internal representations, as long as the args don't want the missing
+        # data
+        for arg, column in [(pages, 'page'), (page_select, 'page'), (case, 'token'),
+                            (pos, 'pos')]:
+            if arg and column not in self._tokencounts.index.names:
+                raise Exception("Your internal tokenlist representation does not have enough "
+                                "information for the current args. Missing column: %s" % column)
+        
+        if page_select:
+            try:
+                df = self._tokencounts.xs(page_select,
+                                          level='page', drop_level=False)
+            except KeyError:
+                # Empty tokenlist
+                return self._tokencounts.iloc[0:0]
+        else:
+            df = self._tokencounts
 
-        return group_tokenlist(self._tokencounts, pages=pages, section=section,
+        df = group_tokenlist(df, pages=pages, section=section,
                                case=case, pos=pos, page_freq=page_freq)
+        
+        if drop_section:
+            return df.droplevel('section')
+        else:
+            return df
+        
 
     def term_page_freqs(self, page_freq=True, case=True):
         ''' Return a term frequency x page matrix, or optionally a
@@ -556,103 +917,75 @@ class Volume(object):
         '''
         return self.line_chars(place='begin', **args)
 
-    def line_chars(self, section='default', place='all'):
+    def line_chars(self, section='default', place='all', page_select=False):
         '''
         Interface for all begin/end of line character information.
         '''
-        if self._schema == '2.0' and not self._has_advanced:
-            logging.error("For schema version 2.0, you need load the "
-                          "'advanced' file for begin/endLineChars")
-            return
 
+        # Create the internal representation
+        if self._line_chars.empty:
+            self._line_chars = self.parser._make_line_char_df()
+        
+        df = self._line_chars
+        if page_select:
+            try:
+                df = df.xs(page_select, level='page',
+                                         drop_level=False)
+            except KeyError:
+                # Empty tokenlist
+                return self._line_chars.iloc[0:0]
+            
         if section == 'default':
             section = self.default_page_section
 
-        if self._line_chars.empty and self._has_advanced:
-            logging.error("Something went wrong. Expected Advanced features"
-                          " to already be processed")
-            return
-        elif self._line_chars.empty and not self._has_advanced:
-            self._line_chars = self._make_line_char_df(self._pages)
-
-        df = self._line_chars
         return group_linechars(df, section=section, place=place)
-
-    def _make_tokencount_df(self, pages):
+    
+    def save_parquet(self, path, meta=True, tokens=True, chars=False, 
+                     section_features=False, compression='snappy',
+                     token_kwargs=dict(section='all', drop_section=False)
+                     ):
         '''
-        Returns a Pandas dataframe of:
-            page / section / place(i.e. begin/end) / char / count
-        '''
-        if self._schema == '1.0':
-            tname = 'tokens'
-        else:
-            tname = 'tokenPosCount'
-
-        # Make structured numpy array
-        # Because it is typed, this approach is ~40x faster than earlier
-        # methods
-        m = sum([page['tokenCount'] for page in pages])
-        arr = np.zeros(m, dtype=[(str('page'), str('u8')),
-                                 (str('section'), str('U6')),
-                                 (str('token'), str('U64')),
-                                 (str('pos'), str('U6')),
-                                 (str('count'), str('u4'))])
-        i = 0
-        for page in pages:
-            for sec in ['header', 'body', 'footer']:
-                for token, posvalues in iteritems(page[sec][tname]):
-                    for pos, value in iteritems(posvalues):
-                        arr[i] = (page['seq'], sec, token, pos, value)
-                        i += 1
-                        if (i > m+1):
-                            logging.error("This volume has more token info "
-                                          "than the internal representation "
-                                          "allows. Email organisciak@gmail.com"
-                                          "to let the library author know!")
-
-        # Create a DataFrame
-        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
-                                              'token', 'pos'])
-        df.sort_index(inplace=True, level=0, sort_remaining=True)
-        return df
-
-    def _make_line_char_df(self, pages):
-        '''
-        Returns a Pandas dataframe of:
-            page / section / place(i.e. begin/end) / char / count
-
-        Provide an array of pages that hold beginLineChars and endLineChars.
-        '''
-        if self._schema == '3.0':
-            logging.warning("Adapted to erroneous key names in schema 3.0.")
-            place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
-        else:
-            place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
-           
+        Save the internal representations of feature data to parquet, and the metadata to json,
+        using the naming convention used by parquetVolumeParser.
         
-        # Make structured numpy array
-        # Because it is typed, this approach is ~40x faster than earlier
-        # methods
-        m = len(pages) * 3 * 2  # Pages * section types * places
-        arr = np.zeros(int(m*100), dtype=[(str('page'), str('u8')),
-                                          (str('section'), str('U6')),
-                                          (str('place'), str('U5')),
-                                          (str('char'), str('U1')),
-                                          (str('count'), str('u8'))])
-        i = 0
-        for page in pages:
-            for sec in ['header', 'body', 'footer']:
-                for place, json_key in  place_key:
-                    for char, value in iteritems(page[sec][json_key]):
-                        arr[i] = (page['seq'], sec, place, char, value)
-                        i += 1
-
-        # Create a DataFrame
-        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
-                                              'place', 'char'])
-        df.sort_index(inplace=True)
-        return df
+        The primary use is for converting the feature files to something more efficient. By default,
+        only metadata and tokencounts are saved.
         
+        Saving page features is currently unsupported, as it's an ill-fit for parquet. This is currently
+        just the language-inferences for each page - everything else is in section features 
+        (page by body/header/footer).
+        
+        Since Volumes partially support incomplete dataframes, you can pass Volume.tokenlist arguments
+        as a dict with token_kwargs. For example, if you want to save a representation with only body
+        information, drop the 'section' level of the index, and fold part-of-speech counts, you can pass
+        token_kwargs=dict(section='body', drop_section=True, pos=False).
+        '''
+        fname_root = os.path.join(path, self.id)
+        
+        if meta:
+            with open(fname_root + '.meta.json', mode='w') as f:
+                json.dump(self.parser.meta, f)
+        
+        if tokens:
+            try:
+                feats = self.tokenlist(**token_kwargs)
+            except:
+                # In the internal representation is incomplete, returning the above may fail,
+                # but the cache may have an acceptable dataset to return
+                feats = self._tokencounts
+            if not feats.empty:
+                feats.to_parquet(fname_root + '.tokens.parquet', compression=compression)
+            
+        if section_features:
+            feats = self.section_features(section='all')
+            if not feats.empty:
+                feats.to_parquet(fname_root + '.section.parquet', compression=compression)
+            
+        if chars:
+            feats = self.line_chars()
+            if not feats.empty:
+                feats.to_parquet(fname_root + '.chars.parquet', compression=compression)
+    
     def __str__(self):
         def truncate(s, maxlen):
             if len(s) > maxlen:
@@ -661,11 +994,8 @@ class Volume(object):
                 return s.strip()
         return "<Volume: %s (%s) by %s>" % (truncate(self.title, 30), self.year, truncate(self.author[0], 40))
 
-
 class Page:
 
-    _tokencounts = pd.DataFrame()
-    _line_chars = pd.DataFrame()
     BASIC_FIELDS = [('seq', 'seq'), ('tokenCount', '_token_count'),
                     ('languages', 'languages')]
     ''' List of fields which return primitive values in the schema, as tuples
@@ -674,44 +1004,22 @@ class Page:
                       'capAlphaSeq']
     ''' Fields that are counted by section.'''
 
-    def __init__(self, pageobj, volume, default_section='body'):
-        self.volume = volume
+    def __init__(self, seq, volume, default_section='body'):
         self.default_section = default_section
-        self._json = pageobj
+        self.volume = volume
+        self.seq = int(seq)
 
         assert(self.default_section in SECREF + ['all', 'group'])
 
-        for key, pythonkey in self.BASIC_FIELDS:
-            if key in pageobj:
-                setattr(self, pythonkey, pageobj[key])
-
-        arr = np.zeros((len(SECREF), len(self.SECTION_FIELDS)), dtype='u4')
-        for i, sec in enumerate(SECREF):
-                for j, stat in enumerate(self.SECTION_FIELDS):
-                            if stat in self._json[sec]:
-                                arr[i, j] = self._json[sec][stat]
-                            else:
-                                arr[i, j] = 0
-        self._basic_stats = pd.DataFrame(arr, columns=self.SECTION_FIELDS,
-                                         index=SECREF)
-
-    def tokens(self, section='default', case=True):
-        ''' Get unique tokens '''
-        tokens = self.tokenlist(section=section).index\
-                     .get_level_values('token').to_series()
-        if case:
-            return tokens.unique().tolist()
-        else:
-            return tokens.str.lower().unique().tolist()
-
-    def count(self):
-        return self._df['count'].astype(int).sum()
+    def tokens(self, **kwargs):
+        ''' Get unique tokens. Use args from Volume. '''
+        return self.volume.tokens(page_select=self.seq, **kwargs)
 
     def line_count(self, section='default'):
-        return self._get_basic_stat(section, 'lineCount')
+        return self.volume.section_features(page_select=self.seq, feature='lineCount').values[0]
 
     def empty_line_count(self, section='default'):
-        return self._get_basic_stat(section, 'emptyLineCount')
+        return self.volume.section_features(page_select=self.seq, feature='emptyLineCount').values[0]
 
     def cap_alpha_seq(self, section='body'):
         ''' Return the longest length of consecutive capital letters starting a
@@ -721,123 +1029,33 @@ class Page:
         if section != 'body':
             logging.warning("cap_alpha_seq only includes counts for the body "
                          "section of pages.")
-        return self._get_basic_stat('body', 'capAlphaSeq')
+        return self.volume.cap_alpha_seqs(page_select=self.seq).values[0]
 
     def sentence_count(self, section='default'):
-        return self._get_basic_stat(section, 'sentenceCount')
+        return self.volume.sentence_counts(page_select=self.seq).values[0]
 
-    def _get_basic_stat(self, section, stat):
-        if stat is 'all':
-            # Return all columns. No publicized currently
-            stat = slice(None)
-
-        if section == 'default':
-            section = self.default_section
-
-        if section in ['header', 'body', 'footer']:
-            return self._basic_stats.loc[section, stat]
-        elif section == 'all':
-            return self._basic_stats.loc[:, stat]
-        elif section == 'group':
-            return self._basic_stats.loc[:, stat].sum()
-
-    def tokenlist(self, section='default', case=True, pos=True):
-        ''' Get or set tokencounts DataFrame
-
-        section[string]: Which part of the page to return. In addition to
-            'header', 'body', and 'footer', 'all' will return a DataFrame with
-            all the sections, 'group' will sum all sections,
-            section in ['header', 'footer', 'body'] will return those fields
-            section == 'all' will group and sum all sections
-            section == 'default' falls back on what the page object has saved
-
-        case[bool] : Preserve case, or fold. To save processing, it's likely
-                    more efficient to calculate lowercase later in the process:
-                    if you want information for all pages, first collect your
-                    information case-sensitive, then fold at the end.
-
-        pos[bool] : Specify whether to return frequencies per part of speech,
-                    or simply by word
+    def tokenlist(self, **kwargs):
         '''
-        section = self.default_section if section == 'default' else section
-
-        # If there are no tokens, return an empty dataframe
-        if self._token_count == 0:
-            emptycols = ['page']
-            if section in SECREF + ['all']:
-                emptycols.append('section')
-            emptycols.append('token' if case else 'lowercase')
-            if pos:
-                emptycols.append('pos')
-            emptycols.append('count')
-            return pd.DataFrame([], columns=emptycols)
-
-        # If there's a volume-level representation, simply pull from that
-        elif not self.volume._tokencounts.empty:
-            try:
-                df = self.volume._tokencounts.loc[([int(self.seq)]), ]
-            except:
-                logging.error("Error subsetting volume DF for seq:{}".format(
-                              self.seq))
-                return
-
-        # Create the internal representation if it does not already
-        # This will only need to be created once
-        elif self._tokencounts.empty:
-            # Using the DF building method from Volume
-            self._tokencounts = self.volume._make_tokencount_df([self._json])
-            df = self._tokencounts
-        else:
-            df = self._tokencounts
-
-        return group_tokenlist(df, pages=True, section=section, case=case,
-                               pos=pos)
-
-    def end_line_chars(self, section='default'):
-        return self.line_chars(section=section, place='end')
-
-    def begin_line_chars(self, section='default'):
-        return self.line_chars(section=section, place='begin')
-
-    def line_chars(self, section='default', place='all'):
+        Get tokencounts DataFrame.Use args from Volume.tokenlist().
         '''
-        Get a dataframe of character counts at the start and end of lines
+        return self.volume.tokenlist(page_select=self.seq, **kwargs)
+
+    def end_line_chars(self, **kwargs):
+        return self.line_chars(place='end', **kwargs)
+
+    def begin_line_chars(self, **kwargs):
+        return self.line_chars(place='begin', **kwargs)
+
+    def line_chars(self, **kwargs):
         '''
-        section = self.default_section if section == 'default' else section
+        Get a dataframe of character counts at the start and end of lines. Use
+        args from Volume.line_chars().
+        '''
+        return self.volume.line_chars(page_select=self.seq, **kwargs)
 
-        # If there are no tokens, return an empty dataframe
-        if self._token_count == 0:
-            emptycols = ['page']
-            if section in SECREF + ['all']:
-                emptycols.append('section')
-            if place in ['begin', 'end', 'all']:
-                emptycols.append('place')
-            emptycols.append('character')
-            emptycols.append('count')
-            return pd.DataFrame([], columns=emptycols)
-
-        # If there's a volume-level representation, simply pull from that
-        elif not self.volume._line_chars.empty:
-            try:
-                self._line_chars = self.volume._line_chars\
-                                       .loc[([int(self.seq)]), ]
-            except:
-                logging.error("Error subsetting volume DF for seq:{}".format(
-                              self.seq))
-                return
-
-        # Create the internal representation if it does not already exist
-        # Since the code is the same, we'll use the definition from Volume
-        elif self._line_chars.empty:
-            self._line_chars = self.volume._make_line_char_df(self,
-                                                              [self._json])
-        df = self._line_chars
-
-        return group_linechars(df, section=section, place=place)
-
-    def token_count(self, section='default'):
+    def token_count(self, **kwargs):
         ''' Count total tokens on the page '''
-        return self.tokenlist(section=section)['count'].sum()
+        return self.volume.section_features(page_select=self.seq, feature='tokenCount', **kwargs).values[0]
 
     def __str__(self):
         if self.volume:
