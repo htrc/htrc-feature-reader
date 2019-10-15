@@ -124,7 +124,19 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
             return df.reset_index().groupby(['page']+groups).apply(set_to_one)\
                      .groupby(groups).sum()[['count']]
 
-
+def fold_pages(page_list, chunkname):
+    '''
+    Fold the tokenlist from a provided list of page tokenlists,
+    replacing the page with a named 'chunk'
+    '''
+    chunk = pd.concat(page_list, sort=False)
+    indexnames = chunk.index.names
+    newindex = [v if v != 'page' else 'chunk'  for v in indexnames]
+    
+    chunk['chunk'] = chunkname
+    grouped = chunk.reset_index().groupby(newindex)[['count']].sum()
+    return grouped
+        
 def group_linechars(df, section='all', place='all'):
 
     # Set up grouping
@@ -820,7 +832,9 @@ class Volume(object):
         return self.section_features(feature='sentenceCount', **kwargs)
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
-                  page_freq=False, page_select=False, drop_section=False):
+                  page_freq=False, page_select=False, drop_section=False,
+                  htid=False, **kwargs):
+
         ''' Get or set tokencounts DataFrame
 
         pages[bool]: Keep page-level info if true, else fold.
@@ -844,7 +858,8 @@ class Volume(object):
             page.
             
         drop_section[bool]: Whether to drop the index level refering to the section.
-        
+
+        htid[bool]: whether to add an index level with the htid included.
         '''
         if section == 'default':
             section = self.default_page_section
@@ -880,10 +895,13 @@ class Volume(object):
                                case=case, pos=pos, page_freq=page_freq)
         
         if drop_section:
-            return df.droplevel('section')
-        else:
-            return df
+            df = return df.droplevel('section')
         
+        if htid:
+            # Prepent level with htid
+            df = pd.concat([df], keys=[self.id], names=['htid'])
+        
+        return df
 
     def term_page_freqs(self, page_freq=True, case=True):
         ''' Return a term frequency x page matrix, or optionally a
@@ -894,6 +912,92 @@ class Volume(object):
                            .pivot(index='page', columns='token',
                                   values='count')\
                            .fillna(0)
+    
+    def chunked_tokenlist(self, chunk_target = 10000, max_adjust=1000, **kwargs):
+        '''
+        Return a tokenlist grouped by numbered 'chunks', which are roughly `chunk_target`
+        sized.
+        
+        Pass arguments to tokenlist() for the proper pos, case, and section args.
+        
+        Strategy:
+        - pages are collected together until their word count is > chunk_target
+        - chunk_target is adjusted slightly to minimize the size of straggler chunks
+        - `max_adjust` limits how much the chunk size target can deviate - any difference
+            is split between the first and last chunks so that the remaining chunks are
+            more intact
+        
+        '''
+        # Chunking won't work with pages=False
+        kwargs['pages'] = True
+        tl = self.tokenlist(**kwargs)
+        
+        if tl.empty:
+            tl = tl.copy()
+            tl.columns = [col if col != 'page' else 'chunk'  for col in tl.columns]
+            return tl
+
+        tokens_per_page = self.tokens_per_page()
+        ntokens = tokens_per_page.sum(axis=0).values[0]
+
+        if ntokens < chunk_target:
+            # Avoid division by zero errors.
+            chunk_target = ntokens
+            
+        nchunks = int(ntokens/chunk_target)
+
+        
+        overflow = (ntokens % chunk_target)
+        avg_page_n = ntokens / self.page_count
+
+        # If the remainder is more than half of a chunk, a new chunk will be created
+        # and difference will be distributed by subtracting from all the chunks
+        if overflow > chunk_target/2:
+            overflow -= chunk_target
+            nchunks += 1
+
+        if np.abs(overflow) > (nchunks * max_adjust):
+            # Limit how much of the overflow we distribute across 
+            # all chunks, distributing the rest across the first and last
+            edgeadjust = .5 * (overflow - np.sign(overflow)*max_adjust*nchunks)
+            overflow = np.sign(overflow)*max_adjust
+        else:
+            edgeadjust = 0
+
+        chunk_target += int(overflow / nchunks)
+        
+        counter = 0
+        chunkname = 1
+        page_collector = []
+        chunk_collector = []
+
+        groups = tl.groupby(level='page')
+
+        for pagen, group in groups:
+            ntokens = group['count'].sum()
+
+            page_collector.append(group)
+            counter += ntokens
+
+            firstchunk_full = (edgeadjust and (chunkname == 1) and (counter > (chunk_target + edgeadjust - avg_page_n/2)))
+            regularchunk_full = (counter > (chunk_target - avg_page_n/2))
+
+            
+            if (firstchunk_full or regularchunk_full) and len(page_collector) and (chunkname < nchunks):
+                chunk = fold_pages(page_collector, chunkname)
+                chunk_collector.append(chunk)
+
+                chunkname += 1
+                page_collector = []
+                counter = 0
+
+        # Finally
+        if len(page_collector):
+            chunk = fold_pages(page_collector, chunkname)
+            chunk_collector.append(chunk)
+
+        chunked_tl = pd.concat(chunk_collector)
+        return chunked_tl
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
