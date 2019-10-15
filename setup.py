@@ -1,12 +1,11 @@
 from setuptools import setup
 
 setup(name='htrc-feature-reader',
-      version='2.00',
+      version='2.01',
       description='Library for working with the HTRC Extracted Features dataset',
       classifiers=[
           'Development Status :: 5 - Production/Stable',
           'License :: OSI Approved :: University of Illinois/NCSA Open Source License',
-          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3.5',
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7',
