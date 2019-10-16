@@ -895,7 +895,7 @@ class Volume(object):
                                case=case, pos=pos, page_freq=page_freq)
         
         if drop_section:
-            df = return df.droplevel('section')
+            df = df.droplevel('section')
         
         if htid:
             # Prepent level with htid
