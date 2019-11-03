@@ -10,6 +10,7 @@ import pymarc
 from six import iteritems, StringIO, BytesIO
 import codecs
 import os
+from htrc_features import utils
 
 try:
     import ujson as json
@@ -937,8 +938,7 @@ class Volume(object):
             tl.columns = [col if col != 'page' else 'chunk'  for col in tl.columns]
             return tl
 
-        tokens_per_page = self.tokens_per_page()
-        ntokens = tokens_per_page.sum(axis=0).values[0]
+        ntokens = self.tokens_per_page().sum()
 
         if ntokens < chunk_target:
             # Avoid division by zero errors.
@@ -1064,7 +1064,7 @@ class Volume(object):
         information, drop the 'section' level of the index, and fold part-of-speech counts, you can pass
         token_kwargs=dict(section='body', drop_section=True, pos=False).
         '''
-        fname_root = os.path.join(path, self.id)
+        fname_root = os.path.join(path, utils.clean_htid(self.id))
         
         if meta:
             with open(fname_root + '.meta.json', mode='w') as f:

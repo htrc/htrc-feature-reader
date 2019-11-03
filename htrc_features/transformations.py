@@ -37,7 +37,7 @@ def chunk_to_wem(chunk_tl, model, vocab=None, stop=True, log=True, min_ncount=10
         counts = np.log(1+counts)
 
     if counts.shape[0] != all_vecs.shape[0]:
-        raise BaseException("Counts and all_vecs don't align. Like, this means there are duplicated tokens in the data"
+        raise BaseException("Counts and all_vecs don't align. Likely, this means there are duplicated tokens in the data"
                            " e.g. Passing in a dataframe with counts for multiple pages/chunks")
 
     doc_wem = np.dot(all_vecs.T, counts)
