@@ -914,12 +914,12 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
     
-    def chunked_tokenlist(self, chunk_target = 10000, max_adjust=1000, **kwargs):
+    def chunked_tokenlist(self, chunk_target = 10000, max_adjust=1000, page_ref=False, **kwargs):
         '''
         Return a tokenlist grouped by numbered 'chunks', which are roughly `chunk_target`
         sized.
         
-        Pass arguments to tokenlist() for the proper pos, case, and section args.
+        Passes arguments to tokenlist() for the proper pos, case, and section args.
         
         Strategy:
         - pages are collected together until their word count is > chunk_target
@@ -933,6 +933,12 @@ class Volume(object):
         kwargs['pages'] = True
         tl = self.tokenlist(**kwargs)
         
+        if 'chunk' in tl.index.names:
+            logging.warn('The internal representation of the tokenlist is already chunked,'
+                        ' so returning that. The parameters (e.g. word target per chunk)'
+                        ' are not known.')
+            return tl
+            
         if tl.empty:
             tl = tl.copy()
             tl.columns = [col if col != 'page' else 'chunk'  for col in tl.columns]
@@ -970,10 +976,22 @@ class Volume(object):
         chunkname = 1
         page_collector = []
         chunk_collector = []
+        first_page = None
 
         groups = tl.groupby(level='page')
 
+        def add_page_ref(chunk, first, last):
+            ''' Add reference for the page range used in the chunk'''
+            chunk['pstart'] = first
+            chunk['pend'] = last
+            inames = chunk.index.names
+            return (chunk.set_index(['pstart', 'pend'], append=True)
+                          .reorder_levels(['chunk', 'pstart', 'pend'] + inames[1:])
+                   )
+        
         for pagen, group in groups:
+            if not first_page:
+                first_page = pagen
             ntokens = group['count'].sum()
 
             page_collector.append(group)
@@ -985,8 +1003,12 @@ class Volume(object):
             
             if (firstchunk_full or regularchunk_full) and len(page_collector) and (chunkname < nchunks):
                 chunk = fold_pages(page_collector, chunkname)
+                
+                if page_ref:
+                    chunk = add_page_ref(chunk, first_page, pagen)
+                    first_page = None
+                    
                 chunk_collector.append(chunk)
-
                 chunkname += 1
                 page_collector = []
                 counter = 0
@@ -994,6 +1016,8 @@ class Volume(object):
         # Finally
         if len(page_collector):
             chunk = fold_pages(page_collector, chunkname)
+            if page_ref:
+                    chunk = add_page_ref(chunk, first_page, pagen)
             chunk_collector.append(chunk)
 
         chunked_tl = pd.concat(chunk_collector)
