@@ -38,6 +38,8 @@ except ImportError:
 # UTILS
 SECREF = ['header', 'body', 'footer']
 
+class MissingDataError(Exception):
+    pass
 
 def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
                     page_freq=False, pagecolname='page'):
@@ -623,7 +625,7 @@ class parquetVolumeParser(baseVolumeParser):
     
     def _make_tokencount_df(self):
         if not os.path.exists(self.token_path):
-            raise Exception("No token information available")
+            raise MissingDataError("No token information available")
             
         df = pd.read_parquet(self.token_path)
         indcols = [col for col in ['page', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
@@ -637,14 +639,14 @@ class parquetVolumeParser(baseVolumeParser):
     
     def _make_line_char_df(self):
         if not os.path.exists(self.char_path):
-            raise Exception("No line char information available")
+            raise MissingDataError("No line char information available")
             
         df = pd.read_parquet(self.char_path)    
         return df 
         
     def _make_section_feature_df(self):
         if not os.path.exists(self.section_path):
-            raise Exception("No page+section information available")
+            raise MissingDataError("No page+section information available")
             
         df = pd.read_parquet(self.section_path)    
         return df 
@@ -803,9 +805,13 @@ class Volume(object):
 
     def tokens_per_page(self, **kwargs):
         '''
-        Return a Series page lengths
+        Return a Series of page lengths
         '''
-        return self.section_features(feature='tokenCount')
+        try:
+            tokencounts = self.section_features(feature='tokenCount')
+        except MissingDataError:
+            tokencounts = self.tokenlist(pos=False, case=False).groupby(level=self._pagecolname).sum()['count']
+        return tokencounts
 
     def line_counts(self, **kwargs):
         ''' Return a Series of line counts, per page '''
@@ -923,7 +929,7 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
     
-    def chunked_tokenlist(self, chunk_target = 10000, max_adjust=1000, page_ref=False, **kwargs):
+    def chunked_tokenlist(self, chunk_target = 10000, max_adjust=1000, page_ref=False, suppress_warning=False, **kwargs):
         '''
         Return a tokenlist grouped by numbered 'chunks', which are roughly `chunk_target`
         sized.
@@ -943,9 +949,10 @@ class Volume(object):
         tl = self.tokenlist(**kwargs)
         
         if 'chunk' in tl.index.names:
-            logging.warn('The internal representation of the tokenlist is already chunked,'
-                        ' so returning that. The parameters (e.g. word target per chunk)'
-                        ' are not known.')
+            if not suppress_warning:
+                logging.warn('The internal representation of the tokenlist is already chunked,'
+                            ' so returning that. The parameters (e.g. word target per chunk)'
+                            ' are not known.')
             return tl
             
         if tl.empty:
