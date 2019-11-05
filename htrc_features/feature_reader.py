@@ -40,7 +40,7 @@ SECREF = ['header', 'body', 'footer']
 
 
 def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
-                    page_freq=False):
+                    page_freq=False, pagecolname='page'):
     '''
         Return a token count dataframe with requested folding.
 
@@ -53,11 +53,13 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
         pos[bool]: If true, return tokens facets by part-of-speech.
         page_freq[bool]: If true, will simply count whether or not a token is
         on a page. Defaults to false.
+        pagecolname[string]: Name of the page column. Only used if treating
+            a different column like pages (e.g. chunks)
     '''
     groups = []
     if pages:
-        assert 'page' in in_df.index.names
-        groups.append('page')
+        assert pagecolname in in_df.index.names
+        groups.append(pagecolname)
 
     if 'section' not in in_df.index.names:
         section = 'ignore'
@@ -122,7 +124,7 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
             def set_to_one(x):
                 x['count'] = 1
                 return x
-            return df.reset_index().groupby(['page']+groups).apply(set_to_one)\
+            return df.reset_index().groupby([pagecolname]+groups).apply(set_to_one)\
                      .groupby(groups).sum()[['count']]
 
 def fold_pages(page_list, chunkname):
@@ -871,12 +873,18 @@ class Volume(object):
         # exist. This will only need to exist once
         if self._tokencounts.empty:
             self._tokencounts = self.parser._make_tokencount_df()
+            if 'chunk' in self._tokencounts.index.names:
+                logging.info("Internal representation has chunks rather than pages. Treating them"
+                                    " identically.")
+                self._pagecolname = 'chunk'
+            else:
+                self._pagecolname = 'page'
         
-        assert(('token' in self._tokencounts.index.names) or ('lower' in self._tokencounts.index.names))
+        assert(('token' in self._tokencounts.index.names) or ('lowercase' in self._tokencounts.index.names))
         
         # Allow incomplete internal representations, as long as the args don't want the missing
         # data
-        for arg, column in [(pages, 'page'), (page_select, 'page'), (case, 'token'),
+        for arg, column in [(pages, self._pagecolname), (page_select, self._pagecolname), (case, 'token'),
                             (pos, 'pos')]:
             if arg and column not in self._tokencounts.index.names:
                 raise Exception("Your internal tokenlist representation does not have enough "
@@ -885,7 +893,7 @@ class Volume(object):
         if page_select:
             try:
                 df = self._tokencounts.xs(page_select,
-                                          level='page', drop_level=False)
+                                          level=pagecolname, drop_level=False)
             except KeyError:
                 # Empty tokenlist
                 return self._tokencounts.iloc[0:0]
@@ -893,7 +901,7 @@ class Volume(object):
             df = self._tokencounts
 
         df = group_tokenlist(df, pages=pages, section=section,
-                               case=case, pos=pos, page_freq=page_freq)
+                               case=case, pos=pos, page_freq=page_freq, pagecolname=self._pagecolname)
         
         if drop_section:
             df = df.droplevel('section')
@@ -907,10 +915,11 @@ class Volume(object):
     def term_page_freqs(self, page_freq=True, case=True):
         ''' Return a term frequency x page matrix, or optionally a
         page frequency x page matrix '''
-        all_page_dfs = self.tokenlist(page_freq=page_freq, case=case)
+        all_page_dfs = self.tokenlist(page_freq=page_freq, case=case, pos=False)
+        tokencolname = 'token' if case else 'lowercase'
         return all_page_dfs.reset_index()\
-                           .groupby(['token', 'page'], as_index=False).sum()\
-                           .pivot(index='page', columns='token',
+                           .groupby([tokencolname, self._pagecolname], as_index=False).sum()\
+                           .pivot(index=self._pagecolname, columns=tokencolname,
                                   values='count')\
                            .fillna(0)
     
@@ -1026,8 +1035,9 @@ class Volume(object):
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
         df = self.tokenlist(page_freq=page_freq, pos=pos, case=case)
-        groups = ['token'] if not pos else ['token', 'pos']
-        return df.reset_index().drop(['page'], axis=1)\
+        tokencolname = 'token' if case else 'lowercase'
+        groups = [tokencolname] if not pos else [tokencolname, 'pos']
+        return df.reset_index().drop([self._pagecolname], axis=1)\
                  .groupby(groups, as_index=False).sum()\
                  .sort_values(by='count', ascending=False)
 
@@ -1069,7 +1079,7 @@ class Volume(object):
         return group_linechars(df, section=section, place=place)
     
     def save_parquet(self, path, meta=True, tokens=True, chars=False, 
-                     section_features=False, compression='snappy',
+                     section_features=False, compression='snappy', chunked=False,
                      token_kwargs=dict(section='all', drop_section=False)
                      ):
         '''
@@ -1096,7 +1106,10 @@ class Volume(object):
         
         if tokens:
             try:
-                feats = self.tokenlist(**token_kwargs)
+                if chunked:
+                    feats = self.chunked_tokenlist(**token_kwargs)
+                else:
+                    feats = self.tokenlist(**token_kwargs)
             except:
                 # In the internal representation is incomplete, returning the above may fail,
                 # but the cache may have an acceptable dataset to return
