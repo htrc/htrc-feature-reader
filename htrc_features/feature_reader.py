@@ -748,7 +748,7 @@ class Volume(object):
         elif section == 'all':
             return df
         elif section == 'group':
-            return df.sum()
+            return df.groupby(level='page').sum()
         else:
             raise Exception("Bad Section Arg")
 
