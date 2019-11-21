@@ -899,7 +899,7 @@ class Volume(object):
         if page_select:
             try:
                 df = self._tokencounts.xs(page_select,
-                                          level=pagecolname, drop_level=False)
+                                          level=self._pagecolname, drop_level=False)
             except KeyError:
                 # Empty tokenlist
                 return self._tokencounts.iloc[0:0]
