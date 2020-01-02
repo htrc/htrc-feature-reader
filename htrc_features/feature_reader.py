@@ -13,7 +13,7 @@ import os
 from htrc_features import utils
 
 try:
-    import ujson as json
+    import rapidjson as json
 except ImportError:
     import json
 import requests
