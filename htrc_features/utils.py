@@ -1,4 +1,5 @@
 import logging
+import os
 
 EF_CHECK_URL= "http://data.htrc.illinois.edu/htrc-ef-access/get?action=check-exists&ids={}"
 
@@ -31,6 +32,19 @@ def files_available(ids):
     result = requests.get(url).json()
     return result
 
+def extract_htid(filename):
+    """
+    Inverse of clean_htid, that also strips file suffixes
+    """
+    for suffix in [".gz", ".bz2"]:
+        filename = filename.rstrip(suffix)
+    for suffix in [".json", ".parquet"]:
+        filename = filename.rstrip(suffix)
+    for suffix in [".meta", ".tokens", ".chars", ".section"]:
+        filename = filename.rstrip(suffix)
+                       
+    return _id_decode(filename)
+
 def clean_htid(htid):
     '''
     :param htid: A HathiTrust ID of form lib.vol; e.g. mdp.1234
@@ -52,7 +66,8 @@ def _id2path(id):
     while len(clean_id) > 0:
         val, clean_id = clean_id[:2], clean_id[2:]
         path.append(val)
-    return '/'.join(path)
+    return path
+#     return '/'.join(path)
 
 
 def download_file(htids, outdir='./', keep_dirs=False, silent=True):
@@ -161,6 +176,21 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
         
     return out
 
+def id_to_pairtree(htid, format = None, compression = None):
+    '''
+    Take an HTRC id and convert it to a pairtree location.
+
+    suffix: a filename suffix to add to the end.
+
+    '''
+    libid, volid = htid.split('.', 1)
+    volid_clean = _id_encode(volid)
+    
+    suffixes = [s for s in [format, compression] if s is not None]
+    filename = ".".join([clean_htid(htid), *suffixes]) 
+    path = os.path.join(*[libid, 'pairtree_root', * _id2path(volid),
+                     volid_clean, filename])
+    return path
     
 def id_to_rsync(htid, **kwargs):
     '''
@@ -175,11 +205,7 @@ def id_to_rsync(htid, **kwargs):
                      "https://github.com/htrc/htrc-feature-reader/blob/3e100ae"
                      "9ea45317443ae05f43a188b12afe2e69a/htrc_features/utils.py"
                      )
-    libid, volid = htid.split('.', 1)
-    volid_clean = _id_encode(volid)
-    filename = clean_htid(htid) + '.json.bz2'
-    path = '/'.join([libid, 'pairtree_root', _id2path(volid).replace('\\', '/'),
-                     volid_clean, filename])
+    path = id_to_pairtree(htid, format = "json", compression = "bz2")
     return path
 
 
