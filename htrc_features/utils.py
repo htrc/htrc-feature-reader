@@ -36,12 +36,17 @@ def extract_htid(filename):
     """
     Inverse of clean_htid, that also strips file suffixes
     """
+    def trim(string, suffix):
+        if string.endswith(suffix):
+            return string[:-len(suffix)]
+        return string
+    
     for suffix in [".gz", ".bz2"]:
-        filename = filename.rstrip(suffix)
+        filename = trim(filename, suffix)
     for suffix in [".json", ".parquet"]:
-        filename = filename.rstrip(suffix)
+        filename = trim(filename, suffix)
     for suffix in [".meta", ".tokens", ".chars", ".section"]:
-        filename = filename.rstrip(suffix)
+        filename = trim(filename, suffix)
                        
     return _id_decode(filename)
 
