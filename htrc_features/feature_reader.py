@@ -11,7 +11,7 @@ from six import iteritems, StringIO, BytesIO
 import codecs
 import os
 from htrc_features import utils
-from htrc_features import parsers
+from htrc_features import parsers, resolvers
 from htrc_features.parsers import JsonFileHandler, BaseFileHandler, ParquetFileHandler
 
 try:
@@ -144,7 +144,25 @@ def fold_pages(page_list, chunkname):
     chunk['chunk'] = chunkname
     grouped = chunk.reset_index().groupby(newindex)[['count']].sum()
     return grouped
-        
+
+def default_resolver(id, path, format):
+    guess = filename_or_id(id)
+    ### First arg.
+    if path is None and guess == "filename":
+        # Don't really need a warning here.
+        return "path"
+    elif path is None and guess == "id":
+        # Pull from the web on an unlisted path by default.
+        # TODO: I think there are much better approaches here; looking in
+        # various places before pinging Hathi, etc.        
+        return "http"
+    elif path is not None:
+        # Explicitly requesting a path format. Should
+        # this be deprecated? Probably not.
+        return "path"
+    raise
+
+
 def group_linechars(df, section='all', place='all'):
 
     # Set up grouping
@@ -188,14 +206,15 @@ class FeatureReader(object):
         
         paths: Filepaths to dataset files. The format will depend on 
         
-        ids: HathiTrust IDs referred to files. Alternative to `paths`. By default will download
-            json files behind the scenes.
+        ids: HathiTrust IDs referred to files. Alternative to `paths`. By default will download json files behind the scenes.
         
         The other args depend on the parser. For the default jsonVolumeParser, allowable args
-        are: `compressed`.
+        are: `compression`
+        `dir`: The location for local files, pairtree, etc.
         '''
         
-        # only one of paths or ids can be selected - otherwise it's not clear what to iterate
+        # only one of paths or ids can be selected -
+        # otherwise it's not clear what to iterate
         # over. 
         assert (paths or ids) and not (paths and ids)
         
@@ -283,10 +302,23 @@ class FeatureReader(object):
     def __str__(self):
         return "<%d path FeatureReader>" % (len(self.ids))
 
+def filename_or_id(string):
+    for ending in [".gz", ".bz2", ".json", ".parquet"]:
+        if string.endswith(ending):
+            return "filename"
+    if "." in string[:6]:
+        return "id"
+    
+    return None
+
 class Volume(object):
 
-    def __init__(self, path=False, id=False, format='json',
-                    default_page_section='body', **kwargs):
+    def __init__(self, id = None, format='json',
+                    id_resolver = None,
+                    default_page_section='body',
+                    compression = "bz2",
+                    path = None,
+                     **kwargs):
         '''
         The Volume allows simplified, Pandas-based access to the HTRC
         Extracted Features files.
@@ -310,19 +342,40 @@ class Volume(object):
         self._line_chars = pd.DataFrame()
         self._page_features = pd.DataFrame()
         self._section_features = pd.DataFrame()
-        
         self._extra_metadata = None
-        self.default_page_section = default_page_section
-        
-        if format == 'json':
-            self.parser = JsonFileHandler(path, id, **kwargs)
-        elif format == 'parquet':
-            self.parser = ParquetFileHandler(path, id, **kwargs)
-        elif issubclass(parser, BaseFileHandler):
-            self.parser = parser(path, id, **kwargs)
-        else:
-            raise Exception("No valid parser defined.")
+
+        # Back-compatibility. Can't imagine this mattering, though.
+        if id == False:
+            raise DeprecationWarning("Please use None to indicate lack of an id")
+            id = None
+        if path == False:
+            raise DeprecationWarning("Please use None to indicate lack of a path")
+            path = None
             
+        resolver = id_resolver
+        
+        if resolver is None:
+            resolver = default_resolver(id, path, format = format)
+                
+        print(resolver)
+        
+        self.default_page_section = default_page_section
+
+        assert format in ["json", "parquet"]
+
+        if "file_handler" in kwargs:
+            self.parser = kwargs["file_handler"](id)
+        elif format == "json":
+            self.parser = parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
+        elif format == "parquet":
+            self.parser = parsers.ParquetFileHandler(id, compression = compression, id_resolver = resolver, **kwargs)
+        else:
+            raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
+
+        
+        
+        self.args = kwargs
+        
         self._update_meta_attrs()
     
     def _update_meta_attrs(self):

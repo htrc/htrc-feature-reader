@@ -10,8 +10,9 @@ import pymarc
 from six import iteritems, StringIO, BytesIO
 import codecs
 import os
+import types
 
-from htrc_features import utils
+from htrc_features import utils, resolvers
 
 try:
     import ujson as json
@@ -20,103 +21,77 @@ except ImportError:
 import requests
 
 
-if PY3:
-    from urllib.request import urlopen as _urlopen
-    from urllib.parse import urlparse as parse_url
-    from urllib.error import HTTPError
-else:
-    from urlparse import urlparse as parse_url
-    from urllib2 import urlopen as _urlopen
-    from urllib2 import HTTPError
+import htrc_features.resolvers
 
-try:
-    import bz2file as bz2
-except ImportError:
-    import bz2
-    if not PY3:
-        logging.warning("Loading volumes from a URL will not work in Python 2 unless you install bz2file")
+import bz2
+
+resolver_nicknames = {
+    "path": resolvers.PathResolver,
+    "pairtree": resolvers.PairtreeResolver,
+    "ziptree": resolvers.ZiptreeResolver,
+    "local": resolvers.LocalResolver,
+    "http": resolvers.HttpResolver
+}
 
 
-def resolve_file(id, format, storage_strategy, compression = None, dir = None):
-
-    if compression is not None:
-        suffix = f".{format}.{compression}"
-    else:
-        suffix = f".{format}"
-    if storage_strategy == 'pairtree':
-        return os.path.join(dir, utils.id_to_pairtree(id))
-    if storage_strategy == 'local':
-        return os.path.join(dir, utils.clean_htid(id))
-    if storage_strategy == 'http' or storage_scheme == 'https':
-        return 
-
+# UTILS
+SECREF = ['header', 'body', 'footer']
 
 class BaseFileHandler(object):
     
-    def __init__(self, path=False, id=False, id_resolver = None, **kwargs):
-        ''' Base class for volume reading.'''
-        
-        assert (path or id) and not (path and id)
-        
-        self.meta = dict(id=None)
-        self.args = kwargs
-        self.args['id_resolver'] = id_resolver
-        logging.info(self.args)
-                    # When creating, we don't want to raise an error on existing files.
-        
-        self.path = None
-        
-        self.resolve_path(id, path, id_resolver)
+    def __init__(self, id = None, id_resolver = None, **kwargs):
+        '''
 
+        Base class for volume reading.
+
+        '''
+        
+        self.meta = dict(id=None)        
+
+        self.args = kwargs
+#        self.compression = self.args.get("compression", None)
+        
+        # When creating, we don't want to raise an error on existing files.
+        if isinstance(id_resolver, resolvers.IdResolver):
+            self.resolver = id_resolver
+            
+        elif isinstance(id_resolver, types.FunctionType):
+            """
+            Any arbitrary function can be made into a resolver
+            by turning it into a class
+            """
+            logging.debug("Building class to handle retrieval")
+            
+            class Dummy():
+                def __init__(self):
+                    pass
+                def get(self, **kwargs):
+                    return id_resolver(**kwargs)
+                
+            self.resolver = Dummy()
+            
+        else:
+            try:
+                self.resolver = resolver_nicknames[id_resolver](format = self.format, **kwargs)
+            except KeyError:
+                raise TypeError("""Id resolver must be a function, htrc_features.IdResolver, or
+                one of the strings {}""".format(", ".join(list(resolver_nicknames.keys()))))
+        
         if 'load' in self.args and self.args['load'] == False:
             return        
         if 'mode' in self.args and self.args['mode'] == 'create':
+            """
+            Not documented yet, but allow 'mode' = 'create'.
+            """
             return
-        
-        # Note that any FileHanlder must define a path if one isn't passed
-        # in explicitly.
 
-        obj = self.read(self.path, **kwargs)
-        self.parse(obj)
+        self.parse(**kwargs)
 
-    def resolve_path(self, id = False, path = False, id_resolver = None):
-        """
-        Resolve a path to the object.
-        """
-        if path:
-            self.path = path
-            return
-        
-        if id_resolver == 'http' or id_resolver == 'https':
-            self.path = self.DL_URL.format(id)
-            
-        if id_resolver == 'pairtree':
-            dirname = utils.id_to_pairtree(id, self.args.get('format', 'json'), self.args.get('compression', None))
-            self.path = os.path.join(self.args["dir"], dirname)
-            
-        return self.path
-        
-    def read(self):
-        ''' Args can be dependent on individual parser.'''
-        pass
-
-    def write(self):
+    def parse(self, **kwargs):
         '''
-        
-        '''
-
-        if self.args['storage_scheme'] in ['pairtree', 'path', 'local']:
-            directory = os.path.dirname(file_path)
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-
-        
-        
-        raise NotImplementedError("A write method has not been defined for this parser.")
-                
-    def parse(self):
-        ''' Save any info that needs to be held at init time for parsing. In some cases,
-        little needs to be saved before methods like _make_tokencount_df need to be run.
+        Save any info that needs to be held at init time for
+        parsing. In some cases, little needs to be saved before methods
+        like _make_tokencount_df need to be run.
         '''
         pass
     
@@ -166,85 +141,39 @@ class JsonFileHandler(BaseFileHandler):
     PAGE_FIELDS =  ['seq', 'languages']
     SECTION_FIELDS =  ['tokenCount', 'lineCount', 'emptyLineCount',
                              'capAlphaSeq', 'sentenceCount']
-    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
+
     
-    def __init__(self, path=False, id=False, id_resolver = None, **kwargs):
+    def __init__(self, id, id_resolver, **kwargs):
         self.meta = dict(id=None, handle_url=None)
+        self.format = "json"
+        self.id = id
         self._schema = None
         self._pages = None
 
         # parsing and reading are called here.
-        super().__init__(path, id, id_resolver, **kwargs)
+        super().__init__(id, id_resolver = id_resolver, **kwargs)
 
-    def write(self, volume):
-        """
-        Logic: you can currently only write JSON from a JSON,
-        because fully recreating that format is outside the scope here. (Would it ever be useful for it not to be?)
-
-        Moreover, that volume needs to have the json actually attached, which doesn't happen by default.
-        """
-
+    def write(self, filehandle):
+        raise NotImplementedError("Json writing not supported")
+    
+    def read(self, id, **kwargs):
+        '''
+        Load JSON for a path. Allows remote files in addition to local ones. 
+        Returns: string of json.
+        '''
         pass
     
-    def read(self, path_or_url, **kwargs):
-        '''
-            Load JSON for a path. Allows remote files in addition to local ones. 
-            Returns: JSON object.
-        '''
-        try:
-            compression = self.args['compression']
-        except KeyError:
-            compression = 'bz2'
-        
-        id_resolver = self.args['id_resolver']
-            
-        if parse_url(path_or_url).scheme in ['http', 'https']:
-            try:
-                req = _urlopen(path_or_url)
-                filename_or_buffer = BytesIO(req.read())
-            except HTTPError:
-                logging.exception("HTTP Error accessing %s" % path_or_url)
-                raise
-            compressed = False
-        else:
-            filename_or_buffer = path_or_url
+    def _parse_json(self):
+        logging.debug(self.resolver)
+        rawjson = self.resolver.get(self.id, **self.args).read()
+        if isinstance(rawjson, BytesIO):
+            rawjson = rawjson.decode()
+        return json.loads(rawjson)
 
-        compressed = False
-        if 'compression' in self.args and self.args['compression'] != None:
-            compressed = True
+    def parse(self, **kwargs):
         
-        try:
-            if compressed:
-                f = bz2.BZ2File(filename_or_buffer)
-            else:
-                if (type(filename_or_buffer) != BytesIO) and not isinstance(filename_or_buffer, StringIO):
-                    f = codecs.open(filename_or_buffer, 'r+', encoding="utf-8")
-                else:
-                    f = filename_or_buffer
-            rawjson = f.readline()
-            f.close()
-        except IOError:
-            logging.exception("Can't read %s. Did you pass the incorrect "
-                              "'compressed=' argument?", path_or_url)
-            raise
-        except:
-            print(compressed, type(filename_or_buffer))
-            logging.exception("Can't open %s", path_or_url)
-            raise
+        obj = self._parse_json()
 
-        try:
-            # For Python3 compatibility, decode to str object
-            if PY3 and (type(rawjson) != str):
-                rawjson = rawjson.decode()
-            volumejson = json.loads(rawjson)
-        except:
-            logging.exception("Problem reading JSON for %s. One common reason"
-                              " for this error is an incorrect compressed= "
-                              "argument", path_or_url)
-            raise
-        return volumejson
-    
-    def parse(self, obj):
         self._schema = obj['features']['schemaVersion']
         if self._schema not in self.SUPPORTED_SCHEMA:
             logging.warning('Schema version of imported (%s) file does not match '
@@ -306,7 +235,7 @@ class JsonFileHandler(BaseFileHandler):
     @property
     def token_freqs(self):
         ''' Returns a dataframe of page / section /count '''
-        if not self._token_freqs:
+        if not hasattr(self, "_token_freqs"):
             d = [{'page': int(page['seq']), 'section': sec,
                  'count':page[sec]['tokenCount']} for page 
                  in self._pages for sec in SECREF]
@@ -411,22 +340,20 @@ class ParquetFileHandler(BaseFileHandler):
         this parser doesn't provide much fanciness beyond loading.
         
         TO LOAD DATA
-        By default, the loading enforces a filename convention, and the path provided
+        The loading enforces a filename convention, and the path provided
         to the parser should avoid the file extension. The filename convention is
             - ../{htid}.meta.json
             - ../{htid}.tokens.parquet
             - ../{htid}.chars.parquet
             - ../{htid}.section.parquet
-        
-        If assume_filenames is False, you won't need to follow the filename convention, and
-        instead provide a tuple of the filenames. This is not currently implemented.
+      
     '''
         
     
-    def __init__(self, path=False, id=False, id_resolver = None, **kwargs):
+    def __init__(self, id=False, id_resolver = None, **kwargs):
 
-        path = self.resolve_path(path, id, id_resolver, **kwargs)
-        
+        self.format = "parquet"
+
         self.meta_path = path + '.meta.json'
         self.token_path = path + '.tokens.parquet'
         self.char_path = path + '.chars.parquet'
