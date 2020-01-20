@@ -18,6 +18,10 @@ def volume(paths):
     feature_reader = FeatureReader(paths, compressed=False)
     return next(feature_reader.volumes())
 
+@pytest.fixture(scope="module")
+def fullvolume(paths):
+    return Volume(os.path.join('tests', 'data', 'green-gables-full.json'), compressed=False)
+
 class TestVolume():
 
     def test_caching(self, paths):
@@ -210,3 +214,16 @@ class TestVolume():
         volume = feature_reader.first()
         tokenlist = volume.tokenlist()
         assert tokenlist.shape[0] == 56397
+        
+    def test_chunking(self, fullvolume):
+        # This tests whether chunking works on a basic case, working from a full 
+        # JSON-based EF file
+
+        longest_page = fullvolume.tokenlist().groupby('page').sum().max().iloc[0]
+        for chunk_size in [5000, 10000]:
+            chunked = (fullvolume.chunked_tokenlist(chunk_target=chunk_size)
+                                 .groupby(level='chunk').sum()
+                      )
+            assert abs(chunked.mean().iloc[0] - chunk_size) < chunk_size/3 
+            assert abs(chunked.max().iloc[0] - chunk_size) < longest_page*2 # Does it avoid huge chunks
+            assert abs(chunked.min().iloc[0] - chunk_size) < chunk_size/4 # Does it avoid tiny chunks
