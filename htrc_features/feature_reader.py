@@ -786,14 +786,19 @@ class Volume(object):
             self._extra_metadata = xml_record
         return self._extra_metadata
 
-    def tokens(self, section='default', case=True, page_select=False):
-        ''' Get unique tokens '''
-        tokens = (self.tokenlist(section=section, page_select=page_select)
-                  .index.get_level_values('token').to_series())
-        if case:
-            return tokens.unique().tolist()
+    def tokens(self, section='default', case=True, page_select=False, min_count=1):
+        ''' Get unique tokens.
+        
+        Convenient if somewhat inefficient, since it does groupby().sum() in
+        calling the tokenlist.
+        '''
+        tokencounts = self.tokenlist(section=section, case=case,
+                                     page_select=page_select, pos=False,
+                                     pages=False)['count']
+        if min_count == 1:
+            return tokencounts.index.unique().tolist()
         else:
-            return tokens.str.lower().unique().tolist()
+            return tokencounts[tokencounts >= min_count].index.unique().tolist()
 
     def pages(self, **kwargs):
         ''' Iterate through Page objects with a reference to this class.
