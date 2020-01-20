@@ -1,5 +1,5 @@
 import pytest
-from htrc_features import FeatureReader, Volume
+from htrc_features import FeatureReader, Volume, utils
 import os
 import htrc_features
 
@@ -41,6 +41,12 @@ class TestVolume():
         # Load new volume specifically for this test
         vol = Volume(paths[0], compressed=False)
         assert type(vol) == htrc_features.feature_reader.Volume
+        
+    def test_parquet_saving(self, volume, tmp_path):
+        volume.save_parquet(tmp_path, meta=True, tokens=True, chars=True, section_features=True)
+        files = os.listdir(tmp_path)
+        for ext in ['meta.json', 'tokens.parquet', 'section.parquet', 'chars.parquet']:
+            assert '{}.{}'.format(utils.clean_htid(volume.id), ext) in files
 
     def test_included_metadata(self, volume):
         import re
