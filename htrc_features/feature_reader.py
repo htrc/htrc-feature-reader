@@ -41,6 +41,9 @@ SECREF = ['header', 'body', 'footer']
 class MissingDataError(Exception):
     pass
 
+class MissingFieldError(Exception):
+    pass
+
 def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
                     page_freq=False, pagecolname='page'):
     '''
@@ -594,6 +597,7 @@ class parquetVolumeParser(baseVolumeParser):
             raise Exception("assume_filenames currently cannot be false. See docstring "
                             "for parquetVolumeParser")
         
+        self.path = path
         self.meta_path = path + '.meta.json'
         self.token_path = path + '.tokens.parquet'
         self.char_path = path + '.chars.parquet'
@@ -614,8 +618,8 @@ class parquetVolumeParser(baseVolumeParser):
     def parse(self):
         if not self.meta['id']:
             # Parse from filename
-            filename = os.path.split(self.tokencount_path)[-1]
-            self.meta['id'] = os.path.splitext(filename)[0].replace("+", ":").replace("=", "/").replace(",", ".")
+            filename = os.path.split(self.path)[-1]
+            self.meta['id'] = utils._id_decode(filename)
         
         if not self.meta['handle_url']:
             self.meta['handle_url'] = "http://hdl.handle.net/2027/%s" % self.meta['id']
@@ -875,9 +879,6 @@ class Volume(object):
 
         htid[bool]: whether to add an index level with the htid included.
         '''
-        if section == 'default':
-            section = self.default_page_section
-        
         assert not (page_select and not pages)
 
         # Create the internal representation if it does not already
@@ -893,13 +894,21 @@ class Volume(object):
         
         assert(('token' in self._tokencounts.index.names) or ('lowercase' in self._tokencounts.index.names))
         
+        if section == 'default':
+            section = self.default_page_section
+        elif 'section' not in self._tokencounts.index.names:
+            raise MissingFieldError("Section not saved in internal representation, so you can't "
+                                    "select a specific section. Use section='default' or load a "
+                                    "complete dataset.")
+        
         # Allow incomplete internal representations, as long as the args don't want the missing
         # data
-        for arg, column in [(pages, self._pagecolname), (page_select, self._pagecolname), (case, 'token'),
-                            (pos, 'pos')]:
+        for arg, column in [(pages, self._pagecolname), (page_select, self._pagecolname),
+                            (case, 'token'), (pos, 'pos')]:
             if arg and column not in self._tokencounts.index.names:
-                raise Exception("Your internal tokenlist representation does not have enough "
-                                "information for the current args. Missing column: %s" % column)
+                raise MissingFieldError("Your internal tokenlist representation does not have "
+                                        "enough information for the current args. Missing "
+                                        "column: %s" % column)
         
         if page_select:
             try:
