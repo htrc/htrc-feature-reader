@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='htrc-feature-reader',
-      version='2.01',
+      version='2.02',
       description='Library for working with the HTRC Extracted Features dataset',
       classifiers=[
           'Development Status :: 5 - Production/Stable',

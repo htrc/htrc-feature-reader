@@ -105,8 +105,25 @@ class TestVolume():
         assert type(metadata) == pymarc.record.Record
 
     def test_token_stats(self, volume):
-        assert volume.tokens()[:600:100] == ['/', 'her', 'but', "'re",
-                                             'announced', 'entirely']
+        t = volume.tokens()
+        assert type(t) is set
+        assert len(t) == 882
+        assert sorted(t)[:600:100] == ['!', 'Matthew', 'away', 'day', 'garden', 'last']
+
+        # Min count
+        t = volume.tokens(min_count=2)
+        assert len(t) == 376
+        assert sorted(t)[:600:100] == ['!', 'body', 'it', 'some']
+
+        # Lowercase
+        t = volume.tokens(case=False)
+        assert len(t) == 815
+        assert sorted(t)[:600:100] == ['!', 'beyond', 'discerned', 'get', 'knees', 'noticed']
+
+        # Min count and lowercase
+        t = volume.tokens(min_count=4, case=False)
+        assert len(t) == 158
+        assert sorted(t)[:600:100] == ['!', 'no']
 
     def test_line_counting(self, volume):
         assert sum(volume.line_counts()) == 441

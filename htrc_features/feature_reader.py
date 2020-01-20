@@ -787,18 +787,18 @@ class Volume(object):
         return self._extra_metadata
 
     def tokens(self, section='default', case=True, page_select=False, min_count=1):
-        ''' Get unique tokens.
-        
-        Convenient if somewhat inefficient, since it does groupby().sum() in
-        calling the tokenlist.
         '''
-        tokencounts = self.tokenlist(section=section, case=case,
-                                     page_select=page_select, pos=False,
-                                     pages=False)['count']
-        if min_count == 1:
-            return tokencounts.index.unique().tolist()
+        Get unique tokens as a set. Setting min_count increases processing.
+        '''
+        tokencolname = 'token' if case else 'lowercase'
+        if min_count <= 1:
+            return set(self.tokenlist(case=case).reset_index()[tokencolname])
         else:
-            return tokencounts[tokencounts >= min_count].index.unique().tolist()
+            tokencounts = (self.tokenlist(case=case).reset_index()
+                               .groupby(tokencolname)['count'].sum()
+                          )
+            tokencounts = tokencounts[tokencounts >= min_count]
+            return set(tokencounts.index)
 
     def pages(self, **kwargs):
         ''' Iterate through Page objects with a reference to this class.
