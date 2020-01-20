@@ -1,7 +1,9 @@
 import pytest
 from htrc_features import FeatureReader, Volume, utils
 import os
+import json
 import htrc_features
+import pandas as pd
 
 
 # TestFeatureReader already tested loading, so we'll load a common volume
@@ -46,11 +48,36 @@ class TestVolume():
         vol = Volume(paths[0], compressed=False)
         assert type(vol) == htrc_features.feature_reader.Volume
         
-    def test_parquet_saving(self, volume, tmp_path):
+    def test_fullparquet_saving(self, volume, tmp_path):
         volume.save_parquet(tmp_path, meta=True, tokens=True, chars=True, section_features=True)
         files = os.listdir(tmp_path)
         for ext in ['meta.json', 'tokens.parquet', 'section.parquet', 'chars.parquet']:
             assert '{}.{}'.format(utils.clean_htid(volume.id), ext) in files
+            
+    def test_partial_parquet_saving(self, volume, tmp_path):
+        clean_id = utils.clean_htid(volume.id)
+        
+        # Save only meta
+        volume.save_parquet(tmp_path, meta=True, tokens=False, chars=False, section_features=False)
+        metapath = os.path.join(tmp_path, clean_id+'.meta.json')
+        assert os.listdir(tmp_path) == [clean_id+'.meta.json']
+        with open(metapath, mode='r') as f:
+            data = json.load(f)
+            assert data['id'] == volume.id
+        os.remove(metapath)
+        
+        # Save only tokens
+        volume.save_parquet(tmp_path, meta=False, tokens=True, chars=False, section_features=False)
+        assert os.listdir(tmp_path) == [clean_id+'.tokens.parquet']
+        os.remove(os.path.join(tmp_path, clean_id+'.tokens.parquet'))
+        
+    def test_partial_tokenlist_saving(self, volume, tmp_path):
+        tkwargs = dict(case=False, pos=False, drop_section=True)
+        volume.save_parquet(tmp_path, meta=False, token_kwargs = tkwargs)
+        
+        path = os.path.join(tmp_path, os.listdir(tmp_path)[0])
+        df = pd.read_parquet(path).reset_index()
+        assert (df.columns == ['page', 'lowercase', 'count']).all()
 
     def test_included_metadata(self, volume):
         import re

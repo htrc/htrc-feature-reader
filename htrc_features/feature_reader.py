@@ -1112,6 +1112,10 @@ class Volume(object):
         '''
         fname_root = os.path.join(path, utils.clean_htid(self.id))
         
+        if not (meta or tokens or section_features or chars):
+            logging.warning("You're not saving anything with save_parquet")
+            return
+        
         if meta:
             with open(fname_root + '.meta.json', mode='w') as f:
                 json.dump(self.parser.meta, f)
