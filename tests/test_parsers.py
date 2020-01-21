@@ -75,4 +75,11 @@ class TestParsing():
             tl = vol.tokenlist(case=False, pos=False, section='header')
 
     def test_chunked_parq_tokenlist(self):
-        pass
+        htid = 'uc2.ark+=13960=t1xd0sc6x'
+        filepath = os.path.join('tests', 'data', 'chunkedparq', htid)
+        vol = Volume(filepath, parser='parquet')
+
+        assert vol.tokenlist(case=False, pos=True).reset_index().columns.tolist() == ['chunk', 'section', 'lowercase', 'pos', 'count']
+        assert vol.tokenlist(case=True, pos=False).reset_index().columns.tolist() == ['chunk', 'section', 'token', 'count']
+        assert vol.tokenlist().reset_index().columns.tolist() == ['chunk', 'section', 'token', 'pos', 'count']
+        assert vol.tokenlist(drop_section=True).reset_index().columns.tolist() == ['chunk', 'token', 'pos', 'count']
