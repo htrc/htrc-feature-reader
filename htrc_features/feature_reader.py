@@ -974,12 +974,10 @@ class Volume(object):
         # Last entry gives number of words
         ntokens = cumsums.iloc[-1]
         n_chunks = int(int((ntokens) / chunk_target))
-
-        overflow = (ntokens % chunk_target)
-
         # Use actual page counts not including zeros
         avg_page_n = ntokens / pagecounts.shape[0]
 
+        overflow = (ntokens % chunk_target)
         if overflow > chunk_target/2:
             overflow -= chunk_target
             n_chunks +=1
@@ -996,13 +994,13 @@ class Volume(object):
         elif overflow_strategy == "last":
             target = chunk_target
         elif overflow_strategy == "even":
-            chunk_target += overflow / n_chunks
-            target = chunk_target
+            target = chunk_target + overflow / n_chunks
 
         # Assign the endpoints for all but the last chunk.
-        for i in enumerate(range(n_chunks-1)):
+        for i in range(n_chunks):
             last_page = np.argmin(np.abs(cumsums.values - target))
-            breaks[last_page+1] = 1
+            if last_page + 1 < len(breaks):
+                breaks[last_page+1] = 1
             target = chunk_target + cumsums.values[last_page]
 
         chunk_names = pd.Series(np.cumsum(breaks), index = cumsums.index).to_frame("chunk")
