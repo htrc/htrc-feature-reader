@@ -944,11 +944,33 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
                            
-    def simple_chunks2(self, chunk_target, max_adjust, page_ref = False, **kwargs):
 
-        tokens = self.tokenlist(**kwargs)
-        pagecounts = tokens.reset_index().groupby('page').agg('sum')['count']
-        cumsums = pagecounts.agg('cumsum')
+    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, suppress_warning=False, **kwargs):
+        '''
+        Return a tokenlist dataframe grouped by numbered 'chunks', each of which has roughly `chunk_target` words.
+
+        chunk_target: the target size--in number of words--of each chunk.
+        
+        - pages are collected together until their word count is > chunk_target
+        - chunk_target is adjusted slightly to minimize the size of straggler chunks
+            
+        - overflow_strategy: How to handle cases in which the total number of words does not divide directly into the chosen chunk_target.
+           - "ends" allows the first and last chunks -- which, in books, are often the messiest -- to vary greatly in length
+             while keeping the middle sections as close to `chunk_target` in length as possible given the page lengths.
+           - "even" sets preset targets based on the document length, and creates chunks that are of approximately even size within each book.
+             There may be great variability in chunk length *between* books using this method.
+           - "last" (not implemented) keeps all but the last chunk at the desired length, but allows huge variability in the final chunk.
+
+        - also takes tokenlist() arguments, such as case, drop_section, pos
+        
+        '''
+        max_adjust = 1
+        
+        # Chunking won't work with pages=False
+        kwargs['pages'] = True
+        tl = self.tokenlist(**kwargs)
+        pagecounts = tl.reset_index().groupby('page')['count'].sum()
+        cumsums = pagecounts.cumsum()
 
         # Last entry gives number of words
         ntokens = cumsums.iloc[-1]
@@ -1005,11 +1027,11 @@ class Volume(object):
         
         chunk_names = pd.Series(np.cumsum(breaks), index = cumsums.index).to_frame("chunk")
 
-        with_chunks = tokens.reset_index().set_index("page").join(chunk_names)
+        with_chunks = tl.reset_index().set_index("page").join(chunk_names)
         
         # return chunk_names
     
-        groups = [g for g in tokens.index.names if g != 'page']
+        groups = [g for g in tl.index.names if g != 'page']
         
         return_val = with_chunks.groupby(groups + ['chunk'])['count'].sum().reset_index()
         if page_ref:
@@ -1019,160 +1041,6 @@ class Volume(object):
             return_val = return_val.set_index('chunk').join(chunk_bounds)
         return return_val
     
-    def simple_chunks(self, target, max_adjust, page_ref = False, **kwargs):
-
-        tokens = self.tokenlist(**kwargs)
-
-        cumsums = tokens.reset_index().groupby('page').agg('sum')['count'].agg('cumsum')
-
-        # Last entry gives number of words
-        ntokens = cumsums.iloc[-1]
-
-        n_chunks = int(round((ntokens) / target))
-        chunk_size = round(ntokens/n_chunks)
-        avg_page_n = ntokens / self.page_count
-        
-        # These can vary from the basic chunk size.
-        first_and_last_size = chunk_size
-
-        if np.abs(target - chunk_size) > max_adjust and n_chunks > 2:
-            orig = chunk_size
-            if chunk_size < target:
-                chunk_size = target - max_adjust
-            else:
-                chunk_size = target + max_adjust
-            nonfirst_size = (n_chunks - 2) * chunk_size
-            first_and_last_size = round((ntokens - nonfirst_size)/2)
-
-#        chunk1 = np.argmax(cumsums > (first_and_last_size - avg_page_n/2))
-        # Subtract the first chunk size so that the beginning of chunk **2** 
-        # is at number zero.
-        chunk_names = ((cumsums - first_and_last_size - avg_page_n/2) // chunk_size) + 2
-        # print(list(zip(chunk_names, cumsums - first_and_last_size - avg_page_n/2)))
-        # Sometimes this will result in the last page being allocated to a new chunk.
-        # Or the first page to chunk -1 or 0. 
-        # Undo that.
-
-        chunk_names = np.clip(chunk_names, 1, n_chunks).astype("int").to_frame('chunk')
-        with_chunks = tokens.reset_index().set_index("page").join(chunk_names)
-
-        groups = [g for g in tokens.index.names if g != 'page']
-        
-        return_val = with_chunks.groupby(groups + ['chunk'])['count'].sum().reset_index()
-        if page_ref:
-            chunk_bounds = with_chunks.reset_index().groupby("chunk")['page']\
-               .agg(['min', 'max'])\
-               .rename(columns = {'min':'pstart', 'max':'pend'})
-            return_val = return_val.set_index('chunk').join(chunk_bounds)
-        return return_val
-
-    def chunked_tokenlist(self, chunk_target = 10000, max_adjust=1000, page_ref=False, suppress_warning=False, **kwargs):
-        '''
-        Return a tokenlist grouped by numbered 'chunks', which are roughly `chunk_target`
-        sized.
-        
-        Passes arguments to tokenlist() for the proper pos, case, and section args.
-        
-        Strategy:
-        - pages are collected together until their word count is > chunk_target
-        - chunk_target is adjusted slightly to minimize the size of straggler chunks
-        - `max_adjust` limits how much the chunk size target can deviate - any difference
-            is split between the first and last chunks so that the remaining chunks are
-            more intact
-        
-        '''
-        # Chunking won't work with pages=False
-        kwargs['pages'] = True
-        tl = self.tokenlist(**kwargs)
-        
-        if 'chunk' in tl.index.names:
-            if not suppress_warning:
-                logging.warn('The internal representation of the tokenlist is already chunked,'
-                            ' so returning that. The parameters (e.g. word target per chunk)'
-                            ' are not known.')
-            return tl
-
-        ntokens = self.tokens_per_page().sum()
-
-        if tl.empty:
-            tl = tl.copy()
-            tl.columns = [col if col != 'page' else 'chunk'  for col in tl.columns]
-            return tl
-
-        if ntokens < chunk_target:
-            # Avoid division by zero errors.
-            chunk_target = ntokens
-            
-        nchunks = int(ntokens/chunk_target)
-        overflow = (ntokens % chunk_target)
-        avg_page_n = ntokens / self.page_count
-
-        # If the remainder is more than half of a chunk, a new chunk will be created
-        # and difference will be distributed by subtracting from all the chunks
-        if overflow > chunk_target/2:
-            overflow -= chunk_target
-            nchunks += 1
-
-        if np.abs(overflow) > (nchunks * max_adjust):
-            # Limit how much of the overflow we distribute across 
-            # all chunks, distributing the rest across the first and last
-            edgeadjust = .5 * (overflow - np.sign(overflow)*max_adjust*nchunks)
-            overflow = np.sign(overflow)*max_adjust
-        else:
-            edgeadjust = 0
-
-        chunk_target += int(overflow / nchunks)
-        
-        counter = 0
-        chunkname = 1
-        page_collector = []
-        chunk_collector = []
-        first_page = None
-
-        groups = tl.groupby(level='page')
-
-        def add_page_ref(chunk, first, last):
-            ''' Add reference for the page range used in the chunk'''
-            chunk['pstart'] = first
-            chunk['pend'] = last
-            inames = chunk.index.names
-            return (chunk.set_index(['pstart', 'pend'], append=True)
-                          .reorder_levels(['chunk', 'pstart', 'pend'] + inames[1:])
-                   )
-        
-        for pagen, group in groups:
-            if not first_page:
-                first_page = pagen
-            ntokens = group['count'].sum()
-
-            page_collector.append(group)
-            counter += ntokens
-
-            firstchunk_full = (edgeadjust and (chunkname == 1) and (counter > (chunk_target + edgeadjust - avg_page_n/2)))
-            regularchunk_full = (counter > (chunk_target - avg_page_n/2))
-
-            
-            if (firstchunk_full or regularchunk_full) and len(page_collector) and (chunkname < nchunks):
-                chunk = fold_pages(page_collector, chunkname)
-                
-                if page_ref:
-                    chunk = add_page_ref(chunk, first_page, pagen)
-                    first_page = None
-                    
-                chunk_collector.append(chunk)
-                chunkname += 1
-                page_collector = []
-                counter = 0
-
-        # Finally
-        if len(page_collector):
-            chunk = fold_pages(page_collector, chunkname)
-            if page_ref:
-                    chunk = add_page_ref(chunk, first_page, pagen)
-            chunk_collector.append(chunk)
-
-        chunked_tl = pd.concat(chunk_collector)
-        return chunked_tl
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
