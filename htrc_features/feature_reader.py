@@ -964,7 +964,6 @@ class Volume(object):
         - also takes tokenlist() arguments, such as case, drop_section, pos
         
         '''
-        max_adjust = 1
         
         # Chunking won't work with pages=False
         kwargs['pages'] = True
@@ -974,37 +973,17 @@ class Volume(object):
 
         # Last entry gives number of words
         ntokens = cumsums.iloc[-1]
-
         n_chunks = int(int((ntokens) / chunk_target))
 
         overflow = (ntokens % chunk_target)
+
         # Use actual page counts not including zeros
         avg_page_n = ntokens / pagecounts.shape[0]
 
         if overflow > chunk_target/2:
             overflow -= chunk_target
             n_chunks +=1
-            
-        if np.abs(overflow/n_chunks) > max_adjust:
-            chunk_target += np.sign(overflow) * max_adjust
 
-            # Drop this much overflow.
-            overflow -= np.sign(overflow) * max_adjust * n_chunks
-            first_and_last_size = chunk_target + overflow/2
-        else:
-            chunk_target += overflow/n_chunks
-            first_and_last_size = chunk_target
-
-        """
-        if np.abs(overflow) > (nchunk*max_adjust) and n_chunks > 2:
-            if chunk_size < target:
-                chunk_size = target - max_adjust
-            else:
-                chunk_size = target + max_adjust
-            nonfirst_size = (n_chunks - 2) * chunk_size
-            first_and_last_size = round((ntokens - nonfirst_size)/2)
-        """
-            
         # Store the start of chunks in an array.
         breaks = np.zeros(cumsums.shape[0], np.int)
 
@@ -1012,27 +991,26 @@ class Volume(object):
         breaks[0] = 1
 
         # variable; how far do we want the next one to go?
-        target = first_and_last_size# + avg_page_n/2
+        if overflow_strategy == "ends":
+            target = chunk_target + overflow/2 # + avg_page_n/2
+        elif overflow_strategy == "last":
+            target = chunk_target
+        elif overflow_strategy == "even":
+            chunk_target += overflow / n_chunks
+            target = chunk_target
 
-        cumsums_np = cumsums.to_numpy()
-        
         # Assign the endpoints for all but the last chunk.
         for i in enumerate(range(n_chunks-1)):
-            last_page = np.argmin(np.abs(cumsums_np - target))
-            # Can also forbid it from ever going over; but what's the point
-            # of that?
- #           last_page = np.argmax(cumsums_np > (target - avg_page_n/2)) - 1
+            last_page = np.argmin(np.abs(cumsums.values - target))
             breaks[last_page+1] = 1
-            target = chunk_target + cumsums_np[last_page]
-        
+            target = chunk_target + cumsums.values[last_page]
+
         chunk_names = pd.Series(np.cumsum(breaks), index = cumsums.index).to_frame("chunk")
 
         with_chunks = tl.reset_index().set_index("page").join(chunk_names)
-        
-        # return chunk_names
-    
+
         groups = [g for g in tl.index.names if g != 'page']
-        
+
         return_val = with_chunks.groupby(groups + ['chunk'])['count'].sum().reset_index()
         if page_ref:
             chunk_bounds = with_chunks.reset_index().groupby("chunk")['page']\
