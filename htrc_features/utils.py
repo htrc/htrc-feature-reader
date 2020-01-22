@@ -181,7 +181,7 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
         
     return out
 
-def id_to_pairtree(htid, format = None, compression = None):
+def id_to_pairtree(htid, format = None, suffix = None, compression = None):
     '''
     Take an HTRC id and convert it to a pairtree location.
 

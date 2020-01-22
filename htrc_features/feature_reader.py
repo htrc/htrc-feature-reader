@@ -313,10 +313,11 @@ def filename_or_id(string):
 
 class Volume(object):
 
-    def __init__(self, id = None, format='json',
+    def __init__(self, id = None,
+                    format='json',
                     id_resolver = None,
                     default_page_section='body',
-                    compression = "bz2",
+                    compression = 'bz2',
                     path = None,
                      **kwargs):
         '''
@@ -356,15 +357,15 @@ class Volume(object):
         
         if resolver is None:
             resolver = default_resolver(id, path, format = format)
-                
-        print(resolver)
+            if resolver == 'http':
+                compression = None
         
         self.default_page_section = default_page_section
 
         assert format in ["json", "parquet"]
 
         if "file_handler" in kwargs:
-            self.parser = kwargs["file_handler"](id)
+            self.parser = kwargs["file_handler"]#(id, format = format, compression = compression)
         elif format == "json":
             self.parser = parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
         elif format == "parquet":
