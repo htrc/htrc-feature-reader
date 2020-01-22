@@ -995,16 +995,29 @@ class Volume(object):
         elif overflow_strategy == "last":
             target = chunk_target
         elif overflow_strategy == "even":
-            target = chunk_target + overflow / n_chunks
+            chunk_target += overflow / n_chunks
+            target = chunk_target
 
         # Assign the endpoints for all but the last chunk.
         for i in range(n_chunks-1):
             last_page = np.argmin(np.abs(cumsums.values - target))
-            if last_page + 1 < len(breaks):
-                breaks[last_page+1] = 1
-                target = chunk_target + cumsums.values[last_page]
-                if overflow_strategy == "even":
-                    target += overflow / n_chunks
+            if last_page + 1 >= len(breaks):
+                continue
+            breaks[last_page+1] = 1
+
+            # Remainder adjust - nudge next section slightly, to try to balance
+            # out consistently under or oversized parts
+            remaining_chunks = n_chunks - i
+            remaining_nwords = (cumsums.values[-1] - cumsums.values[last_page]) 
+            if 'even':
+                # Adjust for what's necessary
+                adjust = remaining_nwords / remaining_chunks - chunk_target
+            else:
+                # Adjust slightly, then hope for the rest to sort itself out as the runs continue
+                # This should decay or be capped, so if things are really bad at the end, don't 
+                # add excessive words to the 2nd- and 3rd-to-last chunks
+                adjust = 0.5 * (remaining_nwords / remaining_chunks - chunk_target)
+            target = chunk_target + cumsums.values[last_page] + adjust
 
         chunk_names = pd.Series(np.cumsum(breaks), index = cumsums.index).to_frame("chunk")
 
