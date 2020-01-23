@@ -1036,7 +1036,6 @@ class Volume(object):
             elif (overflow_strategy == 'ends') and remaining_chunks:   
                 err = ((remaining_nwords-overflow/2) / (remaining_chunks-1)) - chunk_target
                 adjust = (0.5+0.5*remaining_chunks/n_chunks) * err
-            print(i, n_chunks, remaining_word_per_chunk_diff, adjust, max_adjust)
             if abs(adjust) > max_adjust:
                 adjust = np.sign(adjust) * max_adjust
             target = chunk_target + cumsums.values[last_page] + adjust
