@@ -153,16 +153,21 @@ def default_resolver(id, path, format):
     if path is None and guess == "filename":
         # Don't really need a warning here.
         return "path"
-    elif path is None and guess == "id":
+    elif path is None and guess == "id" and format == "json":
         # Pull from the web on an unlisted path by default.
         # TODO: I think there are much better approaches here; looking in
         # various places before pinging Hathi, etc.        
         return "http"
+    elif guess == "id" and format == "parquet":
+        # Pull from the web on an unlisted path by default.
+        # TODO: I think there are much better approaches here; looking in
+        # various places before pinging Hathi, etc.        
+        return "local"
     elif path is not None:
         # Explicitly requesting a path format. Should
         # this be deprecated? Probably not.
         return "path"
-    raise
+    raise AttributeError("No sensible default for {} with dir {}".format(format, path))
 
 
 def group_linechars(df, section='all', place='all'):
@@ -372,7 +377,7 @@ class Volume(object):
         elif format == "json":
             self.parser = parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
         elif format == "parquet":
-            self.parser = parsers.ParquetFileHandler(id, compression = compression, id_resolver = resolver, **kwargs)
+            self.parser = parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
         else:
             raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
 

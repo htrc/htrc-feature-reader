@@ -45,13 +45,11 @@ class BaseFileHandler(object):
         Base class for volume reading.
 
         '''
-        
-        self.meta = dict(id=None)        
+
+        self.meta = dict(id=id)        
 
         self.args = kwargs
-#        self.compression = self.args.get("compression", None)
         
-        # When creating, we don't want to raise an error on existing files.
         if isinstance(id_resolver, resolvers.IdResolver):
             self.resolver = id_resolver
             
@@ -79,7 +77,7 @@ class BaseFileHandler(object):
         
         if 'load' in self.args and self.args['load'] == False:
             return        
-        if 'mode' in self.args and self.args['mode'] == 'create':
+        if 'mode' in self.args and self.args['mode'] == 'wb':
             """
             Not documented yet, but allow 'mode' = 'create'.
             """
@@ -351,7 +349,7 @@ class ParquetFileHandler(BaseFileHandler):
     '''
         
     
-    def __init__(self, id=False, id_resolver = None, **kwargs):
+    def __init__(self, id, id_resolver, **kwargs):
 
         self.format = "parquet"
         self.id = id
@@ -359,26 +357,31 @@ class ParquetFileHandler(BaseFileHandler):
         self.compression = kwargs.get("compression", "snappy")
 
         self.resolver = id_resolver
+
+        super().__init__(id = id, id_resolver = id_resolver, **kwargs)
         
-        super().__init__(path = path, id = id, id_resolver = id_resolver, **kwargs)
+#    def read(self, **kwargs):
+
     
-    def read(self, **kwargs):
+    def parse(self, **kwargs):
         """
         Unlike Peter's version, this breaks if the json isn't there.
         """
-        with self.resolver.open(id, suffix = "meta", format = "json", compression = None) as meta_buffer:
-            self.meta = json.loads(meta_buffer.read().decode("utf-8"))
-#        else:
-#           self.meta = dict(id=None, handle_url=None, title=None)
-    
-    def parse(self, meta, **kwargs):
+        try:
+            with self.resolver.open(self.id, suffix = "meta", format = "json", compression = None) as meta_buffer:
+                self.meta = json.loads(meta_buffer.read().decode("utf-8"))
+        except:
+            self.meta = dict(id=None, handle_url=None, title=None)
+            raise
+
+            
         if not self.meta['id']:
             self.meta['id'] = htrc_features.utils.extract_htid(self.id)
         
-        if not self.meta['handle_url']:
+        if not 'handle_url' in self.meta or not self.meta['handle_url']:
             self.meta['handle_url'] = "http://hdl.handle.net/2027/%s" % self.meta['id']
             
-        if not self.meta['title']:
+        if not 'title' in self.meta or not self.meta['title']:
             self.meta['title'] = self.meta['id']
 
     def write(self, volume, **kwargs):
@@ -426,38 +429,34 @@ class ParquetFileHandler(BaseFileHandler):
                 with self.resolver.open(id = self.id, suffix = 'chars') as fout:
                     feats.to_parquet(fout, compression=self.compression)                
 
-
-            
     def _make_tokencount_df(self):
-        if not os.path.exists(self.token_path):
+        try:
+            with self.resolver.open(id = self.id, suffix = 'tokens', format = 'parquet') as fin:
+                df = pd.read_parquet(fin)
+        except IOError:
             raise MissingDataError("No token information available")
-
-        with self.resolver.open(id = self.id, suffix = 'tokens', format = 'parquet') as fin:
-            df = pd.read_parquet(fin)
-        
+            
         indcols = [col for col in ['page', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
         if len(indcols):
             df = df.set_index(indcols)
         return df
-        
-        return self._tokencount_df
-        ''' Dummy: data already read at init and cached.'''
-        return self._tokencount_df
     
     def _make_line_char_df(self):
-        if not os.path.exists(self.char_path):
+        try:
+            with self.resolver.open(id = self.id, suffix = 'chars', format = 'parquet') as fin:
+                df = pd.read_parquet(fin)
+                return df 
+        except IOError:
             raise MissingDataError("No line char information available")
-        with self.resolver.open(id = self.id, suffix = 'tokens', format = 'chars') as fin:
-            df = pd.read_parquet(fin)
-        return df 
         
     def _make_section_feature_df(self):
-#        if not os.path.exists(self.section_path):
-#            raise MissingDataError("No page+section information available")
-        with self.resolver.open(id = self.id, suffix = 'section', format = 'chars') as fin:
-            df = pd.read_parquet(fin)
-        return df 
-    
+        try:
+            with self.resolver.open(id = self.id, suffix = 'section', format = 'parquet') as fin:
+                df = pd.read_parquet(fin)
+            return df 
+        except IOError:
+            raise MissingDataError("No section information available")
+        
     def _make_page_feature_df(self):
         raise Exception("parquet parser doesn't support non-token, non-section page features")
 

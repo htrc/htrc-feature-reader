@@ -60,25 +60,19 @@ class IdResolver():
         # Sometimes we have to remember open buffers to close.
         self.active_buffers = []
             
-    def fname(self, id, format = None, compression = None, suffix = None):
+    def fname(self, id, format, compression, suffix):
         """
         Returns a filename given an id and format.
+
+        No defaults because this should always be fully described.
+
         """
-        if format is None:
-            format = self.format
-            
-        if compression is None:
-            compression = self.compression
-            
         clean_id = htrc_features.utils.clean_htid(id)
-        
-        fname = [clean_id, format]
-        
-        if suffix is not None:
-            fname.append(suffix)
-        if compression is not None and format != "parquet":
-            fname.append(compression)
-        return ".".join(fname)
+        if format == "parquet":
+            # Because it's not in the parquet filename.
+            compression = None
+        fname = [clean_id, suffix, format, compression]
+        return ".".join([part for part in fname if part is not None])
     
     def _decompress(self, buffer, format, compression, mode = 'rb'):
         
@@ -87,9 +81,6 @@ class IdResolver():
         layer. Generally used in decompress mode,
         but using 'wb' make this return a compressed buffer.
         """
-        
-        if compression is None:
-            compression = self.compression
         if compression is None or format=="parquet":
             return buffer
         elif compression == "bz2":
@@ -112,6 +103,9 @@ class IdResolver():
         compression = kwargs.get("compression", self.compression)
         format = kwargs.get("format", self.format)
         uncompressed = self._open(id = id, suffix = suffix, mode = mode, **kwargs)
+
+        # The name here is misleading; if mode is 'w', 'decompress' may actually be
+        # acting as a compression filter on write actions.
         fout = self._decompress(uncompressed, format, compression, mode)
         if len(self.active_buffers) > 0:
             # When working with zipfiles, we need 'with' and 'close' to
@@ -165,7 +159,8 @@ class LocalResolver(IdResolver):
         super().__init__(dir = dir, **kwargs)
     
     def _open(self, id, format = None, compression = None, mode = 'rb', **kwargs):
-        filename = self.fname(id, format = format, compression = compression, suffix = None)
+        suffix = kwargs.get("suffix", None)
+        filename = self.fname(id, format = format, compression = compression, suffix = suffix)
         dirname = kwargs.get("dir", self.dir)
         return open(os.path.join(dirname, filename), mode)
 
