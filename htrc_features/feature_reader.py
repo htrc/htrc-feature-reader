@@ -946,7 +946,7 @@ class Volume(object):
                            
 
     def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, suppress_warning=False, adjust_cap=.05, 
-                          chunk_chunk_threshold=.4, **kwargs):
+                          chunk_change_threshold=.4, **kwargs):
         '''
         Return a tokenlist dataframe grouped by numbered 'chunks', each of which has roughly `chunk_target` words.
 
@@ -1003,7 +1003,7 @@ class Volume(object):
         max_adjust = adjust_cap * chunk_target
         # When the remaining words per chunk is higher/lower that x proportion
         #  of the chunk_target, add/remove a chunk.
-        new_chunk_threshold = chunk_chunk_threshold * chunk_target
+        new_chunk_threshold = chunk_change_threshold * chunk_target
 
         i = 1
         while True:
