@@ -682,24 +682,39 @@ class Volume(object):
             chunk_target += overflow / n_chunks
             target = chunk_target
 
-        # Assign the endpoints for all but the last chunk.
-        for i in range(1, n_chunks):
+        # Proportion of chunk_target that the length adjustment should cap at
+        max_adjust = .1 * chunk_target
+        # When the remaining words per chunk is higher/lower that x proportion
+        #  of the chunk_target, add/remove a chunk.
+        new_chunk_threshold = .4 * chunk_target
+
+        i = 1
+        while True:
+            remaining_chunks = n_chunks - i
+            if not remaining_chunks:
+                break
+                
             last_page = np.argmin(np.abs(cumsums.values - target))
             if last_page + 1 >= len(breaks):
-                continue
+                break
+            
             breaks[last_page+1] = 1
 
             # Remainder adjust - nudge next section slightly, to try to balance
-            # out consistently under or oversized parts
-            remaining_chunks = n_chunks - i
-            remaining_nwords = (cumsums.values[-1] - cumsums.values[last_page]) 
+            # out consistently under or oversized parts.
+            remaining_nwords = (cumsums.values[-1] - cumsums.values[last_page])
+            remaining_word_per_chunk_diff = (remaining_nwords / remaining_chunks) - chunk_target
+            if abs(remaining_word_per_chunk_diff) > new_chunk_threshold:
+                n_chunks += np.sign(remaining_word_per_chunk_diff)
+
             if overflow_strategy == 'even':
-                # Adjust for what's necessary
-                adjust = remaining_nwords / remaining_chunks - chunk_target
+                adjust = remaining_word_per_chunk_diff
             else:
-                # Adjust slightly - allowing more adjustment early (when necessary adjustments are lower)
-                adjust = 2*(remaining_chunks/n_chunks) * (remaining_nwords / remaining_chunks - chunk_target)
+                # Adjust slightly - allowing more adjustment early
+                adjust = (0.5+0.5*remaining_chunks/n_chunks) * remaining_word_per_chunk_diff
+            adjust = min(max_adjust, adjust)
             target = chunk_target + cumsums.values[last_page] + adjust
+            i += 1
 
         chunk_names = pd.Series(np.cumsum(breaks), index = cumsums.index).to_frame("chunk")
 
@@ -714,8 +729,6 @@ class Volume(object):
                .rename(columns = {'min':'pstart', 'max':'pend'})
             return_val = return_val.set_index('chunk').join(chunk_bounds)
         return return_val
-
-    
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
