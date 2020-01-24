@@ -629,26 +629,27 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
                            
-    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, suppress_warning=False, **kwargs):
+    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, suppress_warning=False, adjust_cap=.05, 
+                          chunk_change_threshold=.4, **kwargs):
         '''
         Return a tokenlist dataframe grouped by numbered 'chunks', each of which has roughly `chunk_target` words.
 
         chunk_target: the target size--in number of words--of each chunk.
-        
+
         - pages are collected together until their word count is > chunk_target
         - chunk_target is adjusted slightly to minimize the size of straggler chunks
-            
+
         - overflow_strategy: How to handle cases in which the total number of words does not divide directly into the chosen chunk_target.
            - "ends" allows the first and last chunks -- which, in books, are often the messiest -- to vary greatly in length
              while keeping the middle sections as close to `chunk_target` in length as possible given the page lengths.
            - "even" sets preset targets based on the document length, and creates chunks that are of approximately even size within each book.
              There may be great variability in chunk length *between* books using this method.
-           - "last" (not implemented) keeps all but the last chunk at the desired length, but allows huge variability in the final chunk.
+           - "last" keeps all but the last chunk at the desired length, but allows huge variability in the final chunk.
 
         - also takes tokenlist() arguments, such as case, drop_section, pos
-        
+
         '''
-        
+
         # Chunking won't work with pages=False
         kwargs['pages'] = True
         tl = self.tokenlist(**kwargs)
@@ -657,7 +658,7 @@ class Volume(object):
 
         # Last entry gives number of words
         ntokens = cumsums.iloc[-1]
-        n_chunks = int(int((ntokens) / chunk_target))
+        n_chunks = max(int(int((ntokens) / chunk_target)), 1)
         # Use actual page counts not including zeros
 
         overflow = (ntokens % chunk_target)
@@ -682,10 +683,10 @@ class Volume(object):
             target = chunk_target
 
         # Proportion of chunk_target that the length adjustment should cap at
-        max_adjust = .1 * chunk_target
+        max_adjust = adjust_cap * chunk_target
         # When the remaining words per chunk is higher/lower that x proportion
         #  of the chunk_target, add/remove a chunk.
-        new_chunk_threshold = .4 * chunk_target
+        new_chunk_threshold = chunk_change_threshold * chunk_target
 
         i = 1
         while True:
@@ -703,15 +704,23 @@ class Volume(object):
             # out consistently under or oversized parts.
             remaining_nwords = (cumsums.values[-1] - cumsums.values[last_page])
             remaining_word_per_chunk_diff = (remaining_nwords / remaining_chunks) - chunk_target
+
             if abs(remaining_word_per_chunk_diff) > new_chunk_threshold:
                 n_chunks += np.sign(remaining_word_per_chunk_diff)
+                if n_chunks == i:
+                    break
 
             if overflow_strategy == 'even':
+                # Adjust for what's necessary
                 adjust = remaining_word_per_chunk_diff
-            else:
-                # Adjust slightly - allowing more adjustment early
-                adjust = (0.5+0.5*remaining_chunks/n_chunks) * remaining_word_per_chunk_diff
-            adjust = min(max_adjust, adjust)
+            elif (overflow_strategy == 'last') and remaining_chunks:
+                err = ((remaining_nwords-overflow) / (remaining_chunks-1)) - chunk_target
+                adjust = (0.5+0.5*remaining_chunks/n_chunks) * err
+            elif (overflow_strategy == 'ends') and remaining_chunks:   
+                err = ((remaining_nwords-overflow/2) / (remaining_chunks-1)) - chunk_target
+                adjust = (0.5+0.5*remaining_chunks/n_chunks) * err
+            if abs(adjust) > max_adjust:
+                adjust = np.sign(adjust) * max_adjust
             target = chunk_target + cumsums.values[last_page] + adjust
             i += 1
 
