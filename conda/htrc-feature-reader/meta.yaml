@@ -32,7 +32,7 @@ requirements:
     - numpy
     - pymarc
     - requests
-    - ujson
+    - rapidjson
     - bz2file
 
   run:
@@ -42,7 +42,7 @@ requirements:
     - numpy
     - pymarc
     - requests
-    - ujson
+    - rapidjson
     - bz2file
 
 test:

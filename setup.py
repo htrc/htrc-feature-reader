@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='htrc-feature-reader',
-      version='2.01',
+      version='2.02',
       description='Library for working with the HTRC Extracted Features dataset',
       classifiers=[
           'Development Status :: 5 - Production/Stable',
@@ -17,7 +17,7 @@ setup(name='htrc-feature-reader',
       author_email='organisciak@gmail.com',
       license='NCSA',
       packages=['htrc_features'],
-      install_requires=['six', 'pandas', 'numpy', 'requests', 'bz2file', 'pymarc'],
+      install_requires=['six', 'pandas', 'numpy', 'requests', 'bz2file', 'rapidjson', 'pymarc'],
       setup_requires=['pytest-runner'],
       tests_require=['pytest'],
       entry_points={

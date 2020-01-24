@@ -1,7 +1,9 @@
 import pytest
-from htrc_features import FeatureReader, Volume
+from htrc_features import FeatureReader, Volume, utils
 import os
+import json
 import htrc_features
+import pandas as pd
 
 
 # TestFeatureReader already tested loading, so we'll load a common volume
@@ -17,6 +19,10 @@ def volume(paths):
     paths = paths[0]
     feature_reader = FeatureReader(paths, compressed=False)
     return next(feature_reader.volumes())
+
+@pytest.fixture(scope="module")
+def fullvolume(paths):
+    return Volume(os.path.join('tests', 'data', 'green-gables-full.json'), compressed=False)
 
 class TestVolume():
 
@@ -41,6 +47,37 @@ class TestVolume():
         # Load new volume specifically for this test
         vol = Volume(paths[0], compressed=False)
         assert type(vol) == htrc_features.feature_reader.Volume
+        
+    def test_fullparquet_saving(self, volume, tmp_path):
+        volume.save_parquet(tmp_path, meta=True, tokens=True, chars=True, section_features=True)
+        files = os.listdir(tmp_path)
+        for ext in ['meta.json', 'tokens.parquet', 'section.parquet', 'chars.parquet']:
+            assert '{}.{}'.format(utils.clean_htid(volume.id), ext) in files
+            
+    def test_partial_parquet_saving(self, volume, tmp_path):
+        clean_id = utils.clean_htid(volume.id)
+        
+        # Save only meta
+        volume.save_parquet(tmp_path, meta=True, tokens=False, chars=False, section_features=False)
+        metapath = os.path.join(tmp_path, clean_id+'.meta.json')
+        assert os.listdir(tmp_path) == [clean_id+'.meta.json']
+        with open(metapath, mode='r') as f:
+            data = json.load(f)
+            assert data['id'] == volume.id
+        os.remove(metapath)
+        
+        # Save only tokens
+        volume.save_parquet(tmp_path, meta=False, tokens=True, chars=False, section_features=False)
+        assert os.listdir(tmp_path) == [clean_id+'.tokens.parquet']
+        os.remove(os.path.join(tmp_path, clean_id+'.tokens.parquet'))
+        
+    def test_partial_tokenlist_saving(self, volume, tmp_path):
+        tkwargs = dict(case=False, pos=False, drop_section=True)
+        volume.save_parquet(tmp_path, meta=False, token_kwargs = tkwargs)
+        
+        path = os.path.join(tmp_path, os.listdir(tmp_path)[0])
+        df = pd.read_parquet(path).reset_index()
+        assert (df.columns == ['page', 'lowercase', 'count']).all()
 
     def test_included_metadata(self, volume):
         import re
@@ -99,8 +136,25 @@ class TestVolume():
         assert type(metadata) == pymarc.record.Record
 
     def test_token_stats(self, volume):
-        assert volume.tokens()[:600:100] == ['/', 'her', 'but', "'re",
-                                             'announced', 'entirely']
+        t = volume.tokens()
+        assert type(t) is set
+        assert len(t) == 882
+        assert sorted(t)[:600:100] == ['!', 'Matthew', 'away', 'day', 'garden', 'last']
+
+        # Min count
+        t = volume.tokens(min_count=2)
+        assert len(t) == 376
+        assert sorted(t)[:600:100] == ['!', 'body', 'it', 'some']
+
+        # Lowercase
+        t = volume.tokens(case=False)
+        assert len(t) == 815
+        assert sorted(t)[:600:100] == ['!', 'beyond', 'discerned', 'get', 'knees', 'noticed']
+
+        # Min count and lowercase
+        t = volume.tokens(min_count=4, case=False)
+        assert len(t) == 158
+        assert sorted(t)[:600:100] == ['!', 'no']
 
     def test_line_counting(self, volume):
         assert sum(volume.line_counts()) == 441
@@ -187,3 +241,16 @@ class TestVolume():
         volume = feature_reader.first()
         tokenlist = volume.tokenlist()
         assert tokenlist.shape[0] == 56397
+        
+    def test_chunking(self, fullvolume):
+        # This tests whether chunking works on a basic case, working from a full 
+        # JSON-based EF file
+
+        longest_page = fullvolume.tokenlist().groupby('page').sum().max().iloc[0]
+        for chunk_size in [5000, 10000]:
+            chunked = (fullvolume.chunked_tokenlist(chunk_target=chunk_size)
+                                 .groupby(level='chunk').sum()
+                      )
+            assert abs(chunked.mean().iloc[0] - chunk_size) < chunk_size/3 
+            assert abs(chunked.max().iloc[0] - chunk_size) < longest_page*2 # Does it avoid huge chunks
+            assert abs(chunked.min().iloc[0] - chunk_size) < chunk_size/4 # Does it avoid tiny chunks
