@@ -77,17 +77,17 @@ class TestFeatureReader():
 
     def test_uncompressed(self, paths, titles):
         paths = [path.replace('.bz2', '') for path in paths]
-        feature_reader = FeatureReader(paths, compressed=False)
+        feature_reader = FeatureReader(paths, compression=None)
         for i, vol in enumerate(feature_reader):
             assert type(vol) == htrc_features.feature_reader.Volume
             assert vol.title == titles[i]
 
     def test_compress_error(self, paths):
-        feature_reader = FeatureReader(paths, compressed=False)
+        feature_reader = FeatureReader(paths, compression=None)
         with pytest.raises(ValueError):
             next(feature_reader.volumes())
 
         paths = [path.replace('.bz2', '') for path in paths]
-        feature_reader = FeatureReader(paths, compressed=True)
+        feature_reader = FeatureReader(paths, compression='bz2')
         with pytest.raises(IOError):
             next(feature_reader.volumes())

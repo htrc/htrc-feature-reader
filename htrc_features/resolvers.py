@@ -89,6 +89,12 @@ class IdResolver():
             return bz2.open(buffer, mode)
         elif compression == "gz":
             return gzip.open(buffer, mode)
+        
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.close()
 
     def open(self, id, suffix = None, mode = 'rb', **kwargs):
         """
@@ -100,7 +106,6 @@ class IdResolver():
         Suffix: an addition key at the end, mostly used with parquet.
         Mode: 'rb' (read only) or 'wb' (write and read).
         """
-
         if not mode in ['rb', 'wb']:
             raise TypeError("Storage backends only support binary writing formats ('wb' or 'rb')")
         
@@ -108,10 +113,12 @@ class IdResolver():
         compression = kwargs.get("compression", self.compression)
         format = kwargs.get("format", self.format)
         uncompressed = self._open(id = id, suffix = suffix, mode = mode, **kwargs)
-
+        
         # The name here is misleading; if mode is 'w', 'decompress' may actually be
         # acting as a compression filter on write actions.
         fout = self._decompress(uncompressed, format, compression, mode)
+        assert fout
+        
         if len(self.active_buffers) > 0:
             # When working with zipfiles, we need 'with' and 'close' to
             # close multiple files even during an exception. This wrapper does that.
@@ -175,13 +182,7 @@ class PathResolver(IdResolver):
     # We could check to make sure the pathname makes sense. But we don't.
     def _open(self, id, mode = 'rb', **kwargs):
         self.compression = kwargs.get("compression", None)
-        if self.compression is None:
-            if id.endswith(".gz"):
-                self.compression = "gz"
-            if id.endswith(".bz2"):
-                self.compression = "bz2"
-        """ Use kwargs to absorb unused arguments."""
-        return open(id, "rb")
+        return open(id, mode)
 
 class PairtreeResolver(IdResolver):
     def __init__(self, **kwargs):

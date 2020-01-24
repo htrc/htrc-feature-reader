@@ -360,6 +360,12 @@ class Volume(object):
         if path == False:
             warnings.warn("Please use None to indicate lack of a path", DeprecationWarning)
             path = None
+        if 'compressed' in kwargs:
+            raise Exception("Use 'compression' argument. `compressed` has been deprecated.")
+            if kwargs['compressed'] == False:
+                compression = None
+            elif kwargs['compressed'] == True:
+                compression = 'bz2'
             
         resolver = id_resolver
         if resolver is None:
@@ -377,7 +383,8 @@ class Volume(object):
         if "file_handler" in kwargs:
             self.parser = kwargs["file_handler"]#(id, format = format, compression = compression)
         elif format == "json":
-            self.parser = parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
+            self.parser = parsers.JsonFileHandler(id, id_resolver = resolver, 
+                                                  compression = compression, **kwargs)
         elif format == "parquet":
             self.parser = parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
         else:

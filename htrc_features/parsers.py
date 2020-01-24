@@ -161,6 +161,7 @@ class JsonFileHandler(BaseFileHandler):
     
     def _parse_json(self):
         logging.debug(self.resolver)
+        assert self.id
         with self.resolver.open(self.id, **self.args) as fin:
             rawjson = fin.read()
             if isinstance(rawjson, BytesIO):
