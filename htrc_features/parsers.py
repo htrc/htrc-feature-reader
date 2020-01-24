@@ -163,7 +163,6 @@ class JsonFileHandler(BaseFileHandler):
     
     def _parse_json(self):
         logging.debug(self.resolver)
-        print(self.id)
         rawjson = self.resolver.get(self.id, **self.args).read()
         if isinstance(rawjson, BytesIO):
             rawjson = rawjson.decode()

@@ -10,6 +10,7 @@ import pymarc
 from six import iteritems, StringIO, BytesIO
 import codecs
 import os
+import warnings
 from htrc_features import utils
 from htrc_features import parsers, resolvers
 from htrc_features.parsers import JsonFileHandler, BaseFileHandler, ParquetFileHandler
@@ -351,10 +352,10 @@ class Volume(object):
         self._extra_metadata = None
 
         if id == False:
-            raise DeprecationWarning("Please use None to indicate lack of an id")
+            warnings.warn("Please use None to indicate lack of an id", DeprecationWarning)
             id = None
         if path == False:
-            raise DeprecationWarning("Please use None to indicate lack of a path")
+            warnings.warn("Please use None to indicate lack of a path", DeprecationWarning)
             path = None
             
         resolver = id_resolver
