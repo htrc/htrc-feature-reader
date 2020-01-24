@@ -96,7 +96,7 @@ class IdResolver():
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
 
-    def open(self, id, suffix = None, mode = 'rb', **kwargs):
+    def open(self, id, suffix = None, compression=None, format=None, mode = 'rb', **kwargs):
         """
         Open a file for reading.
         
@@ -110,8 +110,10 @@ class IdResolver():
             raise TypeError("Storage backends only support binary writing formats ('wb' or 'rb')")
         
         # Update with some defaults.
-        compression = kwargs.get("compression", self.compression)
-        format = kwargs.get("format", self.format)
+        if not compression:
+            compression = self.compression
+        if not format:
+            format = self.format
         uncompressed = self._open(id = id, suffix = suffix, mode = mode, **kwargs)
         
         # The name here is misleading; if mode is 'w', 'decompress' may actually be
@@ -126,15 +128,17 @@ class IdResolver():
         
         return fout
 
-    def _open(self, id, **kwargs):
+    def _open(self, id, compression=None, format=None, mode='rb'):
         """
         Each method should define '_open' for itself. The class's 
         'open' method will then handle the method.
         """
         raise NotImplementedError("An IdResolver superclass must overwrite the "
                                   "'_open' method to return an io.Buffer object")
-        compression = kwargs.get('compression', self.compression)
-        format = kwargs.get
+        if not compression:
+            compression = self.compression
+        if not format:
+            format = self.format
         return open("{}.{}.{}".format(id, format, compression, mode = mode))
 
 class HttpResolver(IdResolver):

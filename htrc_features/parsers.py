@@ -48,8 +48,23 @@ class BaseFileHandler(object):
 
         self.args = kwargs
         
+        self.resolver = self._init_resolver(id_resolver, **kwargs)
+        
+        if 'load' in self.args and self.args['load'] == False:
+            return        
+        if 'mode' in self.args and self.args['mode'] == 'wb':
+            """
+            Not documented yet, but allow 'mode' = 'create'.
+            """
+            return
+
+        self.parse(**kwargs)
+        
+    def _init_resolver(self, id_resolver, format=None, **kwargs):
+        if not format:
+            format = self.format
         if isinstance(id_resolver, resolvers.IdResolver):
-            self.resolver = id_resolver
+            return id_resolver
             
         elif isinstance(id_resolver, types.FunctionType):
             """
@@ -64,24 +79,14 @@ class BaseFileHandler(object):
                 def open(self, **kwargs):
                     return id_resolver(**kwargs)
                 
-            self.resolver = Dummy()
+            return Dummy()
             
         else:
             try:
-                self.resolver = resolver_nicknames[id_resolver](format = self.format, **kwargs)
+                return resolver_nicknames[id_resolver](format = format, **kwargs)
             except KeyError:
                 raise TypeError("""Id resolver must be a function, htrc_features.IdResolver, or
                 one of the strings {}""".format(", ".join(list(resolver_nicknames.keys()))))
-        
-        if 'load' in self.args and self.args['load'] == False:
-            return        
-        if 'mode' in self.args and self.args['mode'] == 'wb':
-            """
-            Not documented yet, but allow 'mode' = 'create'.
-            """
-            return
-
-        self.parse(**kwargs)
 
     def parse(self, **kwargs):
         '''
@@ -152,17 +157,22 @@ class JsonFileHandler(BaseFileHandler):
     def write(self, filehandle):
         raise NotImplementedError("Json writing not supported")
     
-    def read(self, id, **kwargs):
+    def read(self, **kwargs):
         '''
         Load JSON for a path. Allows remote files in addition to local ones. 
         Returns: string of json.
         '''
         pass
     
-    def _parse_json(self):
-        logging.debug(self.resolver)
-        assert self.id
-        with self.resolver.open(self.id, **self.args) as fin:
+    def _parse_json(self, id=None, resolver=None, args=None):
+        if not id:
+            id = self.id
+        if not resolver:
+            resolver = self.resolver
+        if not args:
+            args = self.args
+        assert id
+        with resolver.open(id, **args) as fin:
             rawjson = fin.read()
             if isinstance(rawjson, BytesIO):
                 rawjson = rawjson.decode()

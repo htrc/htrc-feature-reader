@@ -228,7 +228,7 @@ class FeatureReader(object):
             
         assert (paths or ids) and not (paths and ids)
         
-        resolver = id_resolver
+        self.resolver = id_resolver
         
         self.paths = paths
         self.ids = ids
@@ -238,8 +238,8 @@ class FeatureReader(object):
         if self.ids and type(self.ids) is not list:
             self.ids = [self.ids]
         
-        if resolver is None:
-            resolver = default_resolver(self.ids, self.paths)
+        if self.resolver is None:
+            self.resolver = default_resolver(self.ids, self.paths)
 
         self.index = 0
 
@@ -269,10 +269,12 @@ class FeatureReader(object):
         ''' Generator for returning Volume objects '''
         if self.ids:
             for id in self.ids:
-                yield Volume(path=None, id=id, parser=self.parser_class, **self.parser_kwargs)
+                yield Volume(path=None, id=id, parser=self.parser_class,
+                             id_resolver=self.resolver, **self.parser_kwargs)
         elif self.paths:
             for path in self.paths:
-                yield Volume(path=path, id=None, parser=self.parser_class, **self.parser_kwargs)
+                yield Volume(path=path, id=None, parser=self.parser_class,
+                             id_resolver=self.resolver, **self.parser_kwargs)
         else:
             raise
 
@@ -280,12 +282,14 @@ class FeatureReader(object):
         ''' Generator for returning decompressed, parsed json dictionaries
         for volumes. Convenience function for when the FeatureReader objects
         are not needed. '''
-        if 'compressed' in self.parser_kwargs:
-            compressed = self.parser_kwargs['compressed']
-        else:
-            compressed = True
+        if 'compression' in self.parser_kwargs:
+            compression = self.parser_kwargs['compression']
+        else: 
+            compression = 'bz2'
         for path in self.paths:
-            yield jsonVolumeParser.read(None, path_or_url = path, compressed=compressed)
+            resolver = parsers.JsonFileHandler._init_resolver(None, self.resolver, format="json")
+            yield parsers.JsonFileHandler._parse_json(None, id=path, resolver=resolver,
+                                                      args=dict(compression=compression))
 
     def first(self):
         ''' Return first volume from Feature Reader. This is a convenience
