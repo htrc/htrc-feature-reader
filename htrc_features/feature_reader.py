@@ -147,8 +147,16 @@ def fold_pages(page_list, chunkname):
     grouped = chunk.reset_index().groupby(newindex)[['count']].sum()
     return grouped
 
-def default_resolver(id, path, format):
-    guess = filename_or_id(id)
+def default_resolver(id, path):
+    if type(id) is list:
+        id = id[0]
+    if type(path) is list:
+        path = path[0]
+        
+    if (id is None) or (path is not None):
+        return "path"
+    else:
+        guess = filename_or_id(id)
     ### First arg.
     if path is None and guess == "filename":
         # Don't really need a warning here.
@@ -158,10 +166,6 @@ def default_resolver(id, path, format):
         # TODO: I think there are much better approaches here; looking in
         # various places before pinging Hathi, etc.        
         return "http"
-    elif path is not None:
-        # Explicitly requesting a path format. Should
-        # this be deprecated? Probably not.
-        return "path"
     raise
 
 
@@ -199,7 +203,7 @@ def group_linechars(df, section='all', place='all'):
 # CLASSES
 class FeatureReader(object):
 
-    def __init__(self, paths=None, ids=None, format="json", **kwargs):
+    def __init__(self, paths=None, ids=None, format="json", id_resolver = None, **kwargs):
         '''
         A reader for Extracted Features Dataset files.
         
@@ -215,39 +219,38 @@ class FeatureReader(object):
         `dir`: The location for local files, pairtree, etc.
         '''
         
-        # only one of paths or ids can be selected -
-        # otherwise it's not clear what to iterate
-        # over. 
+        # only one of paths or ids can be selected - otherwise it's not clear what to iterate over. 
+            
         assert (paths or ids) and not (paths and ids)
         
-        if paths:
-            self._online = False
-            if type(paths) is list:
-                self.paths = paths
-            else:
-                self.paths = [paths]
-        else:
-            self.paths = False
+        resolver = id_resolver
         
-        if ids:
-            if type(ids) is list:
-                self.ids = ids
-            else:
-                self.ids = [ids]
-        else:
-            self.ids = False
+        self.paths = paths
+        self.ids = ids
+
+        if self.paths and type(self.paths) is not list:
+            self.paths = [self.paths]
+        if self.ids and type(self.ids) is not list:
+            self.ids = [self.ids]
+        
+        if resolver is None:
+            resolver = default_resolver(self.ids, self.paths)
 
         self.index = 0
-        
-        if parser == 'json':
-            self.parser_class = jsonVolumeParser
-        elif issubclass(parser, htrc_features.baseVolumeParser):
-            self.parser_class = parser
-        else:
-            raise Exception("No valid parser defined.")
-        
-        self.parser_kwargs = kwargs
 
+        assert format in ["json", "parquet"]
+
+        if "file_handler" in kwargs:
+            self.parser = kwargs["file_handler"](id)
+        elif format == "json":
+            self.parser_class = parsers.JsonFileHandler
+        elif format == "parquet":
+            self.parser_class = parsers.ParquetFileHandler
+        else:
+            raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
+
+        self.parser_kwargs = kwargs
+            
     def __iter__(self):
         return self.volumes()
     
@@ -261,10 +264,10 @@ class FeatureReader(object):
         ''' Generator for returning Volume objects '''
         if self.ids:
             for id in self.ids:
-                yield Volume(path=False, id=id, parser=self.parser_class, **self.parser_kwargs)
+                yield Volume(path=None, id=id, parser=self.parser_class, **self.parser_kwargs)
         elif self.paths:
             for path in self.paths:
-                yield Volume(path, id=False, parser=self.parser_class, **self.parser_kwargs)
+                yield Volume(path=path, id=None, parser=self.parser_class, **self.parser_kwargs)
         else:
             raise
 
@@ -347,7 +350,6 @@ class Volume(object):
         self._section_features = pd.DataFrame()
         self._extra_metadata = None
 
-        # Back-compatibility. Can't imagine this mattering, though.
         if id == False:
             raise DeprecationWarning("Please use None to indicate lack of an id")
             id = None
@@ -356,11 +358,11 @@ class Volume(object):
             path = None
             
         resolver = id_resolver
-        
         if resolver is None:
-            resolver = default_resolver(id, path, format = format)
-                
-        print(resolver)
+            resolver = default_resolver(id, path)
+
+        if path:
+            id = path
         
         self.default_page_section = default_page_section
 
@@ -374,8 +376,6 @@ class Volume(object):
             self.parser = parsers.ParquetFileHandler(id, compression = compression, id_resolver = resolver, **kwargs)
         else:
             raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
-
-        
         
         self.args = kwargs
         
