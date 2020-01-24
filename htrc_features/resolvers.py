@@ -162,6 +162,7 @@ class HttpResolver(IdResolver):
         if mode == 'wb':
             raise NotImplementedError("Mode is not defined")
         path_or_url = self.url.format(id = id)
+
         try:
             req = BytesIO(_urlopen(path_or_url).read())
         except HTTPError:

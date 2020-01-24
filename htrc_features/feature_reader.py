@@ -148,7 +148,7 @@ def fold_pages(page_list, chunkname):
     grouped = chunk.reset_index().groupby(newindex)[['count']].sum()
     return grouped
 
-def default_resolver(id, path):
+def default_resolver(id, path, format):
     if type(id) is list:
         id = id[0]
     if type(path) is list:
@@ -239,7 +239,7 @@ class FeatureReader(object):
             self.ids = [self.ids]
         
         if self.resolver is None:
-            self.resolver = default_resolver(self.ids, self.paths)
+            self.resolver = default_resolver(self.ids, self.paths, format)
 
         self.index = 0
 
@@ -373,9 +373,10 @@ class Volume(object):
             
         resolver = id_resolver
         if resolver is None:
-            resolver = default_resolver(id, path)
-            if resolver == 'http':
-                compression = None
+            resolver = default_resolver(id, path, format)
+            
+        if resolver == 'http':
+            compression = None
 
         if path:
             id = path
