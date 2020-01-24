@@ -407,8 +407,8 @@ class ParquetFileHandler(BaseFileHandler):
         '''
 
         if kwargs.get("meta", True):
-            metastring = BytesIO(json.dumps(volume.parser.meta, f).encode("utf-8"))
-            with self.getter.open(self.id, **kwargs) as fout:
+            metastring = BytesIO(json.dumps(volume.parser.meta).encode("utf-8"))
+            with self.resolver.open(self.id, **kwargs) as fout:
                 fout.write(metastring)
         
         if kwargs.get("tokens", True):

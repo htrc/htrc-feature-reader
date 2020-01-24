@@ -48,9 +48,11 @@ class IdResolver():
     """
     def __init__(self, _sentinel = None, format = None, compression = None, **kwargs):
         if _sentinel is not None:
-            raise KeyError("You must name arguments to the IdHandler constructor.")
+            raise NameError("You must name arguments to the IdHandler constructor.")
         if "dir" in kwargs:
             self.dir = kwargs['dir']
+        if format is None:
+            raise NameError("You must define the file format this resolver uses: json or parquet")
         else:
             pass
         
@@ -68,7 +70,7 @@ class IdResolver():
 
         """
         clean_id = htrc_features.utils.clean_htid(id)
-        if format == "parquet":
+        if format == "parquet" or self.format == 'parquet':
             # Because it's not in the parquet filename.
             compression = None
         fname = [clean_id, suffix, format, compression]
@@ -99,6 +101,9 @@ class IdResolver():
         Mode: 'rb' (read only) or 'wb' (write and read).
         """
 
+        if not mode in ['rb', 'wb']:
+            raise TypeError("Storage backends only support binary writing formats ('wb' or 'rb')")
+        
         # Update with some defaults.
         compression = kwargs.get("compression", self.compression)
         format = kwargs.get("format", self.format)
@@ -179,6 +184,11 @@ class PathResolver(IdResolver):
         return open(id, "rb")
 
 class PairtreeResolver(IdResolver):
+    def __init__(self, **kwargs):
+        if not "dir" in kwargs:
+            raise NameError("You must specify a directory with 'dir'")
+        super().__init__(**kwargs)
+        
     def _open(self, id, mode = 'rb', **kwargs):
         assert(mode.endswith('b'))
         if mode.startswith('w'):

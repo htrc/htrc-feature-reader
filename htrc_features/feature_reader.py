@@ -659,7 +659,6 @@ class Volume(object):
         ntokens = cumsums.iloc[-1]
         n_chunks = int(int((ntokens) / chunk_target))
         # Use actual page counts not including zeros
-        avg_page_n = ntokens / pagecounts.shape[0]
 
         overflow = (ntokens % chunk_target)
 
@@ -809,7 +808,7 @@ class Volume(object):
         if tokens:
             try:
                 if chunked:
-                    feats = self.chunked_tokenlist(**token_kwargs)
+                    feats = self.chunked_tokenlist2(**token_kwargs)
                 else:
                     feats = self.tokenlist(**token_kwargs)
             except:
