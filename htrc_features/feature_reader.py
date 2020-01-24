@@ -159,15 +159,17 @@ def default_resolver(id, path):
     else:
         guess = filename_or_id(id)
     ### First arg.
-    if path is None and guess == "filename":
+    if guess == "filename":
         # Don't really need a warning here.
         return "path"
-    elif path is None and guess == "id":
+    elif guess == "id" and format == "json":
         # Pull from the web on an unlisted path by default.
         # TODO: I think there are much better approaches here; looking in
         # various places before pinging Hathi, etc.        
         return "http"
-    raise
+    elif guess == "id" and format == "parquet":      
+        return "local"
+    raise AttributeError("No sensible default for {} with dir {}".format(format, path))
 
 
 def group_linechars(df, section='all', place='all'):
@@ -216,8 +218,10 @@ class FeatureReader(object):
         ids: HathiTrust IDs referred to files. Alternative to `paths`. By default will download json files behind the scenes.
         
         The other args depend on the parser. For the default jsonVolumeParser, allowable args
-        are: `compression`
+        are: `compression`, and `id_resolver`
+
         `dir`: The location for local files, pairtree, etc.
+
         '''
         
         # only one of paths or ids can be selected - otherwise it's not clear what to iterate over. 
@@ -314,16 +318,15 @@ def filename_or_id(string):
             return "filename"
     if "." in string[:6]:
         return "id"
-    
-    return None
 
 
 class Volume(object):
 
-    def __init__(self, id = None, format='json',
+    def __init__(self, id = None,
+                    format='json',
                     id_resolver = None,
                     default_page_section='body',
-                    compression = "bz2",
+                    compression = 'bz2',
                     path = None,
                      **kwargs):
         '''
@@ -361,6 +364,8 @@ class Volume(object):
         resolver = id_resolver
         if resolver is None:
             resolver = default_resolver(id, path)
+            if resolver == 'http':
+                compression = None
 
         if path:
             id = path
@@ -370,11 +375,11 @@ class Volume(object):
         assert format in ["json", "parquet"]
 
         if "file_handler" in kwargs:
-            self.parser = kwargs["file_handler"](id)
+            self.parser = kwargs["file_handler"]#(id, format = format, compression = compression)
         elif format == "json":
             self.parser = parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
         elif format == "parquet":
-            self.parser = parsers.ParquetFileHandler(id, compression = compression, id_resolver = resolver, **kwargs)
+            self.parser = parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
         else:
             raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
         
@@ -655,7 +660,6 @@ class Volume(object):
         ntokens = cumsums.iloc[-1]
         n_chunks = max(int(int((ntokens) / chunk_target)), 1)
         # Use actual page counts not including zeros
-        avg_page_n = ntokens / pagecounts.shape[0]
 
         overflow = (ntokens % chunk_target)
 
@@ -813,7 +817,7 @@ class Volume(object):
         if tokens:
             try:
                 if chunked:
-                    feats = self.chunked_tokenlist(**token_kwargs)
+                    feats = self.chunked_tokenlist2(**token_kwargs)
                 else:
                     feats = self.tokenlist(**token_kwargs)
             except:
