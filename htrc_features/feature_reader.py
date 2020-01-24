@@ -641,8 +641,8 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
                            
-    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, suppress_warning=False, adjust_cap=.05, 
-                          chunk_change_threshold=.4, **kwargs):
+    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, 
+                          suppress_warning=False, adjust_cap=.05, chunk_change_threshold=.4, **kwargs):
         '''
         Return a tokenlist dataframe grouped by numbered 'chunks', each of which has roughly `chunk_target` words.
 
@@ -661,10 +661,16 @@ class Volume(object):
         - also takes tokenlist() arguments, such as case, drop_section, pos
 
         '''
-
         # Chunking won't work with pages=False
         kwargs['pages'] = True
         tl = self.tokenlist(**kwargs)
+        
+        if 'chunk' in tl.index.names and not suppress_warning:
+            logging.warn('The internal representation of the tokenlist is already chunked,'
+                         ' so returning that. The parameters (e.g. word target per chunk)'
+                         ' are not known.')
+            return tl
+    
         pagecounts = tl.reset_index().groupby('page')['count'].sum()
         cumsums = pagecounts.cumsum()
 
@@ -740,14 +746,18 @@ class Volume(object):
 
         with_chunks = tl.reset_index().set_index("page").join(chunk_names)
 
-        groups = [g for g in tl.index.names if g != 'page']
-
-        return_val = with_chunks.groupby(groups + ['chunk'])['count'].sum().reset_index()
+        newindex = [v if v != 'page' else 'chunk'  for v in tl.index.names]
+        
+        return_val = with_chunks.groupby(newindex)[['count']].sum()
         if page_ref:
             chunk_bounds = with_chunks.reset_index().groupby("chunk")['page']\
                .agg(['min', 'max'])\
                .rename(columns = {'min':'pstart', 'max':'pend'})
-            return_val = return_val.set_index('chunk').join(chunk_bounds)
+            return_val = (return_val.join(chunk_bounds)
+                                    .set_index(['pstart', 'pend'], append=True)
+                                    .reorder_levels(['chunk', 'pstart', 'pend'] + newindex[1:])
+                         )
+        
         return return_val
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
@@ -829,7 +839,7 @@ class Volume(object):
         if tokens:
             try:
                 if chunked:
-                    feats = self.chunked_tokenlist2(**token_kwargs)
+                    feats = self.chunked_tokenlist(**token_kwargs)
                 else:
                     feats = self.tokenlist(**token_kwargs)
             except:
