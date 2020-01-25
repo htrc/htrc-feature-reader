@@ -49,6 +49,7 @@ class MissingFieldError(Exception):
 
 def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
                     page_freq=False, pagecolname='page', indexed = True):
+    
     '''
         Return a token count dataframe with requested folding.
 
@@ -158,6 +159,7 @@ def default_resolver(id, path, format):
         return "path"
     else:
         guess = filename_or_id(id)
+        
     ### First arg.
     if guess == "filename":
         # Don't really need a warning here.
@@ -169,7 +171,7 @@ def default_resolver(id, path, format):
         return "http"
     elif guess == "id" and format == "parquet":      
         return "local"
-    raise AttributeError("No sensible default for {} with dir {}".format(format, path))
+    raise AttributeError("No sensible default for format of {} with ids like {}".format(format, id))
 
 
 def group_linechars(df, section='all', place='all'):
@@ -213,83 +215,84 @@ class FeatureReader(object):
         parser: a VolumeParser class, or a string for a built in class (e.g.'json' or
         'parquet').
         
+        ids: HathiTrust IDs. Preferred to `paths`. By default will download json files behind the scenes.
+
         paths: Filepaths to dataset files. The format will depend on 
         
-        ids: HathiTrust IDs referred to files. Alternative to `paths`. By default will download json files behind the scenes.
-        
-        The other args depend on the parser. For the default jsonVolumeParser, allowable args
-        are: `compression`, and `id_resolver`
+        The other args depend on the parser. For the default jsonVolumeParser.
 
         `dir`: The location for local files, pairtree, etc.
 
         '''
         
         # only one of paths or ids can be selected - otherwise it's not clear what to iterate over. 
-            
+
         assert (paths or ids) and not (paths and ids)
-        
+
         self.resolver = id_resolver
         
-        self.paths = paths
+        if self.resolver is None:
+            self.resolver = default_resolver(ids, paths, format)
+
+        # Define paths as ids with "path" resolution.        
+        if paths is not None:
+            ids = paths
+            paths = None
+        
         self.ids = ids
 
-        if self.paths and type(self.paths) is not list:
-            self.paths = [self.paths]
         if self.ids and type(self.ids) is not list:
             self.ids = [self.ids]
         
-        if self.resolver is None:
-            self.resolver = default_resolver(self.ids, self.paths, format)
-
         self.index = 0
-
+        
         assert format in ["json", "parquet"]
-
-        if "file_handler" in kwargs:
-            self.parser = kwargs["file_handler"](id)
-        elif format == "json":
-            self.parser_class = parsers.JsonFileHandler
-        elif format == "parquet":
-            self.parser_class = parsers.ParquetFileHandler
-        else:
-            raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
-
+        
+        self.format = format
+        
         self.parser_kwargs = kwargs
             
     def __iter__(self):
         return self.volumes()
     
     def __len__(self):
-        return len(self.paths)
+        return len(self.ids)
 
     def __str__(self):
         return "HTRC Feature Reader with %d paths loaded" % (len(self.paths))
 
     def volumes(self):
         ''' Generator for returning Volume objects '''
-        if self.ids:
-            for id in self.ids:
-                yield Volume(path=None, id=id, parser=self.parser_class,
-                             id_resolver=self.resolver, **self.parser_kwargs)
-        elif self.paths:
-            for path in self.paths:
-                yield Volume(path=path, id=None, parser=self.parser_class,
-                             id_resolver=self.resolver, **self.parser_kwargs)
-        else:
-            raise
+        for id in self.ids:
+            yield Volume(id=id, format=self.format,
+                         id_resolver=self.resolver, **self.parser_kwargs)
 
-    def jsons(self):
-        ''' Generator for returning decompressed, parsed json dictionaries
+    def jsons(self, object = True, decompress = True):
+        ''' 
+
+        Generator for returning decompressed, parsed json dictionaries
         for volumes. Convenience function for when the FeatureReader objects
-        are not needed. '''
-        if 'compression' in self.parser_kwargs:
-            compression = self.parser_kwargs['compression']
-        else: 
-            compression = 'bz2'
-        for path in self.paths:
-            resolver = parsers.JsonFileHandler._init_resolver(None, self.resolver, format="json")
-            yield parsers.JsonFileHandler._parse_json(None, id=path, resolver=resolver,
-                                                      args=dict(compression=compression))
+        are not needed. 
+
+        object defines whether to return parsed json, or simply json strings.
+
+        decompress only applies when object is false; whether to bother 
+        decompressing the binary text.
+
+        '''
+        
+        assert self.format == 'json'
+        
+        # Can't avoid decompressing if there's an object involved.
+        assert ((object and decompress) or (not object))
+        
+        for id in self.ids:
+            vol = Volume(id = id, format = self.format, id_resolver = self.resolver,
+                         load = False, **self.parser_kwargs)
+            if decompress == True:
+                yield vol.parser._parse_json(object = object)
+            else:
+                yield vol.parser._parse_json(object = object, compression = None)               
 
     def first(self):
         ''' Return first volume from Feature Reader. This is a convenience
@@ -298,20 +301,12 @@ class FeatureReader(object):
         return next(self.volumes())
     
     def __repr__(self):
-        if self.paths:
-            if len(self.paths) > 1:
-                return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
-            elif len(self.paths) == 0:
-                return "<Empty FeatureReader>"
-            else:
-                return "<FeatureReader for %s>" % self.paths[0]
-        elif self.ids:
-            if len(self.ids) > 1:
-                return "<%d path FeatureReader (%s to %s)>" % (len(self.ids), self.ids[0], self.ids[-1])
-            elif len(self.ids) == 0:
-                return "<Empty FeatureReader>"
-            else:
-                return "<FeatureReader for %s>" % self.ids[0]
+        if len(self.ids) > 1:
+            return "<%d path FeatureReader (%s to %s)>" % (len(self.ids), self.ids[0], self.ids[-1])
+        elif len(self.ids) == 0:
+            return "<Empty FeatureReader>"
+        else:
+            return "<FeatureReader for %s>" % self.ids[0]
         
     def __str__(self):
         return "<%d path FeatureReader>" % (len(self.ids))
@@ -323,6 +318,21 @@ def filename_or_id(string):
     if "." in string[:6]:
         return "id"
 
+def retrieve_parser(id, format, resolver, **kwargs):
+    """
+    Retrieve a parser based on kwargs. Used in both Volume and FeatureReader.
+    """
+
+    # When would this be useful?
+    if "file_handler" in kwargs:
+        return kwargs["file_handler"]
+    elif format == "json":
+        return parsers.JsonFileHandler(id, id_resolver = resolver, **kwargs)
+    elif format == "parquet":
+        return parsers.ParquetFileHandler(id, id_resolver = resolver, **kwargs)
+    else:
+        raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
+
 
 class Volume(object):
 
@@ -330,7 +340,6 @@ class Volume(object):
                     format='json',
                     id_resolver = None,
                     default_page_section='body',
-                    compression = 'bz2',
                     path = None,
                      **kwargs):
         '''
@@ -372,6 +381,7 @@ class Volume(object):
                 compression = 'bz2'
             
         resolver = id_resolver
+        
         if resolver is None:
             resolver = default_resolver(id, path, format)
             
@@ -385,15 +395,7 @@ class Volume(object):
 
         assert format in ["json", "parquet"]
 
-        if "file_handler" in kwargs:
-            self.parser = kwargs["file_handler"]#(id, format = format, compression = compression)
-        elif format == "json":
-            self.parser = parsers.JsonFileHandler(id, id_resolver = resolver, 
-                                                  compression = compression, **kwargs)
-        elif format == "parquet":
-            self.parser = parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
-        else:
-            raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
+        self.parser = retrieve_parser(id, format, resolver, **kwargs)
         
         self.args = kwargs
         
@@ -419,7 +421,10 @@ class Volume(object):
         try:
             return html_template % (self.handle_url, self.title, ",".join(self.author), self.year, self.page_count, self.id)
         except:
-            return "<strong><a href='%s'>%s</a></strong>" % (self.handle_url, self.title)
+            try:
+                return "<strong><a href='%s'>%s</a></strong>" % (self.handle_url, self.title)
+            except:
+                return "Unloaded volume <strong>%s</strong>" % (self.id)                
 
     def page_features(self, feature='all', page_select=False):
         if self._page_features.empty:

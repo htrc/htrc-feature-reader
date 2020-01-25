@@ -16,6 +16,12 @@ from urllib.error import HTTPError
 
 
 class FauxFile():
+    """
+    This class is a shim to allow sensible filehandling and errors
+    with zipfiles, where on an error both the file *inside* the zip
+    and the zipfile itself must be closed. It is only used in that
+    specific case at the moment.
+    """
     def __init__(self, *buffers):
         self.main = buffers[0]
         # Zipfile requires closing other buffers.
@@ -46,7 +52,7 @@ class IdResolver():
     Note: subclasses must consume **kwargs on init and get to support full compatibility.
 
     """
-    def __init__(self, _sentinel = None, format = None, compression = None, **kwargs):
+    def __init__(self, _sentinel = None, format = None, **kwargs):
         if _sentinel is not None:
             raise NameError("You must name arguments to the IdHandler constructor.")
         if "dir" in kwargs:
@@ -57,7 +63,12 @@ class IdResolver():
             pass
         
         self.format = format
-        self.compression = compression
+        if "compression" in kwargs:
+            self.compression = kwargs['compression']
+        else:
+            # Do **not** set compression to 'None', because None also means
+            # 'no compression.'
+            raise AttributeError("You must specify compression for a resolver")
         
         # Sometimes we have to remember open buffers to close.
         self.active_buffers = []
@@ -96,7 +107,8 @@ class IdResolver():
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
 
-    def open(self, id, suffix = None, compression=None, format=None, mode = 'rb', **kwargs):
+    def open(self, id, suffix = None, format=None, mode = 'rb', skip_compression = False,
+             **kwargs):
         """
         Open a file for reading.
         
@@ -105,20 +117,33 @@ class IdResolver():
           and 'gz' or 'snappy' for parquet.
         Suffix: an addition key at the end, mostly used with parquet.
         Mode: 'rb' (read only) or 'wb' (write and read).
+        skip_compression: whether to ignore the decompress stage. ("compression" arguments 
+        may still matter forthe resolution of file names)
+        
         """
         if not mode in ['rb', 'wb']:
             raise TypeError("Storage backends only support binary writing formats ('wb' or 'rb')")
         
         # Update with some defaults.
-        if not compression:
-            compression = self.compression
+        if not 'compression' in kwargs:
+            try:
+                kwargs['compression'] = self.compression
+            except AttributeError:
+                raise AttributeError("You must specify compression somewhere")
+
         if not format:
             format = self.format
-        uncompressed = self._open(id = id, suffix = suffix, mode = mode, **kwargs)
+
+        uncompressed = self._open(id = id, suffix = suffix, mode = mode, format = format,
+                                  **kwargs)
         
         # The name here is misleading; if mode is 'w', 'decompress' may actually be
         # acting as a compression filter on write actions.
-        fout = self._decompress(uncompressed, format, compression, mode)
+        if skip_compression:
+            fout = uncompressed
+        else:
+            fout = self._decompress(uncompressed, format, kwargs['compression'], mode)
+            
         assert fout
         
         if len(self.active_buffers) > 0:
@@ -150,10 +175,12 @@ class HttpResolver(IdResolver):
         self.url = url
         kwargs['format'] = kwargs.get("format", "json")
         
+        # Currently this only returns uncompressed data.
+        if not 'compression' in kwargs:
+            kwargs['compression'] = None
+            
         super().__init__(**kwargs)
     
-        # Currently this only returns uncompressed data.
-        self.compression = None
 
 
     def _open(self, id = None, mode = 'rb', **kwargs):
@@ -175,7 +202,9 @@ class LocalResolver(IdResolver):
     def __init__(self, dir, **kwargs):
         super().__init__(dir = dir, **kwargs)
     
-    def _open(self, id, format = None, compression = None, mode = 'rb', **kwargs):
+    def _open(self, id, format = None, mode = 'rb', **kwargs):
+
+        compression = kwargs.get("compression", self.compression)
         suffix = kwargs.get("suffix", None)
         filename = self.fname(id, format = format, compression = compression, suffix = suffix)
         dirname = kwargs.get("dir", self.dir)
@@ -186,7 +215,9 @@ class PathResolver(IdResolver):
     # A path is the simplest form of id storage. These are not HTIDs, and so aren't stored.
     # We could check to make sure the pathname makes sense. But we don't.
     def _open(self, id, mode = 'rb', **kwargs):
-        self.compression = kwargs.get("compression", None)
+        if "compression" in kwargs:
+            self.compression = kwargs["compression"]
+        
         return open(id, mode)
 
 class PairtreeResolver(IdResolver):
@@ -214,11 +245,11 @@ class ZiptreeResolver(IdResolver):
     
     A 'ziptree' is a set of zipfiles. 
     """
-    def __init__(self, dir, format, compression, pairtree_root = None, **kwargs):
+    def __init__(self, dir, format, pairtree_root = None, **kwargs):
         self.pairtree_root = pairtree_root
         if not os.path.exists(dir):
             os.makedirs(dir)
-        super().__init__(dir = dir, format = format, compression = compression, **kwargs)
+        super().__init__(dir = dir, format = format, **kwargs)
         
     def which_zipfile(self, id, digits = 3):
         # Use the sha1 hash of the id; and take only the first three digits.
@@ -293,27 +324,6 @@ class ZiptreeResolver(IdResolver):
                 
         return DummyWriter(filename, zipfile)
     
-    def insert(self, id, depth = 3, dangerously = False):
-        """
-        Dangerously: ignore errors on the insertion step. This is used only for building out pairtrees.
-        """
-        # Use the json reader to get the pairtree name.
-        f = htrc_features.parsers.JsonFileHandler(id = id, dir = self.pairtree_root, id_resolver = "pairtree", compression = "bz2", load = False)
-        path = f.path
-        # Insert and close in a single operation to avoid contamination.
-        with zipfile.ZipFile(self.which_zipfile(id, depth), mode="a") as zipdest:
-            filename = path.split("/")[-1]
-            if filename in zipdest.namelist():
-                return "already present"
-            try:
-
-                return "successful insertion"
-            except:
-                zipdest.close()
-                if not dangerously:
-                    raise
-                return "assorted error"
-
 if __name__ == "__main__":
     import sys
     zipdir, id = sys.argv[1:]

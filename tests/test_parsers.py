@@ -10,16 +10,19 @@ class TestParsing():
         pass
 
     def test_bad_parser(self):
-        htid = 'uc2.ark+=13960=t1xd0sc6x'
+        """
+        What does this test do?
+        """
+        htid = 'uc2.ark:/13960/t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'fullparquet', htid)
         
         with pytest.raises(FileNotFoundError):
             vol = Volume(filepath, parser='json')
         
     def test_full_parquet(self):
-        htid = 'uc2.ark+=13960=t1xd0sc6x'
+        htid = 'uc2.ark+=13960=t1xd0sc6x.parquet'
         filepath = os.path.join('tests', 'data', 'fullparquet', htid)
-        vol = Volume(filepath, parser='parquet')
+        vol = Volume(path = filepath, parser='parquet')
         assert vol.id == 'uc2.ark:/13960/t1xd0sc6x'
         assert type(vol.tokenlist()) is pd.core.frame.DataFrame
         assert type(vol.begin_line_chars()) is pd.core.frame.DataFrame
@@ -28,7 +31,7 @@ class TestParsing():
     def test_token_only_parquet(self):
         htid = 'uc2.ark+=13960=t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'justtokens', htid)
-        vol = Volume(filepath, parser='parquet')
+        vol = Volume(path = filepath, parser='parquet')
         
         # Should be inferred from path
         assert vol.id == 'uc2.ark:/13960/t1xd0sc6x'
@@ -83,3 +86,20 @@ class TestParsing():
         assert vol.tokenlist(case=True, pos=False).reset_index().columns.tolist() == ['chunk', 'section', 'token', 'count']
         assert vol.tokenlist().reset_index().columns.tolist() == ['chunk', 'section', 'token', 'pos', 'count']
         assert vol.tokenlist(drop_section=True).reset_index().columns.tolist() == ['chunk', 'token', 'pos', 'count']
+
+
+# Allow compression formats.
+
+compressions = {
+    'parquet': ['snappy', None, 'gz'],
+    'json': ['bz2', None, 'gz']
+}
+
+for format in ['parquet', 'json']:
+    for compression in compressions[format]:
+        pass
+
+def build_unit_test(format, compression):
+    def my_test(self):
+        p = Volume(id = "aeu.ark:/13960/t1rf63t52", format = "json", compression = "bz2")
+        

@@ -48,21 +48,43 @@ class BaseFileHandler(object):
 
         self.args = kwargs
         
+        self.compression = kwargs.get('compression', 'secretly_fall_back')
+        
+        if self.compression == 'secretly_fall_back':
+            if self.format == "json":
+                # bz2 default for local files, 'json' for remote.
+                if id_resolver == 'http':
+                    self.compression = None
+                elif isinstance(id_resolver, resolvers.HttpResolver):
+                    self.compression = None
+                else:
+                    self.compression = "bz2"
+                    
+            elif self.format == 'parquet':
+                self.compression = "snappy"
+                
+        # This is the only place in the code a compression default lives.
+        kwargs['compression'] = self.compression
+
+        
         self.resolver = self._init_resolver(id_resolver, **kwargs)
         
         if 'load' in self.args and self.args['load'] == False:
-            return        
+            return
+        
         if 'mode' in self.args and self.args['mode'] == 'wb':
             """
             Not documented yet, but allow 'mode' = 'create'.
             """
             return
+        
 
         self.parse(**kwargs)
         
     def _init_resolver(self, id_resolver, format=None, **kwargs):
         if not format:
             format = self.format
+            
         if isinstance(id_resolver, resolvers.IdResolver):
             return id_resolver
             
@@ -145,6 +167,11 @@ class JsonFileHandler(BaseFileHandler):
 
     
     def __init__(self, id, id_resolver, **kwargs):
+
+        # Since 'None' is a valid compression, the way to get the default is
+        # by not passing compression at all.
+        
+            
         self.meta = dict(id=None, handle_url=None)
         self.format = "json"
         self.id = id
@@ -154,8 +181,20 @@ class JsonFileHandler(BaseFileHandler):
         # parsing and reading are called here.
         super().__init__(id, id_resolver = id_resolver, **kwargs)
 
-    def write(self, filehandle):
-        raise NotImplementedError("Json writing not supported")
+    def write(self, outside_volume):
+        
+        if outside_volume.parser.format != "json":
+            warnings.error("Can only write to json from other json")
+
+        if outside_volume.parser.compression == self.compression:
+            skip_compression = True
+        else:
+            skip_compression = False            
+        json_bytestring = outside_volume.parser._parse_json(object = False, skip_compression = skip_compression)
+        with self.resolver.open(self.id, compression = self.compression, format = 'json',
+                                skip_compression = skip_compression,
+                                mode = 'wb') as fout:
+            fout.write(json_bytestring)
     
     def read(self, **kwargs):
         '''
@@ -164,19 +203,25 @@ class JsonFileHandler(BaseFileHandler):
         '''
         pass
     
-    def _parse_json(self, id=None, resolver=None, args=None):
-        if not id:
-            id = self.id
-        if not resolver:
-            resolver = self.resolver
-        if not args:
-            args = self.args
-        assert id
-        with resolver.open(id, **args) as fin:
+    def _parse_json(self, **kwargs):
+        id = self.id
+        resolver = self.resolver
+        if not "compression" in kwargs:
+            kwargs['compression'] = self.compression
+        
+        for k in self.args:
+            if not k in kwargs:
+                kwargs[k] = self.args[k]
+                
+        with resolver.open(id, **kwargs) as fin:
             rawjson = fin.read()
+            
+            if "object" in kwargs and kwargs['object'] == False:
+                return rawjson
+            
             if isinstance(rawjson, BytesIO):
                 rawjson = rawjson.decode()
-        return json.loads(rawjson)
+            return json.loads(rawjson)
 
     def parse(self, **kwargs):
         
@@ -362,10 +407,10 @@ class ParquetFileHandler(BaseFileHandler):
 
         self.format = "parquet"
         self.id = id
-
+        self.compression = compression
         self.resolver = id_resolver
 
-        super().__init__(id = id, id_resolver = id_resolver, **kwargs)
+        super().__init__(id = id, id_resolver = id_resolver, compression = compression, **kwargs)
         
 #    def read(self, **kwargs):
 
@@ -378,8 +423,7 @@ class ParquetFileHandler(BaseFileHandler):
             with self.resolver.open(self.id, suffix = "meta", format = "json", compression = None) as meta_buffer:
                 self.meta = json.loads(meta_buffer.read().decode("utf-8"))
         except:
-            self.meta = dict(id=None, handle_url=None, title=None)
-            raise
+            self.meta = dict(id=self.id, title=self.id)
 
             
         if not self.meta['id']:
@@ -392,11 +436,10 @@ class ParquetFileHandler(BaseFileHandler):
             self.meta['title'] = self.meta['id']
 
     def write(self, volume, meta=True, tokens=True, section_features=False, chars=False, **kwargs):
-        
         '''
 
         Save the internal representations of feature data to parquet, and the metadata to json,
-        using the naming convention used by parquetVolumeParser.
+        using the naming convention used by ParquetFileHandler.
         
         The primary use is for converting the feature files to something more efficient. By default,
         only metadata and tokencounts are saved.
@@ -413,6 +456,7 @@ class ParquetFileHandler(BaseFileHandler):
         token_kwargs=dict(section='body', drop_section=True, pos=False).
         '''
 
+        
         if meta:
             metastring = BytesIO(json.dumps(volume.parser.meta).encode("utf-8"))
             with self.resolver.open(self.id, **kwargs) as fout:
