@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import sys
 PY3 = (sys.version_info[0] >= 3)
 
+import warnings
 import logging
 import pandas as pd
 import numpy as np
@@ -34,8 +35,11 @@ resolver_nicknames = {
 }
 
 
-# UTILS
 SECREF = ['header', 'body', 'footer']
+
+class MissingDataError(Exception):
+    pass
+
 
 class BaseFileHandler(object):
     
@@ -48,10 +52,13 @@ class BaseFileHandler(object):
 
         self.args = kwargs
         
-        self.compression = kwargs.get('compression', 'secretly_fall_back')
+        self.compression = kwargs.get('compression', 'default')
         
-        if self.compression == 'secretly_fall_back':
-            if self.format == "json":
+        if self.compression == 'default':
+            if isinstance(id_resolver, resolvers.IdResolver):
+                # First choice; inherit from the resolver.
+                compression = id_resolver.compression
+            elif self.format == "json":
                 # bz2 default for local files, 'json' for remote.
                 if id_resolver == 'http':
                     self.compression = None
@@ -59,11 +66,11 @@ class BaseFileHandler(object):
                     self.compression = None
                 else:
                     self.compression = "bz2"
-                    
             elif self.format == 'parquet':
                 self.compression = "snappy"
-                
-        # This is the only place in the code a compression default lives.
+            else:
+                raise
+            
         kwargs['compression'] = self.compression
 
         
@@ -72,13 +79,17 @@ class BaseFileHandler(object):
         if 'load' in self.args and self.args['load'] == False:
             return
         
-        if 'mode' in self.args and self.args['mode'] == 'wb':
+        if 'mode' in self.args:
             """
             Not documented yet, but allow 'mode' = 'create'.
             """
-            return
+            mode = self.args['mode']
+            assert( mode in ['wb', 'rb'] )
+            self.mode = mode
+            if mode.startswith('w'):
+                # No need to parse in write mode.
+                return
         
-
         self.parse(**kwargs)
         
     def _init_resolver(self, id_resolver, format=None, **kwargs):
@@ -166,34 +177,55 @@ class JsonFileHandler(BaseFileHandler):
                              'capAlphaSeq', 'sentenceCount']
 
     
-    def __init__(self, id, id_resolver, **kwargs):
+    def __init__(self, id, id_resolver, compression = 'default', **kwargs):
 
-        # Since 'None' is a valid compression, the way to get the default is
-        # by not passing compression at all.
-        
-            
         self.meta = dict(id=None, handle_url=None)
         self.format = "json"
         self.id = id
         self._schema = None
         self._pages = None
 
-        # parsing and reading are called here.
-        super().__init__(id, id_resolver = id_resolver, **kwargs)
 
-    def write(self, outside_volume):
+        # parsing and reading are called here.
+        super().__init__(id, id_resolver = id_resolver, compression = compression, **kwargs)
+
+    def write(self, outside_volume, **kwargs):
+
         
+        # Look for a mode flag in three places: the passed args,
+        # the parser, and the parser's resolver. This is to ensure
+        # that a user actually typed 'wb' *somewhere* before doing
+        # anything destructive.
+        
+        if not 'mode' in kwargs:
+            try:
+                kwargs['mode'] = self.mode
+            except AttributeError:
+                kwargs['mode'] = self.resolver.mode
+
+        
+        compression = kwargs.get("compression", self.compression)
+
+        if compression == "default":
+            compression = "bz2"
+            
         if outside_volume.parser.format != "json":
-            warnings.error("Can only write to json from other json")
+            raise TypeError("Can only write to json from other json, because"
+                            "data is lost in creating the parquet files.")
 
         if outside_volume.parser.compression == self.compression:
-            skip_compression = True
+            if self.compression is not "default":
+                skip_compression = True
+            else:
+                skip_compression = False
         else:
-            skip_compression = False            
+            skip_compression = False
+            
         json_bytestring = outside_volume.parser._parse_json(object = False, skip_compression = skip_compression)
+        
         with self.resolver.open(self.id, compression = self.compression, format = 'json',
                                 skip_compression = skip_compression,
-                                mode = 'wb') as fout:
+                                **kwargs) as fout:
             fout.write(json_bytestring)
     
     def read(self, **kwargs):
@@ -212,17 +244,16 @@ class JsonFileHandler(BaseFileHandler):
         for k in self.args:
             if not k in kwargs:
                 kwargs[k] = self.args[k]
-                
         with resolver.open(id, **kwargs) as fin:
             rawjson = fin.read()
-            
+
             if "object" in kwargs and kwargs['object'] == False:
                 return rawjson
-            
+
             if isinstance(rawjson, BytesIO):
                 rawjson = rawjson.decode()
             return json.loads(rawjson)
-
+        
     def parse(self, **kwargs):
         
         obj = self._parse_json()
@@ -393,7 +424,7 @@ class ParquetFileHandler(BaseFileHandler):
         this parser doesn't provide much fanciness beyond loading.
         
         TO LOAD DATA
-        The loading enforces a filename convention, and the path provided
+        The loading enforces a filename convention, the path provided
         to the parser should avoid the file extension. The filename convention is
             - ../{htid}.meta.json
             - ../{htid}.tokens.parquet
@@ -403,26 +434,23 @@ class ParquetFileHandler(BaseFileHandler):
     '''
         
     
-    def __init__(self, id, id_resolver, compression="snappy", **kwargs):
+    def __init__(self, id, id_resolver, compression="default", mode = 'rb', **kwargs):
 
         self.format = "parquet"
         self.id = id
         self.compression = compression
         self.resolver = id_resolver
-
-        super().__init__(id = id, id_resolver = id_resolver, compression = compression, **kwargs)
+        self.mode = mode
         
-#    def read(self, **kwargs):
-
+        super().__init__(id = id, id_resolver = id_resolver, compression = compression, **kwargs)
     
     def parse(self, **kwargs):
-        """
-        Unlike Peter's version, this breaks if the json isn't there.
-        """
+        
         try:
             with self.resolver.open(self.id, suffix = "meta", format = "json", compression = None) as meta_buffer:
                 self.meta = json.loads(meta_buffer.read().decode("utf-8"))
         except:
+
             self.meta = dict(id=self.id, title=self.id)
 
             
@@ -456,29 +484,48 @@ class ParquetFileHandler(BaseFileHandler):
         token_kwargs=dict(section='body', drop_section=True, pos=False).
         '''
 
+
+        # Look for a mode flag in three places: the passed args,
+        # the parser, and the parser's resolver. This is to ensure
+        # that a user actually typed 'wb' *somewhere* before writing.
+        
+        if not 'mode' in kwargs:
+            try:
+                kwargs['mode'] = self.mode
+            except AttributeError:
+                kwargs['mode'] = self.resolver.mode
+
+        indexed = kwargs.get("indexed", True)
+
+        compression = kwargs.get('compression', self.compression)
+        
+        if compression == "default":
+            compression = "snappy"
         
         if meta:
             metastring = BytesIO(json.dumps(volume.parser.meta).encode("utf-8"))
-            with self.resolver.open(self.id, **kwargs) as fout:
-                fout.write(metastring)
+            with self.resolver.open(self.id, format = "json", compression = None, suffix = 'meta', **kwargs) as fout:
+                fout.write(metastring.read())
         
         if tokens:
-            feats = volume._tokencounts
+            feats = volume.tokenlist()
+            if not indexed:
+                feats = feats.reset_index()
             if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'tokens') as fout:
-                    feats.to_parquet(fout, compression=self.compression)                
-            
+                with self.resolver.open(id = self.id, suffix = 'tokens', **kwargs) as fout:
+                    feats.to_parquet(fout, compression=compression)                
+                
         if section_features:
             feats = volume.section_features(section='all')
             if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'section') as fout:
-                    feats.to_parquet(fout, compression=self.compression)
+                with self.resolver.open(id = self.id, suffix = 'section', **kwargs) as fout:
+                    feats.to_parquet(fout, compression=compression)
             
         if chars:
             feats = volume.line_chars()
             if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'chars') as fout:
-                    feats.to_parquet(fout, compression=self.compression)                
+                with self.resolver.open(id = self.id, suffix = 'chars', **kwargs) as fout:
+                    feats.to_parquet(fout, compression=compression)
 
     def _make_tokencount_df(self):
         try:

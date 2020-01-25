@@ -20,18 +20,17 @@ class TestParsing():
             vol = Volume(filepath, parser='json')
         
     def test_full_parquet(self):
-        htid = 'uc2.ark+=13960=t1xd0sc6x.parquet'
-        filepath = os.path.join('tests', 'data', 'fullparquet', htid)
-        vol = Volume(path = filepath, parser='parquet')
+        dir = os.path.join('tests', 'data', 'fullparquet')
+        vol = Volume(id = 'uc2.ark:/13960/t1xd0sc6x', parser='parquet', dir = dir)
         assert vol.id == 'uc2.ark:/13960/t1xd0sc6x'
         assert type(vol.tokenlist()) is pd.core.frame.DataFrame
         assert type(vol.begin_line_chars()) is pd.core.frame.DataFrame
         assert type(vol.section_features(section='all')) is pd.core.frame.DataFrame
     
     def test_token_only_parquet(self):
-        htid = 'uc2.ark+=13960=t1xd0sc6x'
-        filepath = os.path.join('tests', 'data', 'justtokens', htid)
-        vol = Volume(path = filepath, parser='parquet')
+        htid = 'uc2.ark:/13960/t1xd0sc6x'
+        filepath = os.path.join('tests', 'data', 'justtokens')
+        vol = Volume(id = htid, parser='parquet', dir = filepath)
         
         # Should be inferred from path
         assert vol.id == 'uc2.ark:/13960/t1xd0sc6x'
@@ -64,7 +63,7 @@ class TestParsing():
         htid = 'uc2.ark+=13960=t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'partialparq', htid)
         vol = Volume(filepath, parser='parquet')
-
+ 
         tl = vol.tokenlist(case=False, pos=False)
         assert tl.reset_index().columns.tolist() == ['page', 'lowercase', 'count']
 

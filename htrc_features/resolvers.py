@@ -7,6 +7,7 @@ import bz2
 import gzip
 import logging
 import sys
+from pathlib import Path
 
 MINOR_VERSION = (sys.version_info[1])
 
@@ -45,14 +46,17 @@ class FauxFile():
             
 class IdResolver():
     """
-    This class exposes two methods for each storage format: get and put.
+    The base class method handles decompression for gzip and bz2.
 
-    The base class method handles decompression for zip and csv files.
+    Note: subclasses must consume **kwargs on init to support full compatibility.
 
-    Note: subclasses must consume **kwargs on init and get to support full compatibility.
+    A subclass must, at a minimum, define an '_open' method that handles the non-compression
+    parts of reading and writing.
+
+    This base class enforces some pretty strict rules.
 
     """
-    def __init__(self, _sentinel = None, format = None, **kwargs):
+    def __init__(self, _sentinel = None, format = None, mode = 'rb', **kwargs):
         if _sentinel is not None:
             raise NameError("You must name arguments to the IdHandler constructor.")
         if "dir" in kwargs:
@@ -61,8 +65,11 @@ class IdResolver():
             raise NameError("You must define the file format this resolver uses: json or parquet")
         else:
             pass
-        
+
         self.format = format
+
+        self.mode = mode
+        
         if "compression" in kwargs:
             self.compression = kwargs['compression']
         else:
@@ -81,7 +88,7 @@ class IdResolver():
 
         """
         clean_id = htrc_features.utils.clean_htid(id)
-        if format == "parquet" or self.format == 'parquet':
+        if format == "parquet":
             # Because it's not in the parquet filename.
             compression = None
         fname = [clean_id, suffix, format, compression]
@@ -94,12 +101,16 @@ class IdResolver():
         layer. Generally used in decompress mode,
         but using 'wb' make this return a compressed buffer.
         """
-        if compression is None or format=="parquet":
+        if buffer is None:
+            raise FileNotFoundError("Empty buffer found very late")            
+        elif compression is None or format=="parquet":
             return buffer
         elif compression == "bz2":
             return bz2.open(buffer, mode)
         elif compression == "gz":
             return gzip.open(buffer, mode)
+
+
         
     def __enter__(self):
         return self
@@ -107,7 +118,8 @@ class IdResolver():
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
 
-    def open(self, id, suffix = None, format=None, mode = 'rb', skip_compression = False,
+    def open(self, id, suffix = None, format=None, mode = 'rb',
+             skip_compression = False, compression = 'default',
              **kwargs):
         """
         Open a file for reading.
@@ -125,9 +137,9 @@ class IdResolver():
             raise TypeError("Storage backends only support binary writing formats ('wb' or 'rb')")
         
         # Update with some defaults.
-        if not 'compression' in kwargs:
+        if compression =='default':
             try:
-                kwargs['compression'] = self.compression
+                compression = self.compression
             except AttributeError:
                 raise AttributeError("You must specify compression somewhere")
 
@@ -136,13 +148,14 @@ class IdResolver():
 
         uncompressed = self._open(id = id, suffix = suffix, mode = mode, format = format,
                                   **kwargs)
-        
+        if uncompressed is None:
+            raise FileNotFoundError("Empty buffer found very late")
         # The name here is misleading; if mode is 'w', 'decompress' may actually be
         # acting as a compression filter on write actions.
         if skip_compression:
             fout = uncompressed
         else:
-            fout = self._decompress(uncompressed, format, kwargs['compression'], mode)
+            fout = self._decompress(uncompressed, format, compression, mode)
             
         assert fout
         
@@ -208,7 +221,7 @@ class LocalResolver(IdResolver):
         suffix = kwargs.get("suffix", None)
         filename = self.fname(id, format = format, compression = compression, suffix = suffix)
         dirname = kwargs.get("dir", self.dir)
-        return open(os.path.join(dirname, filename), mode)
+        return Path(dirname, filename).open(mode = mode)
 
         
 class PathResolver(IdResolver):
@@ -228,16 +241,22 @@ class PairtreeResolver(IdResolver):
         
     def _open(self, id, mode = 'rb', **kwargs):
         assert(mode.endswith('b'))
-        if mode.startswith('w'):
-            # Ensure DIRS EXIST
-            pass
+        
         format = kwargs.get("format", self.format)
         compression = kwargs.get("compression", self.compression)
         suffix = kwargs.get("suffix", None)
         path = htrc_features.utils.id_to_pairtree(id, format, suffix, compression)
-        full_path = os.path.join(self.dir, path)
-        return open(full_path, mode)
-    
+        full_path = Path(self.dir, path)
+        try:
+            return full_path.open(mode=mode)
+        except FileNotFoundError:
+            if mode.startswith('w'):
+                full_path.parent.mkdir(parents=True, exist_ok=True)
+                return full_path.open(mode=mode)
+            else:
+                raise
+        
+
     
 class ZiptreeResolver(IdResolver):
     """
@@ -247,7 +266,7 @@ class ZiptreeResolver(IdResolver):
     """
     def __init__(self, dir, format, pairtree_root = None, **kwargs):
         self.pairtree_root = pairtree_root
-        if not os.path.exists(dir):
+        if not os.path.exists(dir) and not kwargs['mode'].startswith('b'):
             os.makedirs(dir)
         super().__init__(dir = dir, format = format, **kwargs)
         

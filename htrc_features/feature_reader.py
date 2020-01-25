@@ -11,9 +11,10 @@ from six import iteritems, StringIO, BytesIO
 import codecs
 import os
 import warnings
+
 from htrc_features import utils
 from htrc_features import parsers, resolvers
-from htrc_features.parsers import JsonFileHandler, BaseFileHandler, ParquetFileHandler
+from htrc_features.parsers import JsonFileHandler, BaseFileHandler, ParquetFileHandler, MissingDataError, SECREF
 
 try:
     import rapidjson as json
@@ -37,12 +38,6 @@ except ImportError:
     import bz2
     if not PY3:
         logging.warning("Loading volumes from a URL will not work in Python 2 unless you install bz2file")
-
-# UTILS
-SECREF = ['header', 'body', 'footer']
-
-class MissingDataError(Exception):
-    pass
 
 class MissingFieldError(Exception):
     pass
@@ -208,7 +203,7 @@ def group_linechars(df, section='all', place='all'):
 # CLASSES
 class FeatureReader(object):
 
-    def __init__(self, paths=None, ids=None, format="json", id_resolver = None, **kwargs):
+    def __init__(self, paths=None, ids=None, format = "default", id_resolver = None, **kwargs):
         '''
         A reader for Extracted Features Dataset files.
         
@@ -217,8 +212,14 @@ class FeatureReader(object):
         
         ids: HathiTrust IDs. Preferred to `paths`. By default will download json files behind the scenes.
 
-        paths: Filepaths to dataset files. The format will depend on 
-        
+        paths: Filepaths to dataset files.
+ 
+        format: "json", "parquet", or "default". ("default" is JSON, but will inherit the
+        format from a passed id_resolver.) For custom use, this can also be a class factory that
+        inherits from BaseFileHandler.
+
+        id_resolver: The method used to resolve filenames.
+
         The other args depend on the parser. For the default jsonVolumeParser.
 
         `dir`: The location for local files, pairtree, etc.
@@ -230,7 +231,14 @@ class FeatureReader(object):
         assert (paths or ids) and not (paths and ids)
 
         self.resolver = id_resolver
-        
+
+        if format == "default":
+            # Allow learning the format from the resolver.
+            if isinstance(id_resolver, resolvers.IdResolver):
+                format = id_resolver.format
+            else:
+                format = "json"
+
         if self.resolver is None:
             self.resolver = default_resolver(ids, paths, format)
 
@@ -318,7 +326,7 @@ def filename_or_id(string):
     if "." in string[:6]:
         return "id"
 
-def retrieve_parser(id, format, resolver, **kwargs):
+def retrieve_parser(id, format, resolver, compression, **kwargs):
     """
     Retrieve a parser based on kwargs. Used in both Volume and FeatureReader.
     """
@@ -327,9 +335,9 @@ def retrieve_parser(id, format, resolver, **kwargs):
     if "file_handler" in kwargs:
         return kwargs["file_handler"]
     elif format == "json":
-        return parsers.JsonFileHandler(id, id_resolver = resolver, **kwargs)
+        return parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
     elif format == "parquet":
-        return parsers.ParquetFileHandler(id, id_resolver = resolver, **kwargs)
+        return parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
     else:
         raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
 
@@ -337,10 +345,11 @@ def retrieve_parser(id, format, resolver, **kwargs):
 class Volume(object):
 
     def __init__(self, id = None,
-                    format='json',
+                    format = "default",
                     id_resolver = None,
                     default_page_section='body',
                     path = None,
+                    compression = 'default',
                      **kwargs):
         '''
         The Volume allows simplified, Pandas-based access to the HTRC
@@ -373,6 +382,7 @@ class Volume(object):
         if path == False:
             warnings.warn("Please use None to indicate lack of a path", DeprecationWarning)
             path = None
+            
         if 'compressed' in kwargs:
             raise Exception("Use 'compression' argument. `compressed` has been deprecated.")
             if kwargs['compressed'] == False:
@@ -381,6 +391,14 @@ class Volume(object):
                 compression = 'bz2'
             
         resolver = id_resolver
+
+
+        if format == "default":
+            # Allow learning the format from the resolver.
+            if isinstance(id_resolver, resolvers.IdResolver):
+                format = id_resolver.format
+            else:
+                format = "json"
         
         if resolver is None:
             resolver = default_resolver(id, path, format)
@@ -388,6 +406,8 @@ class Volume(object):
         if resolver == 'http':
             compression = None
 
+        self.resolver = resolver
+            
         if path:
             id = path
         
@@ -395,7 +415,7 @@ class Volume(object):
 
         assert format in ["json", "parquet"]
 
-        self.parser = retrieve_parser(id, format, resolver, **kwargs)
+        self.parser = retrieve_parser(id, format, resolver, compression, **kwargs)
         
         self.args = kwargs
         
@@ -458,6 +478,9 @@ class Volume(object):
         else:
             raise Exception("Bad Section Arg")
 
+    def write(self, volume, **kwargs):
+        self.parser.write(volume, **kwargs)
+        
     @property
     def year(self):
         ''' A friendlier name wrapping Volume.pubDate '''
