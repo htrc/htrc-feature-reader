@@ -358,12 +358,10 @@ class ParquetFileHandler(BaseFileHandler):
     '''
         
     
-    def __init__(self, id, id_resolver, **kwargs):
+    def __init__(self, id, id_resolver, compression="snappy", **kwargs):
 
         self.format = "parquet"
         self.id = id
-        
-        self.compression = kwargs.get("compression", "snappy")
 
         self.resolver = id_resolver
 
@@ -393,7 +391,7 @@ class ParquetFileHandler(BaseFileHandler):
         if not 'title' in self.meta or not self.meta['title']:
             self.meta['title'] = self.meta['id']
 
-    def write(self, volume, **kwargs):
+    def write(self, volume, meta=True, tokens=True, section_features=False, chars=False, **kwargs):
         
         '''
 
@@ -415,24 +413,24 @@ class ParquetFileHandler(BaseFileHandler):
         token_kwargs=dict(section='body', drop_section=True, pos=False).
         '''
 
-        if kwargs.get("meta", True):
+        if meta:
             metastring = BytesIO(json.dumps(volume.parser.meta).encode("utf-8"))
             with self.resolver.open(self.id, **kwargs) as fout:
                 fout.write(metastring)
         
-        if kwargs.get("tokens", True):
+        if tokens:
             feats = volume._tokencounts
             if not feats.empty:
                 with self.resolver.open(id = self.id, suffix = 'tokens') as fout:
                     feats.to_parquet(fout, compression=self.compression)                
             
-        if kw.args.get("section_features", False):
+        if section_features:
             feats = volume.section_features(section='all')
             if not feats.empty:
                 with self.resolver.open(id = self.id, suffix = 'section') as fout:
                     feats.to_parquet(fout, compression=self.compression)
             
-        if kwargs.get("chars", False):
+        if chars:
             feats = volume.line_chars()
             if not feats.empty:
                 with self.resolver.open(id = self.id, suffix = 'chars') as fout:
