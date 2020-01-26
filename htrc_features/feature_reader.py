@@ -13,7 +13,7 @@ import os
 import warnings
 
 from htrc_features import utils
-from htrc_features import parsers, resolvers
+from htrc_features import parsers, resolvers, transformations
 from htrc_features.parsers import JsonFileHandler, BaseFileHandler, ParquetFileHandler, MissingDataError, SECREF
 
 try:
@@ -669,8 +669,7 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
                            
-    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, 
-                          suppress_warning=False, adjust_cap=.05, chunk_change_threshold=.4, **kwargs):
+    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, **kwargs):
         '''
         Return a tokenlist dataframe grouped by numbered 'chunks', each of which has roughly `chunk_target` words.
 
@@ -692,101 +691,32 @@ class Volume(object):
         # Chunking won't work with pages=False
         kwargs['pages'] = True
         tl = self.tokenlist(**kwargs)
+        newindex = ['chunk'] + [v for v in tl.index.names if v != 'page']
         
-        if 'chunk' in tl.index.names and not suppress_warning:
-            logging.warn('The internal representation of the tokenlist is already chunked,'
-                         ' so returning that. The parameters (e.g. word target per chunk)'
-                         ' are not known.')
-            return tl
-    
-        pagecounts = tl.reset_index().groupby('page')['count'].sum()
-        cumsums = pagecounts.cumsum()
+        with_chunks = tl.reset_index().set_index("page")
+        pagecounts = with_chunks.groupby('page')['count'].sum()
 
-        # Last entry gives number of words
-        ntokens = cumsums.iloc[-1]
-        n_chunks = max(int(int((ntokens) / chunk_target)), 1)
-        # Use actual page counts not including zeros
+        assert overflow_strategy in ["ends", "even", "last"]
+        chunking_method = getattr(transformations, "chunk_{}".format(overflow_strategy))
+        chunk_labs = chunking_method(pagecounts.values, chunk_target)
 
-        overflow = (ntokens % chunk_target)
-
-        if overflow > chunk_target/2:
-            overflow -= chunk_target
-            n_chunks +=1
-
-        # Store the start of chunks in an array.
-        breaks = np.zeros(cumsums.shape[0], np.int)
-
-        # 1-index the chunk names. 
-        breaks[0] = 1
-
-        # variable; how far do we want the next one to go?
-        if overflow_strategy == "ends":
-            target = chunk_target + overflow/2 # + avg_page_n/2
-        elif overflow_strategy == "last":
-            target = chunk_target
-        elif overflow_strategy == "even":
-            chunk_target += overflow / n_chunks
-            target = chunk_target
-
-        # Proportion of chunk_target that the length adjustment should cap at
-        max_adjust = adjust_cap * chunk_target
-        # When the remaining words per chunk is higher/lower that x proportion
-        #  of the chunk_target, add/remove a chunk.
-        new_chunk_threshold = chunk_change_threshold * chunk_target
-
-        i = 1
-        while True:
-            remaining_chunks = n_chunks - i
-            if not remaining_chunks:
-                break
-                
-            last_page = np.argmin(np.abs(cumsums.values - target))
-            if last_page + 1 >= len(breaks):
-                break
-            
-            breaks[last_page+1] = 1
-
-            # Remainder adjust - nudge next section slightly, to try to balance
-            # out consistently under or oversized parts.
-            remaining_nwords = (cumsums.values[-1] - cumsums.values[last_page])
-            remaining_word_per_chunk_diff = (remaining_nwords / remaining_chunks) - chunk_target
-
-            if abs(remaining_word_per_chunk_diff) > new_chunk_threshold:
-                n_chunks += np.sign(remaining_word_per_chunk_diff)
-                if n_chunks == i:
-                    break
-
-            if overflow_strategy == 'even':
-                # Adjust for what's necessary
-                adjust = remaining_word_per_chunk_diff
-            elif (overflow_strategy == 'last') and remaining_chunks:
-                remaining_word_per_chunk_diff -= overflow / remaining_chunks
-                adjust = (0.5+0.5*remaining_chunks/n_chunks) * remaining_word_per_chunk_diff
-            elif (overflow_strategy == 'ends') and remaining_chunks:   
-                remaining_word_per_chunk_diff -= overflow / 2 / remaining_chunks
-                adjust = (0.5+0.5*remaining_chunks/n_chunks) * remaining_word_per_chunk_diff
-            if abs(adjust) > max_adjust:
-                adjust = np.sign(adjust) * max_adjust
-            target = chunk_target + cumsums.values[last_page] + adjust
-            i += 1
-
-        chunk_names = pd.Series(np.cumsum(breaks), index = cumsums.index).to_frame("chunk")
-
-        with_chunks = tl.reset_index().set_index("page").join(chunk_names)
-
-        newindex = [v if v != 'page' else 'chunk'  for v in tl.index.names]
+        indexed = pd.Series(chunk_labs, index = pagecounts.index, name='chunk')
+        with_chunks = with_chunks.join(indexed) 
         
-        return_val = with_chunks.groupby(newindex)[['count']].sum()
+
+        groups = [g for g in tl.index.names if g != 'page']
+        return_val = with_chunks.groupby(groups + ['chunk'])['count'].sum().reset_index()
+
         if page_ref:
             chunk_bounds = with_chunks.reset_index().groupby("chunk")['page']\
                .agg(['min', 'max'])\
                .rename(columns = {'min':'pstart', 'max':'pend'})
-            return_val = (return_val.join(chunk_bounds)
-                                    .set_index(['pstart', 'pend'], append=True)
-                                    .reorder_levels(['chunk', 'pstart', 'pend'] + newindex[1:])
-                         )
-        
-        return return_val
+               
+            return_val = return_val.set_index('chunk').join(chunk_bounds).reset_index()
+            newindex = ['chunk', 'pstart', 'pend'] + newindex[1:]
+
+        # WTF with the index order here.
+        return return_val.set_index(newindex)
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
