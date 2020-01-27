@@ -56,7 +56,7 @@ class IdResolver():
     This base class enforces some pretty strict rules.
 
     """
-    def __init__(self, _sentinel = None, format = None, mode = 'rb', **kwargs):
+    def __init__(self, _sentinel = None, format = None, mode = 'rb', dir=None, **kwargs):
         if _sentinel is not None:
             raise NameError("You must name arguments to the IdHandler constructor.")
         if "dir" in kwargs:
@@ -67,7 +67,8 @@ class IdResolver():
             pass
 
         self.format = format
-
+        self.dir = dir
+        
         self.mode = mode
         
         if "compression" in kwargs:

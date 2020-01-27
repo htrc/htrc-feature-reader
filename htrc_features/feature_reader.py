@@ -402,6 +402,10 @@ class Volume(object):
             # Allow learning the format from the resolver.
             if isinstance(id_resolver, resolvers.IdResolver):
                 format = id_resolver.format
+                if (dir is not None) and (dir != id_resolver.dir):
+                    warn.warning("You provided a dir argument ({} )and id_resolver instance with a "
+                                 "different dir ({}).".format(dir, id_resolver.dir))
+                dir = id_resolver.dir
             else:
                 format = "json"
         
