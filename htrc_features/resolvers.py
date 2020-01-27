@@ -182,18 +182,21 @@ class IdResolver():
 
 class HttpResolver(IdResolver):
     
-    def __init__(self, url = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={id}&output=json", **kwargs):
+    def __init__(self, url = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={id}&output=json", dir=None, format='json', **kwargs):
         """
         Initialize with a url; it must contain the string "{id}" in it somewhere, and that will be replaced with the id in the get call.
         """
         self.url = url
-        kwargs['format'] = kwargs.get("format", "json")
+        if dir is not None:
+            raise ValueError("HTTP Resolver doesn't work with `dir`. Are you sure you meant to try to load "
+                             "from HTTP? If not, make sure you're explicit about id_resolver or your format "
+                             "argument is correct. If so, remove the `dir` argument.")
         
         # Currently this only returns uncompressed data.
         if not 'compression' in kwargs:
             kwargs['compression'] = None
             
-        super().__init__(**kwargs)
+        super().__init__(dir=dir, format=format, **kwargs)
     
     def _open(self, id = None, mode = 'rb', **kwargs):
         if 'compression' in kwargs and kwargs['compression'] == 'bz2':

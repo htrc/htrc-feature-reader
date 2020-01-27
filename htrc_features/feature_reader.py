@@ -203,7 +203,8 @@ def group_linechars(df, section='all', place='all'):
 # CLASSES
 class FeatureReader(object):
 
-    def __init__(self, paths=None, ids=None, format = "default", id_resolver = None, **kwargs):
+    def __init__(self, paths=None, ids=None, format = "default", id_resolver = None, dir=None,
+                 **kwargs):
         '''
         A reader for Extracted Features Dataset files.
         
@@ -231,6 +232,7 @@ class FeatureReader(object):
         assert (paths or ids) and not (paths and ids)
 
         self.resolver = id_resolver
+        self.dir = dir
 
         if format == "default":
             # Allow learning the format from the resolver.
@@ -273,7 +275,7 @@ class FeatureReader(object):
         ''' Generator for returning Volume objects '''
         for id in self.ids:
             yield Volume(id=id, format=self.format,
-                         id_resolver=self.resolver, **self.parser_kwargs)
+                         id_resolver=self.resolver, dir=self.dir, **self.parser_kwargs)
 
     def jsons(self, object = True, decompress = True):
         ''' 
@@ -296,7 +298,7 @@ class FeatureReader(object):
         
         for id in self.ids:
             vol = Volume(id = id, format = self.format, id_resolver = self.resolver,
-                         load = False, **self.parser_kwargs)
+                         load = False, dir=self.dir, **self.parser_kwargs)
             if decompress == True:
                 yield vol.parser._parse_json(object = object)
             else:
@@ -326,7 +328,7 @@ def filename_or_id(string):
     if "." in string[:6]:
         return "id"
 
-def retrieve_parser(id, format, resolver, compression, **kwargs):
+def retrieve_parser(id, format, resolver, compression, dir=None, **kwargs):
     """
     Retrieve a parser based on kwargs. Used in both Volume and FeatureReader.
     """
@@ -335,9 +337,11 @@ def retrieve_parser(id, format, resolver, compression, **kwargs):
     if "file_handler" in kwargs:
         return kwargs["file_handler"]
     elif format == "json":
-        return parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
+        return parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression,
+                                       dir=dir, **kwargs)
     elif format == "parquet":
-        return parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression, **kwargs)
+        return parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression,
+                                          dir=dir, **kwargs)
     else:
         raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
 
@@ -350,6 +354,7 @@ class Volume(object):
                     default_page_section='body',
                     path = None,
                     compression = 'default',
+                    dir = None,
                      **kwargs):
         '''
         The Volume allows simplified, Pandas-based access to the HTRC
@@ -415,7 +420,7 @@ class Volume(object):
 
         assert format in ["json", "parquet"]
 
-        self.parser = retrieve_parser(id, format, resolver, compression, **kwargs)
+        self.parser = retrieve_parser(id, format, resolver, compression, dir, **kwargs)
         
         self.args = kwargs
         

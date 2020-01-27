@@ -53,9 +53,9 @@ class TestFeatureReader():
             assert type(vol) == htrc_features.feature_reader.Volume
             assert vol.title == titles[i]
 
-    def test_parquet_reader(self, ids, titles):
+    def test_parquet_reading(self, ids, titles):
         dirpath = os.path.join('tests', 'data', 'partialparq')
-        feature_reader = FeatureReader(ids=ids, dir=dirpath)
+        feature_reader = FeatureReader(ids=ids, format='parquet', dir=dirpath)
         
         vol = next(feature_reader.volumes())
         assert type(vol) == htrc_features.feature_reader.Volume

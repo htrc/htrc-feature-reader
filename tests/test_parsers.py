@@ -13,12 +13,13 @@ class TestParsing():
         ''' Tests if format mismatch from data raises error'''
         dir = os.path.join('tests', 'data', 'fullparquet')
         
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
+            # This tries to load the ID from 
             vol = Volume(id = 'uc2.ark:/13960/t1xd0sc6x', format='json', dir = dir)
         
     def test_full_parquet(self):
         dir = os.path.join('tests', 'data', 'fullparquet')
-        vol = Volume(id = 'uc2.ark:/13960/t1xd0sc6x', parser='parquet', dir = dir)
+        vol = Volume(id = 'uc2.ark:/13960/t1xd0sc6x', format='parquet', dir = dir)
         assert vol.id == 'uc2.ark:/13960/t1xd0sc6x'
         assert type(vol.tokenlist()) is pd.core.frame.DataFrame
         assert type(vol.begin_line_chars()) is pd.core.frame.DataFrame
@@ -27,7 +28,7 @@ class TestParsing():
     def test_token_only_parquet(self):
         htid = 'uc2.ark:/13960/t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'justtokens')
-        vol = Volume(id = htid, parser='parquet', dir = filepath)
+        vol = Volume(id = htid, format='parquet', dir = filepath)
         
         # Should be inferred from path
         assert vol.id == 'uc2.ark:/13960/t1xd0sc6x'
@@ -74,19 +75,7 @@ class TestParsing():
         
         for method in ['section_features', 'tokenlist', 'begin_line_chars']:
             with pytest.raises(MissingDataError):
-                getattr(vol, method)()
-
-    def dont_test_meta_only_parquet(self):
-        htid = 'uc2.ark:/13960/t1xd0sc6x'
-        filepath = os.path.join('tests', 'data', 'justmeta', htid)
-        vol = Volume(filepath, parser='parquet')
-        
-        assert vol.id == 'uc2.ark:/13960/t1xd0sc6x'
-        assert vol.language == 'eng'
-        
-        for method in ['section_features', 'tokenlist', 'begin_line_chars']:
-            with pytest.raises(MissingDataError):
-                getattr(vol, method)()                
+                getattr(vol, method)()           
     
     def test_partial_parq_tokenlist(self):
         '''
