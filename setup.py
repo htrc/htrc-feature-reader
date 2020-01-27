@@ -6,7 +6,6 @@ setup(name='htrc-feature-reader',
       classifiers=[
           'Development Status :: 5 - Production/Stable',
           'License :: OSI Approved :: University of Illinois/NCSA Open Source License',
-          'Programming Language :: Python :: 3.5',
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7',
           'Natural Language :: English',
