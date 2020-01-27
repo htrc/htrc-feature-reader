@@ -56,11 +56,10 @@ class IdResolver():
     This base class enforces some pretty strict rules.
 
     """
-    def __init__(self, _sentinel = None, format = None, mode = 'rb', dir=None, **kwargs):
+    def __init__(self, _sentinel = None, format = None, mode = 'rb', dir=None, compression=None, **kwargs):
         if _sentinel is not None:
             raise NameError("You must name arguments to the IdHandler constructor.")
-        if "dir" in kwargs:
-            self.dir = kwargs['dir']
+
         if format is None:
             raise NameError("You must define the file format this resolver uses: json or parquet")
         else:
@@ -70,13 +69,7 @@ class IdResolver():
         self.dir = dir
         
         self.mode = mode
-        
-        if "compression" in kwargs:
-            self.compression = kwargs['compression']
-        else:
-            # Do **not** set compression to 'None', because None also means
-            # 'no compression.'
-            raise AttributeError("You must specify compression for a resolver")
+        self.compression = compression
         
         # Sometimes we have to remember open buffers to close.
         self.active_buffers = []
@@ -183,25 +176,24 @@ class IdResolver():
 
 class HttpResolver(IdResolver):
     
-    def __init__(self, url = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={id}&output=json", dir=None, format='json', **kwargs):
+    def __init__(self, url = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={id}&output=json", dir=None, format='json', compression=None, **kwargs):
         """
         Initialize with a url; it must contain the string "{id}" in it somewhere, and that will be replaced with the id in the get call.
         """
         self.url = url
+        self.compression = compression
         if dir is not None:
             raise ValueError("HTTP Resolver doesn't work with `dir`. Are you sure you meant to try to load "
                              "from HTTP? If not, make sure you're explicit about id_resolver or your format "
                              "argument is correct. If so, remove the `dir` argument.")
-        
-        # Currently this only returns uncompressed data.
-        if not 'compression' in kwargs:
-            kwargs['compression'] = None
             
-        super().__init__(dir=dir, format=format, **kwargs)
+        super().__init__(dir=dir, format=format, compression=self.compression, **kwargs)
     
-    def _open(self, id = None, mode = 'rb', **kwargs):
-        if 'compression' in kwargs and kwargs['compression'] == 'bz2':
-            raise Warning("You have requested to read from HTTP with bz2 compression, but at time of writing this was not supported.")
+    def _open(self, id = None, mode = 'rb', compression='default', **kwargs):
+        if compression == 'default':
+            compression = self.compression
+        if compression == 'bz2':
+            raise Exception("You have requested to read from HTTP with bz2 compression, but at time of writing this was not supported.")
         if mode == 'wb':
             raise NotImplementedError("Mode is not defined")
         path_or_url = self.url.format(id = id)
@@ -219,37 +211,37 @@ class LocalResolver(IdResolver):
     def __init__(self, dir, **kwargs):
         super().__init__(dir = dir, **kwargs)
     
-    def _open(self, id, format = None, mode = 'rb', compression='default', suffix=None, **kwargs):
+    def _open(self, id, format = None, mode = 'rb', compression='default', dir=None, suffix=None, **kwargs):
 
         if compression is 'default':
             compression = self.compression
+        if not dir:
+            dir = self.dir
         
         filename = self.fname(id, format = format, compression = compression, suffix = suffix)
-        dirname = kwargs.get("dir", self.dir)
-        return Path(dirname, filename).open(mode = mode)
+        return Path(dir, filename).open(mode = mode)
 
         
 class PathResolver(IdResolver):
     # A path is the simplest form of id storage. These are not HTIDs, and so aren't stored.
     # We could check to make sure the pathname makes sense. But we don't.
-    def _open(self, id, mode = 'rb', **kwargs):
-        if "compression" in kwargs:
-            self.compression = kwargs["compression"]
-        
+    def _open(self, id, mode = 'rb', compression=None, **kwargs):
+        self.compression = compression
         return open(id, mode)
 
 class PairtreeResolver(IdResolver):
-    def __init__(self, **kwargs):
-        if not "dir" in kwargs:
+    def __init__(self, dir=None, **kwargs):
+        if not dir:
             raise NameError("You must specify a directory with 'dir'")
-        super().__init__(**kwargs)
+        super().__init__(dir=dir, **kwargs)
         
-    def _open(self, id, mode = 'rb', **kwargs):
+    def _open(self, id, mode = 'rb', format=None, compression='default', suffix=None, **kwargs):
         assert(mode.endswith('b'))
         
-        format = kwargs.get("format", self.format)
-        compression = kwargs.get("compression", self.compression)
-        suffix = kwargs.get("suffix", None)
+        if not format:
+            format = self.format
+        if compression == 'default':
+            compression = self.compression
 
         path = htrc_features.utils.id_to_pairtree(id, format, suffix, compression)
         full_path = Path(self.dir, path)
@@ -283,14 +275,14 @@ class ZiptreeResolver(IdResolver):
             return None
         return os.path.join(self.dir, code + ".zip")
 
-    def _open(self, id, mode = 'rb', **kwargs):
+    def _open(self, id, mode = 'rb', format=None, compression='default', suffix=None, force=False, **kwargs):
         """
         Force: overwrite existing files where found. (not implemented).
         """
-        format = kwargs.get("format", self.format)
-        compression = kwargs.get("compression", self.compression)
-        suffix = kwargs.get("suffix", None)
-        force = kwargs.get("force", False)
+        if not format:
+            format = self.format
+        if compression == 'default':
+            compression = self.compression
         
         filename = self.fname(id, format = format, suffix = suffix, compression = compression)
         

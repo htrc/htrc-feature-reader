@@ -43,7 +43,7 @@ class MissingDataError(Exception):
 
 class BaseFileHandler(object):
     
-    def __init__(self, id = None, id_resolver = None, **kwargs):
+    def __init__(self, id = None, id_resolver = None, compression='default', **kwargs):
         '''
         Base class for volume reading.
         '''
@@ -52,12 +52,11 @@ class BaseFileHandler(object):
 
         self.args = kwargs
         
-        self.compression = kwargs.get('compression', 'default')
-        
+        self.compression = compression
         if self.compression == 'default':
             if isinstance(id_resolver, resolvers.IdResolver):
                 # First choice; inherit from the resolver.
-                compression = id_resolver.compression
+                self.compression = id_resolver.compression
             elif self.format == "json":
                 # bz2 default for local files, 'json' for remote.
                 if id_resolver == 'http':
@@ -70,11 +69,8 @@ class BaseFileHandler(object):
                 self.compression = "snappy"
             else:
                 raise
-            
-        kwargs['compression'] = self.compression
-
         
-        self.resolver = self._init_resolver(id_resolver, **kwargs)
+        self.resolver = self._init_resolver(id_resolver, compression=self.compression, **kwargs)
         
         if 'load' in self.args and self.args['load'] == False:
             return
@@ -177,37 +173,34 @@ class JsonFileHandler(BaseFileHandler):
                              'capAlphaSeq', 'sentenceCount']
 
     
-    def __init__(self, id, id_resolver, compression = 'default', **kwargs):
+    def __init__(self, id, id_resolver, compression = 'bz2', **kwargs):
 
         self.meta = dict(id=None, handle_url=None)
         self.format = "json"
         self.id = id
         self._schema = None
         self._pages = None
+        self.compression = 'bz2'
 
 
         # parsing and reading are called here.
         super().__init__(id, id_resolver = id_resolver, compression = compression, **kwargs)
 
-    def write(self, outside_volume, **kwargs):
+    def write(self, outside_volume, compression='default', mode='default', **kwargs):
 
         
         # Look for a mode flag in three places: the passed args,
         # the parser, and the parser's resolver. This is to ensure
         # that a user actually typed 'wb' *somewhere* before doing
         # anything destructive.
-        
-        if not 'mode' in kwargs:
+        if mode is 'default':
             try:
-                kwargs['mode'] = self.mode
+                mode = self.mode
             except AttributeError:
-                kwargs['mode'] = self.resolver.mode
-
-        
-        compression = kwargs.get("compression", self.compression)
+                mode = self.resolver.mode
 
         if compression == "default":
-            compression = "bz2"
+            compression = self.compression
             
         if outside_volume.parser.format != "json":
             raise TypeError("Can only write to json from other json, because"
@@ -224,7 +217,7 @@ class JsonFileHandler(BaseFileHandler):
         json_bytestring = outside_volume.parser._parse_json(object = False, skip_compression = skip_compression)
         
         with self.resolver.open(self.id, compression = self.compression, format = 'json',
-                                skip_compression = skip_compression,
+                                skip_compression = skip_compression, mode=mode,
                                 **kwargs) as fout:
             fout.write(json_bytestring)
     
@@ -235,11 +228,11 @@ class JsonFileHandler(BaseFileHandler):
         '''
         pass
     
-    def _parse_json(self, **kwargs):
+    def _parse_json(self, compression='default', **kwargs):
         id = self.id
         resolver = self.resolver
-        if not "compression" in kwargs:
-            kwargs['compression'] = self.compression
+        if compression is 'default':
+            compression = self.compression
         
         for k in self.args:
             if not k in kwargs:
@@ -434,7 +427,7 @@ class ParquetFileHandler(BaseFileHandler):
     '''
         
     
-    def __init__(self, id, id_resolver, compression="default", mode = 'rb', **kwargs):
+    def __init__(self, id, id_resolver, compression="snappy", mode = 'rb', **kwargs):
 
         self.format = "parquet"
         self.id = id
@@ -462,7 +455,8 @@ class ParquetFileHandler(BaseFileHandler):
         if not 'title' in self.meta or not self.meta['title']:
             self.meta['title'] = self.meta['id']
 
-    def write(self, volume, meta=True, tokens=True, section_features=False, chars=False, **kwargs):
+    def write(self, volume, meta=True, tokens=True, section_features=False, chars=False, mode='default', 
+              compression=False, indexed=True, **kwargs):
         '''
 
         Save the internal representations of feature data to parquet, and the metadata to json,
@@ -487,23 +481,19 @@ class ParquetFileHandler(BaseFileHandler):
         # Look for a mode flag in three places: the passed args,
         # the parser, and the parser's resolver. This is to ensure
         # that a user actually typed 'wb' *somewhere* before writing.
-        
-        if not 'mode' in kwargs:
+        if mode is 'default':
             try:
-                kwargs['mode'] = self.mode
+                mode = self.mode
             except AttributeError:
-                kwargs['mode'] = self.resolver.mode
+                mode = self.resolver.mode
 
-        indexed = kwargs.get("indexed", True)
-
-        compression = kwargs.get('compression', self.compression)
-        
         if compression == "default":
-            compression = "snappy"
+            compression = self.compression
         
         if meta:
             metastring = BytesIO(json.dumps(volume.parser.meta).encode("utf-8"))
-            with self.resolver.open(self.id, format = "json", compression = None, suffix = 'meta', **kwargs) as fout:
+            with self.resolver.open(self.id, format = "json", compression = None, suffix = 'meta', mode=mode,
+                                    **kwargs) as fout:
                 fout.write(metastring.read())
         
         if tokens:
@@ -511,19 +501,19 @@ class ParquetFileHandler(BaseFileHandler):
             if not indexed:
                 feats = feats.reset_index()
             if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'tokens', **kwargs) as fout:
+                with self.resolver.open(id = self.id, suffix = 'tokens', mode=mode, **kwargs) as fout:
                     feats.to_parquet(fout, compression=compression)                
                 
         if section_features:
             feats = volume.section_features(section='all')
             if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'section', **kwargs) as fout:
+                with self.resolver.open(id = self.id, suffix = 'section', mode=mode, **kwargs) as fout:
                     feats.to_parquet(fout, compression=compression)
             
         if chars:
             feats = volume.line_chars()
             if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'chars', **kwargs) as fout:
+                with self.resolver.open(id = self.id, suffix = 'chars', mode=mode, **kwargs) as fout:
                     feats.to_parquet(fout, compression=compression)
 
     def _make_tokencount_df(self):

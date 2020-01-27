@@ -328,14 +328,14 @@ def filename_or_id(string):
     if "." in string[:6]:
         return "id"
 
-def retrieve_parser(id, format, resolver, compression, dir=None, **kwargs):
+def retrieve_parser(id, format, resolver, compression, dir=None, file_handler=None, **kwargs):
     """
     Retrieve a parser based on kwargs. Used in both Volume and FeatureReader.
     """
 
     # When would this be useful?
-    if "file_handler" in kwargs:
-        return kwargs["file_handler"]
+    if file_handler:
+        return file_handler
     elif format == "json":
         return parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression,
                                        dir=dir, **kwargs)
@@ -389,7 +389,7 @@ class Volume(object):
             path = None
             
         if 'compressed' in kwargs:
-            raise Exception("Use 'compression' argument. `compressed` has been deprecated.")
+            warning.warn("Use 'compression' argument. `compressed` has been deprecated.")
             if kwargs['compressed'] == False:
                 compression = None
             elif kwargs['compressed'] == True:
@@ -573,7 +573,7 @@ class Volume(object):
         line on the page. Returns a list for all pages. Only includes the body:
         header/footer information is not included.
         '''
-        if ('section' in kwargs) and kwargs['section'] != 'body':
+        if section and (section != 'body'):
             logging.warning("cap_alpha_seq only includes counts for the body "
                          "section of pages.")
             kwargs['section'] = 'body'
