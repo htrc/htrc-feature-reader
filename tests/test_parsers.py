@@ -24,7 +24,7 @@ class TestParsing():
         assert type(vol.begin_line_chars()) is pd.core.frame.DataFrame
         assert type(vol.section_features(section='all')) is pd.core.frame.DataFrame
     
-    def dont_test_token_only_parquet(self):
+    def test_token_only_parquet(self):
         htid = 'uc2.ark:/13960/t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'justtokens')
         vol = Volume(id = htid, parser='parquet', dir = filepath)
@@ -77,7 +77,7 @@ class TestParsing():
                 getattr(vol, method)()
 
     def dont_test_meta_only_parquet(self):
-        htid = 'uc2.ark+=13960=t1xd0sc6x'
+        htid = 'uc2.ark:/13960/t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'justmeta', htid)
         vol = Volume(filepath, parser='parquet')
         
@@ -89,9 +89,15 @@ class TestParsing():
                 getattr(vol, method)()                
     
     def test_partial_parq_tokenlist(self):
-        htid = 'uc2.ark+=13960=t1xd0sc6x'
-        filepath = os.path.join('tests', 'data', 'partialparq', htid)
-        vol = Volume(filepath, parser='parquet')
+        '''
+        Test loading of tokenlists saved with less information. In this case, 
+        vol.save_parquet('tests/data/partialparq/', 
+                          token_kwargs=dict(case=False, pos=False, drop_section=False)
+                        )
+        '''
+        htid = 'uc2.ark:/13960/t1xd0sc6x'
+        dirpath = os.path.join('tests', 'data', 'partialparq')
+        vol = Volume(id=htid, format='parquet', dir=dirpath)
  
         tl = vol.tokenlist(case=False, pos=False)
         assert tl.reset_index().columns.tolist() == ['page', 'lowercase', 'count']
@@ -108,8 +114,8 @@ class TestParsing():
 
     def test_chunked_parq_tokenlist(self):
         htid = 'uc2.ark+=13960=t1xd0sc6x'
-        filepath = os.path.join('tests', 'data', 'chunkedparq', htid)
-        vol = Volume(filepath, parser='parquet')
+        dirpath = os.path.join('tests', 'data', 'chunkedparq')
+        vol = Volume(id=htid, format='parquet', dir=dirpath)
 
         assert vol.tokenlist(case=False, pos=True).reset_index().columns.tolist() == ['chunk', 'section', 'lowercase', 'pos', 'count']
         assert vol.tokenlist(case=True, pos=False).reset_index().columns.tolist() == ['chunk', 'section', 'token', 'count']
