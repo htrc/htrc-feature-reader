@@ -1,0 +1,13 @@
+override_code_id_strategies: false
+id_search_strategy:
+  - 
+     format: json
+     id_resolver: pairtree
+     cache: true
+     dir: "htrc-features"
+     compression: bz2
+     indexed: true
+  - 
+     format: json
+     id_resolver: https
+     endpoint: 'f"https://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={id}&output={format}"'

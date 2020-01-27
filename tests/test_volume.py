@@ -17,12 +17,12 @@ def paths():
 @pytest.fixture(scope="module")
 def volume(paths):
     paths = paths[0]
-    feature_reader = FeatureReader(paths, compressed=False)
+    feature_reader = FeatureReader(paths, compression=None)
     return next(feature_reader.volumes())
 
 @pytest.fixture(scope="module")
 def fullvolume(paths):
-    return Volume(os.path.join('tests', 'data', 'green-gables-full.json'), compressed=False)
+    return Volume(os.path.join('tests', 'data', 'green-gables-full.json'), compression=None)
 
 class TestVolume():
 
@@ -30,7 +30,7 @@ class TestVolume():
         import time
         # Load new volume specifically for this test
         paths = paths[0]
-        feature_reader = FeatureReader(paths, compressed=False)
+        feature_reader = FeatureReader(paths, compression=None)
         vol = next(feature_reader.volumes())
         # Systems are different, the rough test here simply checks whether
         # the first run is much slower than later runs.
@@ -45,7 +45,7 @@ class TestVolume():
     def test_direct_loading(self, paths):
         import time
         # Load new volume specifically for this test
-        vol = Volume(paths[0], compressed=False)
+        vol = Volume(paths[0], compression=None)
         assert type(vol) == htrc_features.feature_reader.Volume
         
     def test_fullparquet_saving(self, volume, tmp_path):
@@ -223,7 +223,7 @@ class TestVolume():
 
     def test_internal_tokencount_representation(self, paths):
         paths = paths[0]
-        feature_reader = FeatureReader(paths, compressed=False)
+        feature_reader = FeatureReader(paths, compression=None)
         vol = next(feature_reader.volumes())
 
         assert vol._tokencounts.empty
@@ -252,5 +252,5 @@ class TestVolume():
                                  .groupby(level='chunk').sum()
                       )
             assert abs(chunked.mean().iloc[0] - chunk_size) < chunk_size/3 
-            assert abs(chunked.max().iloc[0] - chunk_size) < longest_page*2 # Does it avoid huge chunks
-            assert abs(chunked.min().iloc[0] - chunk_size) < chunk_size/4 # Does it avoid tiny chunks
+            assert abs(chunked.iloc[1:-1].max().iloc[0] - chunk_size) < longest_page*2 # Does it avoid huge chunks
+            assert abs(chunked.iloc[1:-1].min().iloc[0] - chunk_size) < chunk_size/4 # Does it avoid tiny chunks

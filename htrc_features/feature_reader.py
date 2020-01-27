@@ -10,7 +10,11 @@ import pymarc
 from six import iteritems, StringIO, BytesIO
 import codecs
 import os
+import warnings
+
 from htrc_features import utils
+from htrc_features import parsers, resolvers, transformations
+from htrc_features.parsers import JsonFileHandler, BaseFileHandler, ParquetFileHandler, MissingDataError, SECREF
 
 try:
     import rapidjson as json
@@ -35,17 +39,12 @@ except ImportError:
     if not PY3:
         logging.warning("Loading volumes from a URL will not work in Python 2 unless you install bz2file")
 
-# UTILS
-SECREF = ['header', 'body', 'footer']
-
-class MissingDataError(Exception):
-    pass
-
 class MissingFieldError(Exception):
     pass
 
 def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
-                    page_freq=False, pagecolname='page'):
+                    page_freq=False, pagecolname='page', indexed = True):
+    
     '''
         Return a token count dataframe with requested folding.
 
@@ -144,7 +143,32 @@ def fold_pages(page_list, chunkname):
     chunk['chunk'] = chunkname
     grouped = chunk.reset_index().groupby(newindex)[['count']].sum()
     return grouped
+
+def default_resolver(id, path, format):
+    if type(id) is list:
+        id = id[0]
+    if type(path) is list:
+        path = path[0]
         
+    if (id is None) or (path is not None):
+        return "path"
+    else:
+        guess = filename_or_id(id)
+        
+    ### First arg.
+    if guess == "filename":
+        # Don't really need a warning here.
+        return "path"
+    elif guess == "id" and format == "json":
+        # Pull from the web on an unlisted path by default.
+        # TODO: I think there are much better approaches here; looking in
+        # various places before pinging Hathi, etc.        
+        return "http"
+    elif guess == "id" and format == "parquet":      
+        return "local"
+    raise AttributeError("No sensible default for format of {} with ids like {}".format(format, id))
+
+
 def group_linechars(df, section='all', place='all'):
 
     # Set up grouping
@@ -179,84 +203,106 @@ def group_linechars(df, section='all', place='all'):
 # CLASSES
 class FeatureReader(object):
 
-    def __init__(self, paths=None, ids=None, parser="json", **kwargs):
+    def __init__(self, paths=None, ids=None, format = "default", id_resolver = None, dir=None,
+                 **kwargs):
         '''
         A reader for Extracted Features Dataset files.
         
         parser: a VolumeParser class, or a string for a built in class (e.g.'json' or
         'parquet').
         
-        paths: Filepaths to dataset files. The format will depend on 
-        
-        ids: HathiTrust IDs referred to files. Alternative to `paths`. By default will download
-            json files behind the scenes.
-        
-        The other args depend on the parser. For the default jsonVolumeParser, allowable args
-        are: `compressed`.
+        ids: HathiTrust IDs. Preferred to `paths`. By default will download json files behind the scenes.
+
+        paths: Filepaths to dataset files.
+ 
+        format: "json", "parquet", or "default". ("default" is JSON, but will inherit the
+        format from a passed id_resolver.) For custom use, this can also be a class factory that
+        inherits from BaseFileHandler.
+
+        id_resolver: The method used to resolve filenames.
+
+        The other args depend on the parser. For the default jsonVolumeParser.
+
+        `dir`: The location for local files, pairtree, etc.
+
         '''
         
-        # only one of paths or ids can be selected - otherwise it's not clear what to iterate
-        # over. 
-        assert (paths or ids) and not (paths and ids)
-        
-        if paths:
-            self._online = False
-            if type(paths) is list:
-                self.paths = paths
-            else:
-                self.paths = [paths]
-        else:
-            self.paths = False
-        
-        if ids:
-            if type(ids) is list:
-                self.ids = ids
-            else:
-                self.ids = [ids]
-        else:
-            self.ids = False
+        # only one of paths or ids can be selected - otherwise it's not clear what to iterate over. 
 
+        assert (paths or ids) and not (paths and ids)
+
+        self.resolver = id_resolver
+        self.dir = dir
+
+        if format == "default":
+            # Allow learning the format from the resolver.
+            if isinstance(id_resolver, resolvers.IdResolver):
+                format = id_resolver.format
+            else:
+                format = "json"
+
+        if self.resolver is None:
+            self.resolver = default_resolver(ids, paths, format)
+
+        # Define paths as ids with "path" resolution.        
+        if paths is not None:
+            ids = paths
+            paths = None
+        
+        self.ids = ids
+
+        if self.ids and type(self.ids) is not list:
+            self.ids = [self.ids]
+        
         self.index = 0
         
-        if parser == 'json':
-            self.parser_class = jsonVolumeParser
-        elif issubclass(parser, htrc_features.baseVolumeParser):
-            self.parser_class = parser
-        else:
-            raise Exception("No valid parser defined.")
+        assert format in ["json", "parquet"]
+        
+        self.format = format
         
         self.parser_kwargs = kwargs
-
+            
     def __iter__(self):
         return self.volumes()
     
     def __len__(self):
-        return len(self.paths)
+        return len(self.ids)
 
     def __str__(self):
         return "HTRC Feature Reader with %d paths loaded" % (len(self.paths))
 
     def volumes(self):
         ''' Generator for returning Volume objects '''
-        if self.ids:
-            for id in self.ids:
-                yield Volume(path=False, id=id, parser=self.parser_class, **self.parser_kwargs)
-        elif self.paths:
-            for path in self.paths:
-                yield Volume(path, id=False, parser=self.parser_class, **self.parser_kwargs)
-        else:
-            raise
+        for id in self.ids:
+            yield Volume(id=id, format=self.format,
+                         id_resolver=self.resolver, dir=self.dir, **self.parser_kwargs)
 
-    def jsons(self):
-        ''' Generator for returning decompressed, parsed json dictionaries
+    def jsons(self, object = True, decompress = True):
+        ''' 
+
+        Generator for returning decompressed, parsed json dictionaries
         for volumes. Convenience function for when the FeatureReader objects
-        are not needed. '''
-        if 'compressed' in self.parser_kwargs:
-            compressed = self.parser_kwargs['compressed']
-        else:
-            compressed = True
-        for path in self.paths:
-            yield jsonVolumeParser.read(None, path_or_url = path, compressed=compressed)
+        are not needed. 
+
+        object defines whether to return parsed json, or simply json strings.
+
+        decompress only applies when object is false; whether to bother 
+        decompressing the binary text.
+
+        '''
+        
+        assert self.format == 'json'
+        
+        # Can't avoid decompressing if there's an object involved.
+        assert ((object and decompress) or (not object))
+        
+        for id in self.ids:
+            vol = Volume(id = id, format = self.format, id_resolver = self.resolver,
+                         load = False, dir=self.dir, **self.parser_kwargs)
+            if decompress == True:
+                yield vol.parser._parse_json(object = object)
+            else:
+                yield vol.parser._parse_json(object = object, compression = None)               
 
     def first(self):
         ''' Return first volume from Feature Reader. This is a convenience
@@ -265,405 +311,51 @@ class FeatureReader(object):
         return next(self.volumes())
     
     def __repr__(self):
-        if self.paths:
-            if len(self.paths) > 1:
-                return "<%d path FeatureReader (%s to %s)>" % (len(self.paths), self.paths[0], self.paths[-1])
-            elif len(self.paths) == 0:
-                return "<Empty FeatureReader>"
-            else:
-                return "<FeatureReader for %s>" % self.paths[0]
-        elif self.ids:
-            if len(self.ids) > 1:
-                return "<%d path FeatureReader (%s to %s)>" % (len(self.ids), self.ids[0], self.ids[-1])
-            elif len(self.ids) == 0:
-                return "<Empty FeatureReader>"
-            else:
-                return "<FeatureReader for %s>" % self.ids[0]
+        if len(self.ids) > 1:
+            return "<%d path FeatureReader (%s to %s)>" % (len(self.ids), self.ids[0], self.ids[-1])
+        elif len(self.ids) == 0:
+            return "<Empty FeatureReader>"
+        else:
+            return "<FeatureReader for %s>" % self.ids[0]
         
     def __str__(self):
         return "<%d path FeatureReader>" % (len(self.ids))
 
-class baseVolumeParser(object):
-    
-    def __init__(self, path=False, id=False, **kwargs):
-        ''' Base class for volume reading.'''
-        self.meta = dict(id=None)
-        
-        # Example init process
-        output = self.read(path, id, **kwargs)
-        self.parse(output)
-    
-    def read(self):
-        ''' Args can be dependent on individual parser.'''
-        pass
-    
-    def parse(self):
-        ''' Save any info that needs to be held at init time for parsing. In some cases,
-        little needs to be saved before methods like _make_tokencount_df need to be run.
-        '''
-        pass
-    
-    def _make_tokencount_df(self):
-        pass
-    
-    def _make_line_char_df(self):
-        pass
-    
-    def _make_section_feature_df(self):
-        pass
-    
-    def _make_page_feature_df(self):
-        pass
-    
-    def _parse_meta(self):
-        pass
-        
-        
-class jsonVolumeParser(baseVolumeParser):
-    SUPPORTED_SCHEMA = ['3.0']
-    METADATA_FIELDS = [('schemaVersion', 'schema_version'), ('dateCreated', 'date_created'),
-                       ('title', 'title'), ('pubDate', 'pub_date'), ('language', 'language'),
-                       ('htBibUrl', 'ht_bib_url'), ('handleUrl', 'handle_url'),
-                       ('oclc', 'oclc'), ('imprint', 'imprint'), ('names', 'names'),
-                       ('classification', 'classification'),
-                       ('typeOfResource', 'type_of_resource'), ('issuance', 'issuance'),
-                       ('genre', 'genre'), ("bibliographicFormat", "bibliographic_format"),
-                       ("pubPlace", "pub_place"), ("governmentDocument", "government_document"),
-                       ("sourceInstitution", "source_institution"),
-                       ("enumerationChronology", "enumeration_chronology"),
-                       ("hathitrustRecordNumber", "hathitrust_record_number"),
-                       ("rightsAttributes", "rights_attributes"),
-                       ("accessProfile", "access_profile"),
-                       ("volumeIdentifier", "volume_identifier"),
-                       ("sourceInstitutionRecordNumber", "source_institution_record_number"),
-                       ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"),
-                       ("lastUpdateDate", "last_update_date")
-                      ]
-    ''' List of metadata fields, with their pythonic name mapping. '''
-    
-    BASIC_FIELDS = [('pageCount', 'page_count')]
-    ''' List of fields which return primitive values in the schema, as tuples
-    with (CamelCase, lower_with_under) mapping.
-    '''
-    
-    PAGE_FIELDS =  ['seq', 'languages']
-    SECTION_FIELDS =  ['tokenCount', 'lineCount', 'emptyLineCount',
-                             'capAlphaSeq', 'sentenceCount']
-    DL_URL = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={0}&output=json"
-    
-    def __init__(self, path=False, id=False, compressed=True, **kwargs):
-        self.meta = dict(id=None, handle_url=None)
-        self._schema = None
-        self._pages = None
-        
-        assert (path or id) and not (path and id)
-        
-        if id:
-            path = self.DL_URL.format(id)
-        
-        obj = self.read(path, compressed, **kwargs)
-        self.parse(obj)
-    
-    def read(self, path_or_url, compressed=True, **kwargs):
-        ''' Load JSON for a path. Allows remote files in addition to local ones. 
-            Returns: JSON object.
-        '''
-        if parse_url(path_or_url).scheme in ['http', 'https']:
-            try:
-                req = _urlopen(path_or_url)
-                filename_or_buffer = BytesIO(req.read())
-            except HTTPError:
-                logging.exception("HTTP Error accessing %s" % path_or_url)
-                raise
-            compressed = False
-        else:
-            filename_or_buffer = path_or_url
-        
-        try:
-            if compressed:
-                f = bz2.BZ2File(filename_or_buffer)
-            else:
-                if (type(filename_or_buffer) != BytesIO) and not isinstance(filename_or_buffer, StringIO):
-                    f = codecs.open(filename_or_buffer, 'r+', encoding="utf-8")
-                else:
-                    f = filename_or_buffer
-            rawjson = f.readline()
-            f.close()
-        except IOError:
-            logging.exception("Can't read %s. Did you pass the incorrect "
-                              "'compressed=' argument?", path_or_url)
-            raise
-        except:
-            print(compressed, type(filename_or_buffer))
-            logging.exception("Can't open %s", path_or_url)
-            raise
+def filename_or_id(string):
+    for ending in [".gz", ".bz2", ".json", ".parquet"]:
+        if string.endswith(ending):
+            return "filename"
+    if "." in string[:6]:
+        return "id"
 
-        try:
-            # For Python3 compatibility, decode to str object
-            if PY3 and (type(rawjson) != str):
-                rawjson = rawjson.decode()
-            volumejson = json.loads(rawjson)
-        except:
-            logging.exception("Problem reading JSON for %s. One common reason"
-                              " for this error is an incorrect compressed= "
-                              "argument", path_or_url)
-            raise
-        return volumejson
-    
-    def parse(self, obj):
-        self._schema = obj['features']['schemaVersion']
-        if self._schema not in self.SUPPORTED_SCHEMA:
-            logging.warning('Schema version of imported (%s) file does not match '
-                         'the supported versions (%s). Update your files or use an older '
-                         'version of the library' %
-                         (obj['features']['schemaVersion'],
-                          self.SUPPORTED_SCHEMA))
-            
-        self._pages = obj['features']['pages']
-        
-        # Anything in self.meta becomes an attribute in the volume
-        self.meta = dict(id=obj['id'])
-        
-        # Expand basic values to properties
-        for key, pythonkey in self.METADATA_FIELDS:
-            if key in obj['metadata']:
-                self.meta[pythonkey] = obj['metadata'][key]
-        for key, pythonkey in self.BASIC_FIELDS:
-            if key in obj['features']:
-                self.meta[pythonkey] = obj['features'][key]
-        
-        if 'language' in self.meta:
-            if (self._schema in ['2.0', '3.0']) and (self.meta['language'] in ['jpn', 'chi']):
-                logging.warning("This version of the EF dataset has a tokenization bug "
-                            "for Chinese and Japanese. See " "https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
-        
-        # TODO collect while iterating earlier
-        self.seqs = [int(page['seq']) for page in self._pages]
-    
-    def _parse_meta(self):
-        pass
-    
-    def _make_page_feature_df(self):
-        # Parse basic page features
-        # saves a DF to self.page_features where the index is the seq
-        # number and the columns are the values of PAGE_FIELDS
-        page_features = pd.DataFrame([{k:v for k,v in page.items() 
-                                   if k in self.PAGE_FIELDS} 
-                                  for page in self._pages])
-        page_features['seq'] = pd.to_numeric(page_features['seq'])
-        page_features = page_features.rename(columns={'seq':'page'})
-        return page_features.set_index('page')
-        
-    def _make_section_feature_df(self):
-        # Parse non-token section-specific features
-        # saves a DF to self.section_features where the index is
-        # (seq, section) and the columns are the values of
-        # section_feature_list
-        collector = []
-        for page in self._pages:
-            for sec in SECREF:
-                row = { feat: page[sec][feat] 
-                       for feat in self.SECTION_FIELDS }
-                row['page'] = int(page['seq'])
-                row['section'] = sec
-                collector.append(row)
-        return pd.DataFrame(collector).set_index(['page', 'section'])
-    
-    @property
-    def token_freqs(self):
-        ''' Returns a dataframe of page / section /count '''
-        if not self._token_freqs:
-            d = [{'page': int(page['seq']), 'section': sec,
-                 'count':page[sec]['tokenCount']} for page 
-                 in self._pages for sec in SECREF]
-            self._token_freqs = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
-        return self._token_freqs
-        
-    def _make_tokencount_df(self, pages=False):
-        '''
-        Returns a Pandas dataframe of:
-            page / section / place(i.e. begin/end) / char / count
-            
-        If no page JSON is provided, internal representation will be used.
-        '''
-        if not pages:
-            pages = self._pages
+def retrieve_parser(id, format, resolver, compression, dir=None, **kwargs):
+    """
+    Retrieve a parser based on kwargs. Used in both Volume and FeatureReader.
+    """
 
-        tname = 'tokenPosCount'
+    # When would this be useful?
+    if "file_handler" in kwargs:
+        return kwargs["file_handler"]
+    elif format == "json":
+        return parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression,
+                                       dir=dir, **kwargs)
+    elif format == "parquet":
+        return parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression,
+                                          dir=dir, **kwargs)
+    else:
+        raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
 
-        # Make structured numpy array
-        # Because it is typed, this approach is ~40x faster than earlier
-        # methods
-        m = sum([page['tokenCount'] for page in pages])
-        arr = np.zeros(m, dtype=[(str('page'), str('u8')),
-                                 (str('section'), str('U6')),
-                                 (str('token'), str('U64')),
-                                 (str('pos'), str('U6')),
-                                 (str('count'), str('u4'))])
-        i = 0
-        for page in pages:
-            for sec in ['header', 'body', 'footer']:
-                for token, posvalues in iteritems(page[sec][tname]):
-                    for pos, value in iteritems(posvalues):
-                        arr[i] = (page['seq'], sec, token, pos, value)
-                        i += 1
-                        if (i > m+1):
-                            logging.error("This volume has more token info "
-                                          "than the internal representation "
-                                          "allows. Email organisciak@gmail.com"
-                                          "to let the library author know!")
 
-        # Create a DataFrame
-        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
-                                              'token', 'pos'])
-        df.sort_index(inplace=True, level=0, sort_remaining=True)
-        return df
-            
-    def _make_line_char_df(self, pages=False):
-        '''
-        Returns a Pandas dataframe of:
-            page / section / place(i.e. begin/end) / char / count
-
-        Provide an array of pages that hold beginLineChars and endLineChars.
-        '''
-        
-        # Default to using the internal _pages json, but allow for
-        # Parsing function to be used independently
-        if not pages:
-            pages = self._pages
-
-        if self._schema == '3.0':
-            logging.warning("Adapted to erroneous key names in schema 3.0.")
-            place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
-        else:
-            place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
-           
-        
-        # Make structured numpy array
-        # Because it is typed, this approach is ~40x faster than earlier
-        # methods
-        m = len(pages) * 3 * 2  # Pages * section types * places
-        arr = np.zeros(int(m*100), dtype=[(str('page'), str('u8')),
-                                          (str('section'), str('U6')),
-                                          (str('place'), str('U5')),
-                                          (str('char'), str('U1')),
-                                          (str('count'), str('u8'))])
-        i = 0
-        for page in pages:
-            for sec in ['header', 'body', 'footer']:
-                for place, json_key in  place_key:
-                    for char, value in iteritems(page[sec][json_key]):
-                        arr[i] = (page['seq'], sec, place, char, value)
-                        i += 1
-
-        # Create a DataFrame
-        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
-                                              'place', 'char'])
-        df.sort_index(0, inplace=True)
-        return df
-    
-class parquetVolumeParser(baseVolumeParser):
-    '''
-        This Volume parser allows for Feature Reader data to be loaded from a
-        parquet format, which allows JSON decompression, parsing, and processing
-        to be avoided.
-        
-        The FeatureReader files that can be loaded are the same ones used internally:
-        metadata (as JSON), token counts, line character counts, and
-        page+section level features. The non-section specific features aren't supported.
-        
-        These are essentially what is held internally in a Volume (vol.parser.meta,
-        vol._tokencounts, vol._line_chars, vol._section_features) so 
-        this parser doesn't provide much fanciness beyond loading.
-        
-        TO LOAD DATA
-        By default, the loading enforces a filename convention, and the path provided
-        to the parser should avoid the file extension. The filename convention is
-            - ../{htid}.meta.json
-            - ../{htid}.tokens.parquet
-            - ../{htid}.chars.parquet
-            - ../{htid}.section.parquet
-        
-        If assume_filenames is False, you won't need to follow the filename convention, and
-        instead provide a tuple of the filenames. This is not currently implemented.
-    '''
-        
-    
-    def __init__(self, path=False, id=False, assume_filenames=True, **kwargs):
-
-        if id:
-            raise Exception("id not currently supported in parquetVolumeParser")
-        if not assume_filenames:
-            raise Exception("assume_filenames currently cannot be false. See docstring "
-                            "for parquetVolumeParser")
-        
-        self.path = path
-        self.meta_path = path + '.meta.json'
-        self.token_path = path + '.tokens.parquet'
-        self.char_path = path + '.chars.parquet'
-        self.section_path = path + '.section.parquet'
-        
-        if os.path.exists(self.meta_path):
-            with open(self.meta_path, mode='r') as f:
-                self.meta = json.load(f)
-        else:
-            self.meta = dict(id=None, handle_url=None, title=None)
-        
-        self.read()
-        self.parse()
-    
-    def read(self):
-        pass
-    
-    def parse(self):
-        if not self.meta['id']:
-            # Parse from filename
-            filename = os.path.split(self.path)[-1]
-            self.meta['id'] = utils._id_decode(filename)
-        
-        if not self.meta['handle_url']:
-            self.meta['handle_url'] = "http://hdl.handle.net/2027/%s" % self.meta['id']
-            
-        if not self.meta['title']:
-            self.meta['title'] = self.meta['id']
-    
-    def _make_tokencount_df(self):
-        if not os.path.exists(self.token_path):
-            raise MissingDataError("No token information available")
-            
-        df = pd.read_parquet(self.token_path)
-        indcols = [col for col in ['page', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
-        if len(indcols):
-            df = df.set_index(indcols)
-        return df
-        
-        return self._tokencount_df
-        ''' Dummy: data already read at init and cached.'''
-        return self._tokencount_df
-    
-    def _make_line_char_df(self):
-        if not os.path.exists(self.char_path):
-            raise MissingDataError("No line char information available")
-            
-        df = pd.read_parquet(self.char_path)    
-        return df 
-        
-    def _make_section_feature_df(self):
-        if not os.path.exists(self.section_path):
-            raise MissingDataError("No page+section information available")
-            
-        df = pd.read_parquet(self.section_path)    
-        return df 
-    
-    def _make_page_feature_df(self):
-        raise Exception("parquet parser doesn't support non-token, non-section page features")
-
-    def _parse_meta(self):
-        pass
-    
 class Volume(object):
 
-    def __init__(self, path=False, id=False, parser='json', default_page_section='body', **kwargs):
+    def __init__(self, id = None,
+                    format = "default",
+                    id_resolver = None,
+                    default_page_section='body',
+                    path = None,
+                    compression = 'default',
+                    dir = None,
+                     **kwargs):
         '''
         The Volume allows simplified, Pandas-based access to the HTRC
         Extracted Features files.
@@ -677,7 +369,7 @@ class Volume(object):
             - section features : Features specific to sections
             (body/header/footer) of each page.
         
-        Most of the time, the parser with be the default json parser, which
+        Most of the time, the format will be the default json parser, which
         deals with the format that HTRC distributes, but for various reasons
         you may want to use or write alternative formats. e.g. perhaps you
         just need a nice view into the metadata, or hope for quicker access
@@ -687,19 +379,55 @@ class Volume(object):
         self._line_chars = pd.DataFrame()
         self._page_features = pd.DataFrame()
         self._section_features = pd.DataFrame()
-        
         self._extra_metadata = None
-        self.default_page_section = default_page_section
-        
-        if parser == 'json':
-            self.parser = jsonVolumeParser(path, id, **kwargs)
-        elif parser == 'parquet':
-            self.parser = parquetVolumeParser(path, id, **kwargs)
-        elif issubclass(parser, baseVolumeParser):
-            self.parser = parser(path, id, **kwargs)
-        else:
-            raise Exception("No valid parser defined.")
+
+        if id == False:
+            warnings.warn("Please use None to indicate lack of an id", DeprecationWarning)
+            id = None
+        if path == False:
+            warnings.warn("Please use None to indicate lack of a path", DeprecationWarning)
+            path = None
             
+        if 'compressed' in kwargs:
+            raise Exception("Use 'compression' argument. `compressed` has been deprecated.")
+            if kwargs['compressed'] == False:
+                compression = None
+            elif kwargs['compressed'] == True:
+                compression = 'bz2'
+            
+        resolver = id_resolver
+
+
+        if format == "default":
+            # Allow learning the format from the resolver.
+            if isinstance(id_resolver, resolvers.IdResolver):
+                format = id_resolver.format
+                if (dir is not None) and (dir != id_resolver.dir):
+                    warn.warning("You provided a dir argument ({} )and id_resolver instance with a "
+                                 "different dir ({}).".format(dir, id_resolver.dir))
+                dir = id_resolver.dir
+            else:
+                format = "json"
+        
+        if resolver is None:
+            resolver = default_resolver(id, path, format)
+            
+        if resolver == 'http':
+            compression = None
+
+        self.resolver = resolver
+            
+        if path:
+            id = path
+        
+        self.default_page_section = default_page_section
+
+        assert format in ["json", "parquet"]
+
+        self.parser = retrieve_parser(id, format, resolver, compression, dir, **kwargs)
+        
+        self.args = kwargs
+        
         self._update_meta_attrs()
     
     def _update_meta_attrs(self):
@@ -722,7 +450,10 @@ class Volume(object):
         try:
             return html_template % (self.handle_url, self.title, ",".join(self.author), self.year, self.page_count, self.id)
         except:
-            return "<strong><a href='%s'>%s</a></strong>" % (self.handle_url, self.title)
+            try:
+                return "<strong><a href='%s'>%s</a></strong>" % (self.handle_url, self.title)
+            except:
+                return "Unloaded volume <strong>%s</strong>" % (self.id)                
 
     def page_features(self, feature='all', page_select=False):
         if self._page_features.empty:
@@ -756,6 +487,9 @@ class Volume(object):
         else:
             raise Exception("Bad Section Arg")
 
+    def write(self, volume, **kwargs):
+        self.parser.write(volume, **kwargs)
+        
     @property
     def year(self):
         ''' A friendlier name wrapping Volume.pubDate '''
@@ -944,9 +678,7 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
                            
-
-    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, suppress_warning=False, adjust_cap=.05, 
-                          chunk_change_threshold=.4, **kwargs):
+    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, **kwargs):
         '''
         Return a tokenlist dataframe grouped by numbered 'chunks', each of which has roughly `chunk_target` words.
 
@@ -965,95 +697,35 @@ class Volume(object):
         - also takes tokenlist() arguments, such as case, drop_section, pos
 
         '''
-
         # Chunking won't work with pages=False
         kwargs['pages'] = True
         tl = self.tokenlist(**kwargs)
-        pagecounts = tl.reset_index().groupby('page')['count'].sum()
-        cumsums = pagecounts.cumsum()
+        newindex = ['chunk'] + [v for v in tl.index.names if v != 'page']
+        
+        with_chunks = tl.reset_index().set_index("page")
+        pagecounts = with_chunks.groupby('page')['count'].sum()
 
-        # Last entry gives number of words
-        ntokens = cumsums.iloc[-1]
-        n_chunks = max(int(int((ntokens) / chunk_target)), 1)
-        # Use actual page counts not including zeros
-        avg_page_n = ntokens / pagecounts.shape[0]
+        assert overflow_strategy in ["ends", "even", "last"]
+        chunking_method = getattr(transformations, "chunk_{}".format(overflow_strategy))
+        chunk_labs = chunking_method(pagecounts.values, chunk_target)
 
-        overflow = (ntokens % chunk_target)
-
-        if overflow > chunk_target/2:
-            overflow -= chunk_target
-            n_chunks +=1
-
-        # Store the start of chunks in an array.
-        breaks = np.zeros(cumsums.shape[0], np.int)
-
-        # 1-index the chunk names. 
-        breaks[0] = 1
-
-        # variable; how far do we want the next one to go?
-        if overflow_strategy == "ends":
-            target = chunk_target + overflow/2 # + avg_page_n/2
-        elif overflow_strategy == "last":
-            target = chunk_target
-        elif overflow_strategy == "even":
-            chunk_target += overflow / n_chunks
-            target = chunk_target
-
-        # Proportion of chunk_target that the length adjustment should cap at
-        max_adjust = adjust_cap * chunk_target
-        # When the remaining words per chunk is higher/lower that x proportion
-        #  of the chunk_target, add/remove a chunk.
-        new_chunk_threshold = chunk_change_threshold * chunk_target
-
-        i = 1
-        while True:
-            remaining_chunks = n_chunks - i
-            if not remaining_chunks:
-                break
-                
-            last_page = np.argmin(np.abs(cumsums.values - target))
-            if last_page + 1 >= len(breaks):
-                break
-            
-            breaks[last_page+1] = 1
-
-            # Remainder adjust - nudge next section slightly, to try to balance
-            # out consistently under or oversized parts.
-            remaining_nwords = (cumsums.values[-1] - cumsums.values[last_page])
-            remaining_word_per_chunk_diff = (remaining_nwords / remaining_chunks) - chunk_target
-
-            if abs(remaining_word_per_chunk_diff) > new_chunk_threshold:
-                n_chunks += np.sign(remaining_word_per_chunk_diff)
-                if n_chunks == i:
-                    break
-
-            if overflow_strategy == 'even':
-                # Adjust for what's necessary
-                adjust = remaining_word_per_chunk_diff
-            elif (overflow_strategy == 'last') and remaining_chunks:
-                err = ((remaining_nwords-overflow) / (remaining_chunks-1)) - chunk_target
-                adjust = (0.5+0.5*remaining_chunks/n_chunks) * err
-            elif (overflow_strategy == 'ends') and remaining_chunks:   
-                err = ((remaining_nwords-overflow/2) / (remaining_chunks-1)) - chunk_target
-                adjust = (0.5+0.5*remaining_chunks/n_chunks) * err
-            if abs(adjust) > max_adjust:
-                adjust = np.sign(adjust) * max_adjust
-            target = chunk_target + cumsums.values[last_page] + adjust
-            i += 1
-
-        chunk_names = pd.Series(np.cumsum(breaks), index = cumsums.index).to_frame("chunk")
-
-        with_chunks = tl.reset_index().set_index("page").join(chunk_names)
+        indexed = pd.Series(chunk_labs, index = pagecounts.index, name='chunk')
+        with_chunks = with_chunks.join(indexed) 
+        
 
         groups = [g for g in tl.index.names if g != 'page']
-
         return_val = with_chunks.groupby(groups + ['chunk'])['count'].sum().reset_index()
+
         if page_ref:
             chunk_bounds = with_chunks.reset_index().groupby("chunk")['page']\
                .agg(['min', 'max'])\
                .rename(columns = {'min':'pstart', 'max':'pend'})
-            return_val = return_val.set_index('chunk').join(chunk_bounds)
-        return return_val
+               
+            return_val = return_val.set_index('chunk').join(chunk_bounds).reset_index()
+            newindex = ['chunk', 'pstart', 'pend'] + newindex[1:]
+
+        # WTF with the index order here.
+        return return_val.set_index(newindex)
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
