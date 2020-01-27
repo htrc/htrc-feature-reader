@@ -143,11 +143,12 @@ class IdResolver():
             except AttributeError:
                 raise AttributeError("You must specify compression somewhere")
 
+        
         if not format:
             format = self.format
 
         uncompressed = self._open(id = id, suffix = suffix, mode = mode, format = format,
-                                  **kwargs)
+                                  compression=compression,  **kwargs)
         if uncompressed is None:
             raise FileNotFoundError("Empty buffer found very late")
         # The name here is misleading; if mode is 'w', 'decompress' may actually be
@@ -194,8 +195,6 @@ class HttpResolver(IdResolver):
             
         super().__init__(**kwargs)
     
-
-
     def _open(self, id = None, mode = 'rb', **kwargs):
         if 'compression' in kwargs and kwargs['compression'] == 'bz2':
             raise Warning("You have requested to read from HTTP with bz2 compression, but at time of writing this was not supported.")
@@ -209,16 +208,18 @@ class HttpResolver(IdResolver):
             logging.exception("HTTP Error accessing %s" % path_or_url)
             raise
         return req
-        
+    
+
 class LocalResolver(IdResolver):
 
     def __init__(self, dir, **kwargs):
         super().__init__(dir = dir, **kwargs)
     
-    def _open(self, id, format = None, mode = 'rb', **kwargs):
+    def _open(self, id, format = None, mode = 'rb', compression='default', suffix=None, **kwargs):
 
-        compression = kwargs.get("compression", self.compression)
-        suffix = kwargs.get("suffix", None)
+        if compression is 'default':
+            compression = self.compression
+        
         filename = self.fname(id, format = format, compression = compression, suffix = suffix)
         dirname = kwargs.get("dir", self.dir)
         return Path(dirname, filename).open(mode = mode)
@@ -245,6 +246,7 @@ class PairtreeResolver(IdResolver):
         format = kwargs.get("format", self.format)
         compression = kwargs.get("compression", self.compression)
         suffix = kwargs.get("suffix", None)
+
         path = htrc_features.utils.id_to_pairtree(id, format, suffix, compression)
         full_path = Path(self.dir, path)
         try:

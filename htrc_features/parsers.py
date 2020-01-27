@@ -450,7 +450,6 @@ class ParquetFileHandler(BaseFileHandler):
             with self.resolver.open(self.id, suffix = "meta", format = "json", compression = None) as meta_buffer:
                 self.meta = json.loads(meta_buffer.read().decode("utf-8"))
         except:
-
             self.meta = dict(id=self.id, title=self.id)
 
             

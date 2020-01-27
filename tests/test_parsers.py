@@ -10,14 +10,11 @@ class TestParsing():
         pass
 
     def test_bad_parser(self):
-        """
-        What does this test do?
-        """
-        htid = 'uc2.ark:/13960/t1xd0sc6x'
-        filepath = os.path.join('tests', 'data', 'fullparquet', htid)
+        ''' Tests if format mismatch from data raises error'''
+        dir = os.path.join('tests', 'data', 'fullparquet')
         
-        with pytest.raises(FileNotFoundError):
-            vol = Volume(filepath, parser='json')
+        with pytest.raises(Exception):
+            vol = Volume(id = 'uc2.ark:/13960/t1xd0sc6x', format='json', dir = dir)
         
     def test_full_parquet(self):
         dir = os.path.join('tests', 'data', 'fullparquet')
@@ -107,8 +104,8 @@ class TestParsing():
 
         with pytest.raises(MissingFieldError):
             tl = vol.tokenlist(case=False, pos=False, section='header')
-            
-    """
+
+
     def test_chunked_parq_tokenlist(self):
         htid = 'uc2.ark+=13960=t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'chunkedparq', htid)
@@ -118,7 +115,6 @@ class TestParsing():
         assert vol.tokenlist(case=True, pos=False).reset_index().columns.tolist() == ['chunk', 'section', 'token', 'count']
         assert vol.tokenlist().reset_index().columns.tolist() == ['chunk', 'section', 'token', 'pos', 'count']
         assert vol.tokenlist(drop_section=True).reset_index().columns.tolist() == ['chunk', 'token', 'pos', 'count']
-    """
 
 # Allow compression formats.
 
