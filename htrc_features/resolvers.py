@@ -341,11 +341,61 @@ class ZiptreeResolver(IdResolver):
                 
         return DummyWriter(filename, zipfile)
 
+def copy_between_resolvers(id, resolver1, resolver2):
+    input = Volume(id, id_resolver=resolver1)
+    output = Volume(id, id_resolver=resolver2, mode = 'wb')
+    output.write(input)
+
+
+def make_cache_resolver(preferred, fallback, verbose = False):
+    """
+    A function to return a constructor that uses 
+    a cache.
+    """
+
+    class CacheResolver(preferred):
+
+        """
+        A cache resolver is a resolver that uses either of two methods.
+
+        It's called with the constructors of both arguments. If you have options
+        for the fallback, they must be passed as dict in the first argument; 
+        then the rest of the args are passed as normal.
+        """
+
+        def __init__(self, fallback_kwargs = {}, **preferred_args):
+            self.fallback = fallback(**fallback_kwargs)
+            super().__init__(**preferred_args)            
+
+        def open(self, id, fallback_kwargs = {}, **kwargs):
+            try:
+                fout = super().open(id, **kwargs)
+                logging.debug("Successfully returning from cache")
+                return fout
+            except FileNotFoundError:
+                # Can this happen any earlier?
+                # Circular dependency.
+                from htrc_features import Volume
+                logging.debug("Can't find {} in cache, searching {}".format(id, type(self.fallback)))                
+                input = Volume(id, id_resolver=self.fallback, **fallback_kwargs)
+                kwargs['mode'] = 'wb'
+                output = Volume(id, id_resolver=self, **kwargs)
+                output.write(input)
+                logging.debug("Successfully wrote to cache; now returning from there.")
+                
+                kwargs['mode'] = 'rb'
+                return super().open(id, **kwargs)
+            
+    return CacheResolver
+            
 resolver_nicknames = {
     "path": PathResolver,
     "pairtree": PairtreeResolver,
     "ziptree": ZiptreeResolver,
     "local": LocalResolver,
-    "http": HttpResolver}
-
+    "http": HttpResolver,
+    "local_cache": make_cache_resolver(LocalResolver, HttpResolver),
+    "pairtree_cache": make_cache_resolver(LocalResolver, HttpResolver),
+    "ziptree_cache": make_cache_resolver(ZiptreeResolver, HttpResolver),    
+}
 
