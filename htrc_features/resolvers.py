@@ -9,19 +9,19 @@ import logging
 import sys
 from pathlib import Path
 
+
 MINOR_VERSION = (sys.version_info[1])
 
 from urllib.request import urlopen as _urlopen
 from urllib.parse import urlparse as parse_url
 from urllib.error import HTTPError
 
-
 class FauxFile():
     """
     This class is a shim to allow sensible filehandling and errors
     with zipfiles, where on an error both the file *inside* the zip
     and the zipfile itself must be closed. It is only used in that
-    specific case at the moment.
+    specific case.
     """
     def __init__(self, *buffers):
         self.main = buffers[0]
@@ -340,11 +340,12 @@ class ZiptreeResolver(IdResolver):
                 self.zipfile.writestr(self.filename, what)
                 
         return DummyWriter(filename, zipfile)
-    
-if __name__ == "__main__":
-    import sys
-    zipdir, id = sys.argv[1:]
-    resolver = ZiptreeResolver(zipdir)
-    import json
-    import bz2
-    v = resolver.get(id).read()
+
+resolver_nicknames = {
+    "path": PathResolver,
+    "pairtree": PairtreeResolver,
+    "ziptree": ZiptreeResolver,
+    "local": LocalResolver,
+    "http": HttpResolver}
+
+

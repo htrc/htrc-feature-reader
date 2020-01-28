@@ -23,23 +23,14 @@ import requests
 
 
 import htrc_features.resolvers
+from htrc_features.resolvers import resolver_nicknames
 
 import bz2
-
-resolver_nicknames = {
-    "path": resolvers.PathResolver,
-    "pairtree": resolvers.PairtreeResolver,
-    "ziptree": resolvers.ZiptreeResolver,
-    "local": resolvers.LocalResolver,
-    "http": resolvers.HttpResolver
-}
-
 
 SECREF = ['header', 'body', 'footer']
 
 class MissingDataError(Exception):
     pass
-
 
 class BaseFileHandler(object):
     
@@ -76,9 +67,6 @@ class BaseFileHandler(object):
             return
         
         if 'mode' in self.args:
-            """
-            Not documented yet, but allow 'mode' = 'create'.
-            """
             mode = self.args['mode']
             assert( mode in ['wb', 'rb'] )
             self.mode = mode
@@ -139,8 +127,7 @@ class BaseFileHandler(object):
     
     def _parse_meta(self):
         pass
-        
-        
+    
 class JsonFileHandler(BaseFileHandler):
     SUPPORTED_SCHEMA = ['3.0']
     METADATA_FIELDS = [('schemaVersion', 'schema_version'), ('dateCreated', 'date_created'),
@@ -186,18 +173,8 @@ class JsonFileHandler(BaseFileHandler):
         # parsing and reading are called here.
         super().__init__(id, id_resolver = id_resolver, compression = compression, **kwargs)
 
-    def write(self, outside_volume, compression='default', mode='default', **kwargs):
-
-        
-        # Look for a mode flag in three places: the passed args,
-        # the parser, and the parser's resolver. This is to ensure
-        # that a user actually typed 'wb' *somewhere* before doing
-        # anything destructive.
-        if mode is 'default':
-            try:
-                mode = self.mode
-            except AttributeError:
-                mode = self.resolver.mode
+    
+    def write(self, outside_volume, compression='default', mode='wb', **kwargs):
 
         if compression == "default":
             compression = self.compression
@@ -455,8 +432,11 @@ class ParquetFileHandler(BaseFileHandler):
         if not 'title' in self.meta or not self.meta['title']:
             self.meta['title'] = self.meta['id']
 
-    def write(self, volume, meta=True, tokens=True, section_features=False, chars=False, mode='default', 
-              compression=False, indexed=True, **kwargs):
+    def write(self, volume, meta=True, tokens=True, chars=False,
+              section_features=False, mode='wb', chunked = False,
+              compression="default", indexed=True,
+              token_kwargs=dict(section='all', drop_section=False),
+              **kwargs):
         '''
 
         Save the internal representations of feature data to parquet, and the metadata to json,
@@ -478,28 +458,34 @@ class ParquetFileHandler(BaseFileHandler):
         '''
 
 
-        # Look for a mode flag in three places: the passed args,
-        # the parser, and the parser's resolver. This is to ensure
-        # that a user actually typed 'wb' *somewhere* before writing.
-        if mode is 'default':
-            try:
-                mode = self.mode
-            except AttributeError:
-                mode = self.resolver.mode
-
         if compression == "default":
             compression = self.compression
+
+        if not (meta or tokens or section_features or chars):
+            logging.warning("You're not saving anything with save_parquet")
+            return
         
         if meta:
-            metastring = BytesIO(json.dumps(volume.parser.meta).encode("utf-8"))
-            with self.resolver.open(self.id, format = "json", compression = None, suffix = 'meta', mode=mode,
-                                    **kwargs) as fout:
-                fout.write(metastring.read())
+            metastring = json.dumps(volume.parser.meta).encode("utf-8")
+            with self.resolver.open( self.id, format = "json",
+                                     compression = None, suffix = 'meta', mode=mode,
+                                     **kwargs) as fout:
+                fout.write(metastring)
         
         if tokens:
-            feats = volume.tokenlist()
+            try:
+                if chunked:
+                    feats = volume.chunked_tokenlist(**token_kwargs)
+                else:
+                    feats = volume.tokenlist(**token_kwargs)
+            except:
+                # If the internal representation is incomplete, returning the above may fail,
+                # but the cache may have an acceptable dataset to return
+                feats = volume._tokencounts
+                
             if not indexed:
                 feats = feats.reset_index()
+                
             if not feats.empty:
                 with self.resolver.open(id = self.id, suffix = 'tokens', mode=mode, **kwargs) as fout:
                     feats.to_parquet(fout, compression=compression)                

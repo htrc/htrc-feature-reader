@@ -205,19 +205,20 @@ class FeatureReader(object):
 
     def __init__(self, paths=None, ids=None, format = "default", id_resolver = None, dir=None,
                  **kwargs):
-        '''
-        A reader for Extracted Features Dataset files.
+        '''A reader for Extracted Features Dataset files.
         
-        parser: a VolumeParser class, or a string for a built in class (e.g.'json' or
-        'parquet').
+        parser: a VolumeParser class, or a string for a built in class
+        (e.g.'json' or 'parquet').
         
-        ids: HathiTrust IDs. Preferred to `paths`. By default will download json files behind the scenes.
+        ids: HathiTrust IDs. Preferred to `paths`. By default will
+        download json files behind the scenes.
 
         paths: Filepaths to dataset files.
  
-        format: "json", "parquet", or "default". ("default" is JSON, but will inherit the
-        format from a passed id_resolver.) For custom use, this can also be a class factory that
-        inherits from BaseFileHandler.
+        format: "json", "parquet", or "default". ("default" is JSON,
+        but will inherit the format from a passed id_resolver.) For
+        custom use, this can also be a class factory that inherits
+        from BaseFileHandler.
 
         id_resolver: The method used to resolve filenames.
 
@@ -322,11 +323,17 @@ class FeatureReader(object):
         return "<%d path FeatureReader>" % (len(self.ids))
 
 def filename_or_id(string):
+    """
+    Determine based on suffix is something is a file or an ide.
+    """
     for ending in [".gz", ".bz2", ".json", ".parquet"]:
         if string.endswith(ending):
             return "filename"
     if "." in string[:6]:
+        # All Hathi ids have dots in them.
         return "id"
+    raise NameError("Can't determine if {} is supposed to be a filename or an id.".format(string) + 
+                    "Please explicitly name your first argument to Volume 'id' or 'path'.")
 
 def retrieve_parser(id, format, resolver, compression, dir=None, file_handler=None, **kwargs):
     """
@@ -347,7 +354,6 @@ def retrieve_parser(id, format, resolver, compression, dir=None, file_handler=No
 
 
 class Volume(object):
-
     def __init__(self, id = None,
                     format = "default",
                     id_resolver = None,
@@ -486,7 +492,7 @@ class Volume(object):
             return df.groupby(level='page').sum()
         else:
             raise Exception("Bad Section Arg")
-
+        
     def write(self, volume, **kwargs):
         self.parser.write(volume, **kwargs)
         
@@ -773,58 +779,57 @@ class Volume(object):
 
         return group_linechars(df, section=section, place=place)
     
-    def save_parquet(self, path, meta=True, tokens=True, chars=False, 
-                     section_features=False, compression='snappy', chunked=False,
-                     token_kwargs=dict(section='all', drop_section=False)
-                     ):
+    def save_parquet(self, dir, meta=True, tokens=True, chars=False,
+                     section_features=False, compression='default',
+                     chunked=False, token_kwargs=dict(section='all',
+                                                      drop_section=False),
+                     id_resolver = 'local' ):
         '''
-        Save the internal representations of feature data to parquet, and the metadata to json,
-        using the naming convention used by parquetVolumeParser.
+        Save the internal representations of feature data to parquet, and
+        the metadata to json, using the naming convention used by
+        parquetVolumeParser.
         
-        The primary use is for converting the feature files to something more efficient. By default,
-        only metadata and tokencounts are saved.
+        The primary use is for converting the feature files to
+        something more efficient. By default, only metadata and
+        tokencounts are saved.
         
-        Saving page features is currently unsupported, as it's an ill-fit for parquet. This is currently
-        just the language-inferences for each page - everything else is in section features 
-        (page by body/header/footer).
+        Saving page features is currently unsupported, as it's an
+        ill-fit for parquet. This is currently just the
+        language-inferences for each page - everything else is in
+        section features (page by body/header/footer).
         
-        Since Volumes partially support incomplete dataframes, you can pass Volume.tokenlist arguments
-        as a dict with token_kwargs. For example, if you want to save a representation with only body
-        information, drop the 'section' level of the index, and fold part-of-speech counts, you can pass
-        token_kwargs=dict(section='body', drop_section=True, pos=False).
+        Since Volumes partially support incomplete dataframes, you can
+        pass Volume.tokenlist arguments as a dict with
+        token_kwargs. For example, if you want to save a
+        representation with only body information, drop the 'section'
+        level of the index, and fold part-of-speech counts, you can
+        pass token_kwargs=dict(section='body', drop_section=True,
+        pos=False).
+
         '''
-        fname_root = os.path.join(path, utils.clean_htid(self.id))
+
+        # Allow 'pairtree', or other strings.
         
-        if not (meta or tokens or section_features or chars):
-            logging.warning("You're not saving anything with save_parquet")
-            return
-        
-        if meta:
-            with open(fname_root + '.meta.json', mode='w') as f:
-                json.dump(self.parser.meta, f)
-        
-        if tokens:
-            try:
-                if chunked:
-                    feats = self.chunked_tokenlist(**token_kwargs)
-                else:
-                    feats = self.tokenlist(**token_kwargs)
-            except:
-                # In the internal representation is incomplete, returning the above may fail,
-                # but the cache may have an acceptable dataset to return
-                feats = self._tokencounts
-            if not feats.empty:
-                feats.to_parquet(fname_root + '.tokens.parquet', compression=compression)
+        if id_resolver in resolvers.resolver_nicknames:
+            id_resolver = resolvers.resolver_nicknames[id_resolver](
+                format = 'parquet',
+                dir=dir, mode = 'wb',
+                compression = compression)
             
-        if section_features:
-            feats = self.section_features(section='all')
-            if not feats.empty:
-                feats.to_parquet(fname_root + '.section.parquet', compression=compression)
-            
-        if chars:
-            feats = self.line_chars()
-            if not feats.empty:
-                feats.to_parquet(fname_root + '.chars.parquet', compression=compression)
+        assert isinstance(id_resolver, resolvers.IdResolver)
+
+        if compression == 'default':
+            compression = id_resolver.compression
+            if compression == 'default':
+                compression = 'snappy'
+
+        print(self.id)
+        print(id_resolver.mode)
+        parser = parsers.ParquetFileHandler(id = self.id, id_resolver = id_resolver,
+                                            dir = dir, compression = compression)
+        print(parser.mode)
+        parser.write(volume = self, meta = meta, tokens = tokens, chars = chars, section_features = section_features,
+                     chunked = chunked, token_kwargs = token_kwargs)
     
     def __str__(self):
         def truncate(s, maxlen):
