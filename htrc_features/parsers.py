@@ -12,20 +12,18 @@ from six import iteritems, StringIO, BytesIO
 import codecs
 import os
 import types
-
-from htrc_features import utils, resolvers
+import bz2
 
 try:
-    import ujson as json
+    import rapidjson as json
 except ImportError:
     import json
+
 import requests
 
 
-import htrc_features.resolvers
-from htrc_features.resolvers import resolver_nicknames
-
-import bz2
+from . import utils, resolvers
+from .resolvers import resolver_nicknames
 
 SECREF = ['header', 'body', 'footer']
 
@@ -98,12 +96,14 @@ class BaseFileHandler(object):
                 
             return Dummy()
             
-        else:
+        elif isinstance(id_resolver, str):
             try:
                 return resolver_nicknames[id_resolver](format = format, **kwargs)
             except KeyError:
-                raise TypeError("""Id resolver must be a function, htrc_features.IdResolver, or
+                raise TypeError("""Id resolver strings must be
                 one of the strings {}""".format(", ".join(list(resolver_nicknames.keys()))))
+        raise TypeError("""Id resolver must be a function, htrc_features.IdResolver, or
+        one of the strings {}""".format(", ".join(list(resolver_nicknames.keys()))))            
 
     def parse(self, **kwargs):
         '''

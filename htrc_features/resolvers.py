@@ -145,8 +145,10 @@ class IdResolver():
                                   compression=compression,  **kwargs)
         if uncompressed is None:
             raise FileNotFoundError("Empty buffer found very late")
+        
         # The name here is misleading; if mode is 'w', 'decompress' may actually be
         # acting as a compression filter on write actions.
+        
         if skip_compression:
             fout = uncompressed
         else:
@@ -168,11 +170,6 @@ class IdResolver():
         """
         raise NotImplementedError("An IdResolver superclass must overwrite the "
                                   "'_open' method to return an io.Buffer object")
-        if not compression:
-            compression = self.compression
-        if not format:
-            format = self.format
-        return open("{}.{}.{}".format(id, format, compression, mode = mode))
 
 class HttpResolver(IdResolver):
     
@@ -341,61 +338,42 @@ class ZiptreeResolver(IdResolver):
                 
         return DummyWriter(filename, zipfile)
 
-def copy_between_resolvers(id, resolver1, resolver2):
-    input = Volume(id, id_resolver=resolver1)
-    output = Volume(id, id_resolver=resolver2, mode = 'wb')
-    output.write(input)
 
-
-def make_cache_resolver(preferred, fallback, verbose = False):
+class resolver_dict(dict):
     """
-    A function to return a constructor that uses 
-    a cache.
+    # A method to allow the creation of new methods that cache between the basic 
+    # nickname formats.
+
     """
+    
+    def __missing__(self, key):
+        try:
+            method, cached, fallback = key.split("_")
+            if not cached == "cached":
+                raise KeyError("No known resolver for " + key)
+            if method == "locally":
+                # i.e., the default is "locally_cached_http"
+                method = "local"
+            if key != "locally_cached_http":
+                logging.warning("You're creating an exotic resolver; this is undocumented"
+                                "and unspported, and may be removed in a future version",
+                                DeprecationWarning)
+            logging.debug("Creating resolver for {} -> {}".format(method, fallback))
 
-    class CacheResolver(preferred):
+            # This import has to wait until here to avoid circular dependencies.
+            from .caching import make_fallback_resolver
+            resolver = make_fallback_resolver(self[method], fallback)
 
-        """
-        A cache resolver is a resolver that uses either of two methods.
-
-        It's called with the constructors of both arguments. If you have options
-        for the fallback, they must be passed as dict in the first argument; 
-        then the rest of the args are passed as normal.
-        """
-
-        def __init__(self, fallback_kwargs = {}, **preferred_args):
-            self.fallback = fallback(**fallback_kwargs)
-            super().__init__(**preferred_args)            
-
-        def open(self, id, fallback_kwargs = {}, **kwargs):
-            try:
-                fout = super().open(id, **kwargs)
-                logging.debug("Successfully returning from cache")
-                return fout
-            except FileNotFoundError:
-                # Can this happen any earlier?
-                # Circular dependency.
-                from htrc_features import Volume
-                logging.debug("Can't find {} in cache, searching {}".format(id, type(self.fallback)))                
-                input = Volume(id, id_resolver=self.fallback, **fallback_kwargs)
-                kwargs['mode'] = 'wb'
-                output = Volume(id, id_resolver=self, **kwargs)
-                output.write(input)
-                logging.debug("Successfully wrote to cache; now returning from there.")
-                
-                kwargs['mode'] = 'rb'
-                return super().open(id, **kwargs)
-            
-    return CacheResolver
-            
-resolver_nicknames = {
+            self.__setitem__(key, resolver)
+            return resolver
+        
+        except IndexError:
+            raise KeyError("No known resolver for " + key)
+       
+resolver_nicknames = resolver_dict({
     "path": PathResolver,
     "pairtree": PairtreeResolver,
     "ziptree": ZiptreeResolver,
     "local": LocalResolver,
-    "http": HttpResolver,
-    "local_cache": make_cache_resolver(LocalResolver, HttpResolver),
-    "pairtree_cache": make_cache_resolver(LocalResolver, HttpResolver),
-    "ziptree_cache": make_cache_resolver(ZiptreeResolver, HttpResolver),    
-}
-
+    "http": HttpResolver
+})

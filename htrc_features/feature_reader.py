@@ -11,6 +11,7 @@ from six import iteritems, StringIO, BytesIO
 import codecs
 import os
 import warnings
+import tempfile
 
 from htrc_features import utils
 from htrc_features import parsers, resolvers, transformations
@@ -144,7 +145,7 @@ def fold_pages(page_list, chunkname):
     grouped = chunk.reset_index().groupby(newindex)[['count']].sum()
     return grouped
 
-def default_resolver(id, path, format):
+def default_resolver(id, path, format, dir):
     if type(id) is list:
         id = id[0]
     if type(path) is list:
@@ -160,11 +161,8 @@ def default_resolver(id, path, format):
         # Don't really need a warning here.
         return "path"
     elif guess == "id" and format == "json":
-        # Pull from the web on an unlisted path by default.
-        # TODO: I think there are much better approaches here; looking in
-        # various places before pinging Hathi, etc.        
-        return "http"
-    elif guess == "id" and format == "parquet":      
+        return "locally_cached_http"
+    elif guess == "id" and format == "parquet" and dir is not None:      
         return "local"
     raise AttributeError("No sensible default for format of {} with ids like {}".format(format, id))
 
@@ -243,8 +241,11 @@ class FeatureReader(object):
                 format = "json"
 
         if self.resolver is None:
-            self.resolver = default_resolver(ids, paths, format)
+            self.resolver = default_resolver(ids, paths, format, dir)
 
+        if self.resolver == "locally_cached_http" and dir is None:
+            dir = tempfile.tempdir
+            
         # Define paths as ids with "path" resolution.        
         if paths is not None:
             ids = paths
@@ -335,19 +336,19 @@ def filename_or_id(string):
     raise NameError("Can't determine if {} is supposed to be a filename or an id.".format(string) + 
                     "Please explicitly name your first argument to Volume 'id' or 'path'.")
 
-def retrieve_parser(id, format, resolver, compression, dir=None, file_handler=None, **kwargs):
+def retrieve_parser(id, format, id_resolver, compression, dir=None, file_handler=None, **kwargs):
+    
     """
     Retrieve a parser based on kwargs. Used in both Volume and FeatureReader.
     """
 
-    # When would this be useful?
     if file_handler:
         return file_handler
     elif format == "json":
-        return parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression,
+        return parsers.JsonFileHandler(id, id_resolver = id_resolver, compression = compression,
                                        dir=dir, **kwargs)
     elif format == "parquet":
-        return parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression,
+        return parsers.ParquetFileHandler(id, id_resolver = id_resolver, compression = compression,
                                           dir=dir, **kwargs)
     else:
         raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
@@ -416,7 +417,10 @@ class Volume(object):
                 format = "json"
         
         if resolver is None:
-            resolver = default_resolver(id, path, format)
+            resolver = default_resolver(id, path, format, dir)
+            
+        if resolver == "locally_cached_http" and dir is None:
+            dir = tempfile.tempdir
             
         if resolver == 'http':
             compression = None

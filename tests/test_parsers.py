@@ -15,7 +15,7 @@ class TestParsing():
         
         with pytest.raises(ValueError):
             # This tries to load the ID from 
-            vol = Volume(id = 'uc2.ark:/13960/t1xd0sc6x', format='json', dir = dir)
+            vol = Volume(id = 'uc2.ark:/13960/t1xd0sc6x', format='json', dir = dir, id_resolver = "http")
         
     def test_full_parquet(self):
         dir = os.path.join('tests', 'data', 'fullparquet')
@@ -110,19 +110,3 @@ class TestParsing():
         assert vol.tokenlist(case=True, pos=False).reset_index().columns.tolist() == ['chunk', 'section', 'token', 'count']
         assert vol.tokenlist().reset_index().columns.tolist() == ['chunk', 'section', 'token', 'pos', 'count']
         assert vol.tokenlist(drop_section=True).reset_index().columns.tolist() == ['chunk', 'token', 'pos', 'count']
-
-# Allow compression formats.
-
-compressions = {
-    'parquet': ['snappy', None, 'gz'],
-    'json': ['bz2', None, 'gz']
-}
-
-for format in ['parquet', 'json']:
-    for compression in compressions[format]:
-        pass
-
-def build_unit_test(format, compression):
-    def my_test(self):
-        p = Volume(id = "aeu.ark:/13960/t1rf63t52", format = "json", compression = "bz2")
-        
