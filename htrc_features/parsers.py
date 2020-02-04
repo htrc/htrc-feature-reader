@@ -1,8 +1,5 @@
 from __future__ import unicode_literals
 
-import sys
-PY3 = (sys.version_info[0] >= 3)
-
 import warnings
 import logging
 import pandas as pd
@@ -20,7 +17,6 @@ except ImportError:
     import json
 
 import requests
-
 
 from . import utils, resolvers
 from .resolvers import resolver_nicknames
@@ -172,7 +168,7 @@ class JsonFileHandler(BaseFileHandler):
 
         # parsing and reading are called here.
         super().__init__(id, id_resolver = id_resolver, compression = compression, **kwargs)
-
+        
     
     def write(self, outside_volume, compression='default', mode='wb', **kwargs):
 
@@ -411,6 +407,9 @@ class ParquetFileHandler(BaseFileHandler):
         self.compression = compression
         self.resolver = id_resolver
         self.mode = mode
+
+        if self.resolver == "ziptree" or isinstance(self.resolver, resolvers.ZiptreeResolver):
+            raise NotImplementedError("Not yet able to store parquet files in zp")
         
         super().__init__(id = id, id_resolver = id_resolver, compression = compression, **kwargs)
     

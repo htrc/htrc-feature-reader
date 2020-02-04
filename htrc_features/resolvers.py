@@ -33,6 +33,10 @@ class FauxFile():
 
     def write(self, x, **kwargs):
         return self.main.write(x, **kwargs)
+
+    def __iter__(self):
+        for l in self.main:
+            yield l
     
     def __enter__(self):
         return self
@@ -140,9 +144,12 @@ class IdResolver():
         
         if not format:
             format = self.format
-
+        if format == 'parquet':
+            skip_compression = True
+            
         uncompressed = self._open(id = id, suffix = suffix, mode = mode, format = format,
                                   compression=compression,  **kwargs)
+        
         if uncompressed is None:
             raise FileNotFoundError("Empty buffer found very late")
         
@@ -155,12 +162,17 @@ class IdResolver():
             fout = self._decompress(uncompressed, format, compression, mode)
             
         assert fout
+
         
-        if len(self.active_buffers) > 0:
+        
+
+#        Can't make this work.
+        if len(self.active_buffers) > 0 and mode == 'wb':
             # When working with zipfiles, we need 'with' and 'close' to
             # close multiple files even during an exception. This wrapper does that.
             return FauxFile(fout, *self.active_buffers)
-        
+
+
         return fout
 
     def _open(self, id, compression=None, format=None, mode='rb'):
@@ -240,8 +252,9 @@ class PairtreeResolver(IdResolver):
         if compression == 'default':
             compression = self.compression
 
-        path = htrc_features.utils.id_to_pairtree(id, format, suffix, compression)
-        full_path = Path(self.dir, path)
+        dir = Path(htrc_features.utils.id_to_pairtree(id, format, suffix, compression)).parent
+        fname = self.fname(id = id, format = format, suffix = suffix, compression = compression)
+        full_path = Path(self.dir, dir, fname)
         try:
             return full_path.open(mode=mode)
         except FileNotFoundError:
@@ -259,9 +272,9 @@ class ZiptreeResolver(IdResolver):
     
     A 'ziptree' is a set of zipfiles. 
     """
-    def __init__(self, dir, format, pairtree_root = None, **kwargs):
+    def __init__(self, dir, format, pairtree_root = None, mode = 'rb', **kwargs):
         self.pairtree_root = pairtree_root
-        if not os.path.exists(dir) and not kwargs['mode'].startswith('b'):
+        if not os.path.exists(dir) and not mode.startswith('r'):
             os.makedirs(dir)
         super().__init__(dir = dir, format = format, **kwargs)
         
@@ -308,36 +321,19 @@ class ZiptreeResolver(IdResolver):
         # Prepare it to be closed.
         self.active_buffers = [self.zipcontainer]
         if mode.startswith('w') and filename in self.zipcontainer.namelist():
+            logging.warning("Id '{}' already in zipfile. Refusing to overwrite".format(id))
             self.zipcontainer.close()
+            # Switching away from error.
             raise KeyError("Id '{}' already in zipfile. Refusing to overwrite".format(id))
-        fout = self.zipcontainer.open(filename, mode.rstrip('b'))
+        try:
+            fout = self.zipcontainer.open(filename, mode.rstrip('b'))
+        except KeyError:
+            raise FileNotFoundError("{} not found in {}".format(filename, self.zipcontainer))
+        if zip_mode == 'r':
+            import io
+            fout = io.BytesIO(fout.read())
         return fout
     
-    def _open_fallback(self, filename, zipfile, format, compression, suffix):
-        # Temporary kludge, not complete.
-        
-        # A python 3.5 compatible fallback for mimicking an 'open'
-        # interface to zipfiles that allows writing only.
-
-        # (Because a 'read' interface already exists).
-        
-        class DummyWriter():
-            def __init__(self, filename, zipfile):
-                self.filename = filename
-                self.zipfile = zipfile
-            def close(self):
-                pass
-            def write(self, what):
-                if compression is not None and format != "parquet":
-                    import io
-                    compress = gzip.compress
-                    if compression == "bz2":
-                        compress = bz2.compress
-                    what = compress(what)
-                self.zipfile.writestr(self.filename, what)
-                
-        return DummyWriter(filename, zipfile)
-
 
 class resolver_dict(dict):
     """

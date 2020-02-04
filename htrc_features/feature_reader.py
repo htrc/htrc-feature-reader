@@ -244,7 +244,7 @@ class FeatureReader(object):
             self.resolver = default_resolver(ids, paths, format, dir)
 
         if self.resolver == "locally_cached_http" and dir is None:
-            dir = tempfile.tempdir
+            dir = tempfile.gettempdir()
             
         # Define paths as ids with "path" resolution.        
         if paths is not None:
@@ -336,7 +336,8 @@ def filename_or_id(string):
     raise NameError("Can't determine if {} is supposed to be a filename or an id.".format(string) + 
                     "Please explicitly name your first argument to Volume 'id' or 'path'.")
 
-def retrieve_parser(id, format, id_resolver, compression, dir=None, file_handler=None, **kwargs):
+def retrieve_parser(id, format, id_resolver, compression, dir=None,
+                    file_handler=None, **kwargs):
     
     """
     Retrieve a parser based on kwargs. Used in both Volume and FeatureReader.
@@ -345,11 +346,14 @@ def retrieve_parser(id, format, id_resolver, compression, dir=None, file_handler
     if file_handler:
         return file_handler
     elif format == "json":
-        return parsers.JsonFileHandler(id, id_resolver = id_resolver, compression = compression,
+        return parsers.JsonFileHandler(id, id_resolver = id_resolver,
+                                       compression = compression,
                                        dir=dir, **kwargs)
     elif format == "parquet":
-        return parsers.ParquetFileHandler(id, id_resolver = id_resolver, compression = compression,
-                                          dir=dir, **kwargs)
+        return parsers.ParquetFileHandler(id, id_resolver =
+                                          id_resolver, compression =
+                                          compression, dir=dir,
+                                          **kwargs)
     else:
         raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
 
@@ -404,13 +408,12 @@ class Volume(object):
             
         resolver = id_resolver
 
-
         if format == "default":
             # Allow learning the format from the resolver.
             if isinstance(id_resolver, resolvers.IdResolver):
                 format = id_resolver.format
                 if (dir is not None) and (dir != id_resolver.dir):
-                    warn.warning("You provided a dir argument ({} )and id_resolver instance with a "
+                    warn.warning("You provided a dir argument ({}) and id_resolver instance with a "
                                  "different dir ({}).".format(dir, id_resolver.dir))
                 dir = id_resolver.dir
             else:
@@ -418,22 +421,28 @@ class Volume(object):
         
         if resolver is None:
             resolver = default_resolver(id, path, format, dir)
-            
-        if resolver == "locally_cached_http" and dir is None:
-            dir = tempfile.tempdir
-            
+
+        if resolver == "locally_cached_http":
+            if dir is None:
+                dir = tempfile.gettempdir()
+                
         if resolver == 'http':
             compression = None
-
+        
         self.resolver = resolver
-            
+        
         if path:
             id = path
         
         self.default_page_section = default_page_section
 
+        # Sanity checks.
         assert format in ["json", "parquet"]
-
+        if isinstance(resolver, resolvers.IdResolver):
+            if resolver.format != format:
+                raise TypeError("You have passed an id resolver for {} files,"
+                                "but requested {} files".format(resolver.format, format))
+        
         self.parser = retrieve_parser(id, format, resolver, compression, dir, **kwargs)
         
         self.args = kwargs
@@ -595,7 +604,7 @@ class Volume(object):
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False, page_select=False, drop_section=False,
-                  htid=False, **kwargs):
+                  htid=False, chunk = False, **kwargs):
 
         ''' Get or set tokencounts DataFrame
 
@@ -622,9 +631,28 @@ class Volume(object):
         drop_section[bool]: Whether to drop the index level refering to the section.
 
         htid[bool]: whether to add an index level with the htid included.
+
+        chunk[bool]: whether to divide the text into equal-sized chunks. All remaining options 
+
+        chunk_target: the target size--in number of words--of each chunk.
+
+        - pages are collected together until their word count is > chunk_target
+        - chunk_target is adjusted slightly to minimize the size of straggler chunks
+
+        - overflow_strategy: How to handle cases in which the total number of words does not divide directly into the chosen chunk_target.
+           - "ends" allows the first and last chunks -- which, in books, are often the messiest -- to vary greatly in length
+             while keeping the middle sections as close to `chunk_target` in length as possible given the page lengths.
+           - "even" sets preset targets based on the document length, and creates chunks that are of approximately even size within each book.
+             There may be great variability in chunk length *between* books using this method.
+           - "last" keeps all but the last chunk at the desired length, but allows huge variability in the final chunk.
+
         '''
         assert not (page_select and not pages)
 
+        if chunk:
+            return self._chunked_tokenlist(section=section, case=case, pos=pos,
+                  page_freq=page_freq, page_select=page_select, drop_section=drop_section,
+                                           htid=htid)
         # Create the internal representation if it does not already
         # exist. This will only need to exist once
         if self._tokencounts.empty:
@@ -688,21 +716,10 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
                            
-    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, **kwargs):
+    def _chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, **kwargs):
         '''
         Return a tokenlist dataframe grouped by numbered 'chunks', each of which has roughly `chunk_target` words.
 
-        chunk_target: the target size--in number of words--of each chunk.
-
-        - pages are collected together until their word count is > chunk_target
-        - chunk_target is adjusted slightly to minimize the size of straggler chunks
-
-        - overflow_strategy: How to handle cases in which the total number of words does not divide directly into the chosen chunk_target.
-           - "ends" allows the first and last chunks -- which, in books, are often the messiest -- to vary greatly in length
-             while keeping the middle sections as close to `chunk_target` in length as possible given the page lengths.
-           - "even" sets preset targets based on the document length, and creates chunks that are of approximately even size within each book.
-             There may be great variability in chunk length *between* books using this method.
-           - "last" keeps all but the last chunk at the desired length, but allows huge variability in the final chunk.
 
         - also takes tokenlist() arguments, such as case, drop_section, pos
 

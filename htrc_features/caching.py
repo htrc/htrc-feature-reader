@@ -22,6 +22,10 @@ def make_fallback_resolver(preferred, fallback = None, cache = True):
     attaching an IdResolver to self.fallback).
 
     """
+    if preferred in resolver_nicknames:
+        preferred = resolver_nicknames[preferred]
+        
+#    print(issubclass(preferred, resolvers.IdResolver))
     
     class FallbackResolver(preferred):
 
@@ -50,8 +54,6 @@ def make_fallback_resolver(preferred, fallback = None, cache = True):
             super().__init__(**preferred_args)            
 
         def open(self, id, fallback_kwargs = {}, **kwargs):
-
-
             
             """
             Open a file with a fallback method.
