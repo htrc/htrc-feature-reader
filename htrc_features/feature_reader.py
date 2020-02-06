@@ -652,7 +652,8 @@ class Volume(object):
         if chunk:
             return self._chunked_tokenlist(section=section, case=case, pos=pos,
                   page_freq=page_freq, page_select=page_select, drop_section=drop_section,
-                                           htid=htid)
+                                           htid=htid, overflow_strategy = overflow_strategy,
+                                           chunk_target = chunk_target)
         # Create the internal representation if it does not already
         # exist. This will only need to exist once
         if self._tokencounts.empty:

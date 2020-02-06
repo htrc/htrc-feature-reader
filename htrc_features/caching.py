@@ -6,9 +6,6 @@ from htrc_features.parsers import MissingDataError
 from .resolvers import resolver_nicknames
 
 def copy_between_resolvers(id, resolver1, resolver2):
-
-    from htrc_features.feature_reader import Volume    
-    
     input = Volume(id, id_resolver=resolver1)
     output = Volume(id, id_resolver=resolver2, mode = 'wb')
     output.write(input)
@@ -50,6 +47,8 @@ def make_fallback_resolver(preferred, fallback = None, cache = True):
             else:
                 raise TypeError("You must pass an id_resolver to do fallback searches.")
 
+            # Keep a super instance around for copying.
+            self.super = preferred(**preferred_args)
             
             super().__init__(**preferred_args)            
 
@@ -67,19 +66,22 @@ def make_fallback_resolver(preferred, fallback = None, cache = True):
                 if self.fallback is None:
                     logging.warning("No fallback defined")
                     raise e
-                
-                input = Volume(id, id_resolver=self.fallback, **fallback_kwargs)
-
                 if not cache:
+                    input = Volume(id, id_resolver=self.fallback, **fallback_kwargs)
                     return input.parser.open(id, **kwargs)
+                else:
+                    copy_between_resolvers(id, self.fallback, self.super)
+                    fout = super().open(id, **kwargs)
+                    logging.debug("Successfully returning from cache")
+                    return fout                    
 
-                kwargs['mode'] = 'wb'
-                output = Volume(id, id_resolver=self, **kwargs)
-                output.write(input, **kwargs)
-                logging.debug("Successfully wrote to cache; now returning from there.")
-
-                kwargs['mode'] = 'rb'
-                return super().open(id, **kwargs)
+#                kwargs['mode'] = 'wb'
+ #               output = Volume(id, id_resolver=self, **kwargs)
+  #              output.write(input, **kwargs)
+   #             logging.debug("Successfully wrote to cache; now returning from there.")
+#
+ #               kwargs['mode'] = 'rb'
+  #              return super().open(id, **kwargs)
             
     return FallbackResolver
 

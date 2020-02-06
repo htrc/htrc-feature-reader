@@ -420,7 +420,6 @@ class ParquetFileHandler(BaseFileHandler):
                 self.meta = json.loads(meta_buffer.read().decode("utf-8"))
         except:
             self.meta = dict(id=self.id, title=self.id)
-
             
         if not self.meta['id']:
             self.meta['id'] = htrc_features.utils.extract_htid(self.id)
