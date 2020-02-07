@@ -248,7 +248,7 @@ class TestVolume():
 
         longest_page = fullvolume.tokenlist().groupby('page').sum().max().iloc[0]
         for chunk_size in [5000, 10000]:
-            chunked = (fullvolume.chunked_tokenlist(chunk_target=chunk_size)
+            chunked = (fullvolume.tokenlist(chunk=True, chunk_target=chunk_size)
                                  .groupby(level='chunk').sum()
                       )
             assert abs(chunked.mean().iloc[0] - chunk_size) < chunk_size/3 

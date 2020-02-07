@@ -604,7 +604,7 @@ class Volume(object):
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False, page_select=False, drop_section=False,
-                  htid=False, chunk = False, **kwargs):
+                  htid=False, chunk = False, overflow_strategy="ends", chunk_target = 10000, **kwargs):
 
         ''' Get or set tokencounts DataFrame
 

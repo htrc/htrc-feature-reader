@@ -56,7 +56,8 @@ class TestParsing():
         self.combo_test("parquet", resolvers.PairtreeResolver, "snappy")
 
     def test_parquet_snappy_resolvers_ZiptreeResolver_resolution(self):
-        self.combo_test("parquet", resolvers.ZiptreeResolver, "snappy")
+        with pytest.raises(NotImplementedError):
+            self.combo_test("parquet", resolvers.ZiptreeResolver, "snappy")
 
  
     def test_parquet_snappy_resolvers_LocalResolver_resolution(self):
@@ -68,7 +69,8 @@ class TestParsing():
 
  
     def test_parquet_gz_resolvers_ZiptreeResolver_resolution(self):
-        self.combo_test("parquet", resolvers.ZiptreeResolver, "gz")
+        with pytest.raises(NotImplementedError):        
+            self.combo_test("parquet", resolvers.ZiptreeResolver, "gz")
 
  
     def test_parquet_gz_resolvers_LocalResolver_resolution(self):
