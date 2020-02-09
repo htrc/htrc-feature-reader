@@ -33,7 +33,6 @@ requirements:
     - pymarc
     - requests
     - rapidjson
-    - bz2file
 
   run:
     - python
@@ -43,7 +42,6 @@ requirements:
     - pymarc
     - requests
     - rapidjson
-    - bz2file
 
 test:
   # Python imports
