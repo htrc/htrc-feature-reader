@@ -18,11 +18,11 @@ def make_fallback_resolver(preferred, fallback = None, cache = True):
     If 'fallback' is None, the actual fallback creation can be handled by the user (usually by
     attaching an IdResolver to self.fallback).
 
+
+
     """
     if preferred in resolver_nicknames:
         preferred = resolver_nicknames[preferred]
-        
-#    print(issubclass(preferred, resolvers.IdResolver))
     
     class FallbackResolver(preferred):
 
@@ -56,32 +56,39 @@ def make_fallback_resolver(preferred, fallback = None, cache = True):
             
             """
             Open a file with a fallback method.
+
+
+            kwargs: a set of arguments that will be passed to open.
+          
             """
-            
+            if len(fallback_kwargs) != 0:
+                logging.warn("""You seem to be passing kwargs to a fallback
+                parser while opening. This feature may be deprecated because
+                I can't think of any case in which it would be useful.
+                Well, I guess if you're using two different parquet caches
+                at once??
+                Please e-mail bmschmidt@gmail.com if you want it to stick around!
+                And send me your use case.
+                """)
             try:
                 fout = super().open(id, **kwargs)
                 logging.debug("Successfully returning from cache")
+                
+                
                 return fout
             except (MissingDataError, FileNotFoundError) as e:
                 if self.fallback is None:
                     logging.warning("No fallback defined")
                     raise e
                 if not cache:
+                    print(fallback_kwargs)
                     input = Volume(id, id_resolver=self.fallback, **fallback_kwargs)
-                    return input.parser.open(id, **kwargs)
+                    return input.parser.open(id, **fallback_kwargs)
                 else:
                     copy_between_resolvers(id, self.fallback, self.super)
-                    fout = super().open(id, **kwargs)
+                    fout = super().open(id, **fallback_kwargs)
                     logging.debug("Successfully returning from cache")
-                    return fout                    
-
-#                kwargs['mode'] = 'wb'
- #               output = Volume(id, id_resolver=self, **kwargs)
-  #              output.write(input, **kwargs)
-   #             logging.debug("Successfully wrote to cache; now returning from there.")
-#
- #               kwargs['mode'] = 'rb'
-  #              return super().open(id, **kwargs)
+                    return fout           
             
     return FallbackResolver
 

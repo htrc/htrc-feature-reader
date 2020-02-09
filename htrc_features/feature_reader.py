@@ -392,6 +392,9 @@ class Volume(object):
         self._section_features = pd.DataFrame()
         self._extra_metadata = None
 
+        if "resolver" in kwargs:
+            raise NameError("Caught 'resolver' arg: did you mean to pass 'id_resolver'?")
+        
         if id == False:
             warnings.warn("Please use None to indicate lack of an id", DeprecationWarning)
             id = None
@@ -753,7 +756,7 @@ class Volume(object):
             newindex = ['chunk', 'pstart', 'pend'] + newindex[1:]
 
         # WTF with the index order here.
-        return return_val.set_index(newindex)
+        return return_val.set_index(newindex).sort_index()
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
@@ -845,11 +848,8 @@ class Volume(object):
             if compression == 'default':
                 compression = 'snappy'
 
-        print(self.id)
-        print(id_resolver.mode)
         parser = parsers.ParquetFileHandler(id = self.id, id_resolver = id_resolver,
                                             dir = dir, compression = compression)
-        print(parser.mode)
         parser.write(volume = self, meta = meta, tokens = tokens, chars = chars, section_features = section_features,
                      chunked = chunked, token_kwargs = token_kwargs)
     

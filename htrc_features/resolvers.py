@@ -16,38 +16,6 @@ from urllib.request import urlopen as _urlopen
 from urllib.parse import urlparse as parse_url
 from urllib.error import HTTPError
 
-class FauxFile():
-    """
-    This class is a shim to allow sensible filehandling and errors
-    with zipfiles, where on an error both the file *inside* the zip
-    and the zipfile itself must be closed. It is only used in that
-    specific case.
-    """
-    def __init__(self, *buffers):
-        self.main = buffers[0]
-        # Zipfile requires closing other buffers.
-        self.buffers = buffers
-
-    def read(self, **kwargs):
-        return self.main.read(**kwargs)
-
-    def write(self, x, **kwargs):
-        return self.main.write(x, **kwargs)
-
-    def __iter__(self):
-        for l in self.main:
-            yield l
-    
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        self.close()
-
-    def close(self):
-        for buffer in self.buffers:
-            buffer.close()
-            
 class IdResolver():
     """
     The base class method handles decompression for gzip and bz2.
@@ -75,7 +43,8 @@ class IdResolver():
         self.mode = mode
         self.compression = compression
         
-        # Sometimes we have to remember open buffers to close.
+        # Sometimes (only zipfiles) we have to remember open buffers to close--
+        # e.g., the zipfile holding an open file object.
         self.active_buffers = []
             
     def fname(self, id, format, compression, suffix):
@@ -114,7 +83,9 @@ class IdResolver():
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        self.close()
+        for buffer in self.active_buffers:
+            buffer.close()
+        self.active_buffers = []
 
     def open(self, id, suffix = None, format=None, mode = 'rb',
              skip_compression = False, compression = 'default',
@@ -162,16 +133,6 @@ class IdResolver():
             fout = self._decompress(uncompressed, format, compression, mode)
             
         assert fout
-
-        
-        
-
-#        Can't make this work.
-        if len(self.active_buffers) > 0 and mode == 'wb':
-            # When working with zipfiles, we need 'with' and 'close' to
-            # close multiple files even during an exception. This wrapper does that.
-            return FauxFile(fout, *self.active_buffers)
-
 
         return fout
 
@@ -272,16 +233,19 @@ class ZiptreeResolver(IdResolver):
     
     A 'ziptree' is a set of zipfiles. 
     """
-    def __init__(self, dir, format, pairtree_root = None, mode = 'rb', **kwargs):
+    def __init__(self, dir, format, pairtree_root = None, mode = 'rb', hash_chars = 3, **kwargs):
         self.pairtree_root = pairtree_root
+        self.hash_chars = hash_chars
         if not os.path.exists(dir) and not mode.startswith('r'):
             os.makedirs(dir)
         super().__init__(dir = dir, format = format, **kwargs)
         
-    def which_zipfile(self, id, digits = 3):
+    def which_zipfile(self, id):
+        digits = self.hash_chars
         # Use the sha1 hash of the id; and take only the first three digits.
         code = hashlib.sha1(bytes(id, 'utf-8')).hexdigest()[:digits]
         if digits == 0:
+            return os.path.join(self.dir, "features.zip")
             return None
         return os.path.join(self.dir, code + ".zip")
 
@@ -289,6 +253,7 @@ class ZiptreeResolver(IdResolver):
         """
         Force: overwrite existing files where found. (not implemented).
         """
+        
         if not format:
             format = self.format
         if compression == 'default':
@@ -304,31 +269,22 @@ class ZiptreeResolver(IdResolver):
             zip_mode = 'a'
 
         if mode.startswith('w') and MINOR_VERSION <= 5:
-            
             raise NotImplementedError("Writing to zipfiles with this module requires python 3.6")
-        
-            """
-            I would love to make this work, but for now it's broken.
-            zipcontainer = zipfile.ZipFile(fin, mode = zip_mode)
-            if mode.startswith('w') and filename in zipcontainer.namelist():
-                raise KeyError("Id '{}' already in zipfile. Refusing to overwrite".format(id))
-
-            return self._open_fallback(filename, zipcontainer, format, compression, suffix)
-            """
             
-        self.zipcontainer = zipfile.ZipFile(fin, mode = zip_mode)
+        zipcontainer = zipfile.ZipFile(fin, mode = zip_mode)
 
         # Prepare it to be closed.
-        self.active_buffers = [self.zipcontainer]
-        if mode.startswith('w') and filename in self.zipcontainer.namelist():
+        self.active_buffers.append(zipcontainer)
+        
+        if mode.startswith('w') and filename in zipcontainer.namelist():
             logging.warning("Id '{}' already in zipfile. Refusing to overwrite".format(id))
-            self.zipcontainer.close()
+            # zipcontainer.close()
             # Switching away from error.
             raise KeyError("Id '{}' already in zipfile. Refusing to overwrite".format(id))
         try:
-            fout = self.zipcontainer.open(filename, mode.rstrip('b'))
+            fout = zipcontainer.open(filename, mode.rstrip('b'))
         except KeyError:
-            raise FileNotFoundError("{} not found in {}".format(filename, self.zipcontainer))
+            raise FileNotFoundError("{} not found in {}".format(filename, zipcontainer))
         if zip_mode == 'r':
             import io
             fout = io.BytesIO(fout.read())

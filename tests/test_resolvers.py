@@ -8,6 +8,7 @@ import pandas as pd
 import tempfile
 from pathlib import Path
 import tempfile
+import pyarrow
 
 project_root = Path(htrc_features.__file__).parent.parent
 
@@ -51,35 +52,34 @@ class TestParsing():
 
                 # Our test assertion ensures that the data has made it all the way through.
                 assert(Volume("aeu.ark:/13960/t1rf63t52", id_resolver = resolver3).tokenlist()['count'].sum() == 97691)
-
+                
     def test_parquet_snappy_resolvers_PairtreeResolver_resolution(self):
         self.combo_test("parquet", resolvers.PairtreeResolver, "snappy")
 
     def test_parquet_snappy_resolvers_ZiptreeResolver_resolution(self):
-        with pytest.raises(NotImplementedError):
-            self.combo_test("parquet", resolvers.ZiptreeResolver, "snappy")
-
+        self.combo_test("parquet", resolvers.ZiptreeResolver, "snappy")
  
     def test_parquet_snappy_resolvers_LocalResolver_resolution(self):
         self.combo_test("parquet", resolvers.LocalResolver, "snappy")
 
- 
     def test_parquet_gz_resolvers_PairtreeResolver_resolution(self):
-        self.combo_test("parquet", resolvers.PairtreeResolver, "gz")
+        self.combo_test("parquet", resolvers.PairtreeResolver, "gzip")
 
+    # If you pass a bad compression format, pandas silently
+    # writes with no compression even though pyarrow raises an exception.
+    # Hmmm.
+#    def test_parquet_gz_resolvers_PairtreeResolver_resolution(self):
+#        with pytest.raises(pyarrow.lib.ArrowException):
+#            self.combo_test("parquet", resolvers.PairtreeResolver, "gz")        
  
     def test_parquet_gz_resolvers_ZiptreeResolver_resolution(self):
-        with pytest.raises(NotImplementedError):        
-            self.combo_test("parquet", resolvers.ZiptreeResolver, "gz")
-
+        self.combo_test("parquet", resolvers.ZiptreeResolver, "gzip")
  
     def test_parquet_gz_resolvers_LocalResolver_resolution(self):
-        self.combo_test("parquet", resolvers.LocalResolver, "gz")
-
+        self.combo_test("parquet", resolvers.LocalResolver, "gzip")
  
     def test_json_gz_resolvers_PairtreeResolver_resolution(self):
         self.combo_test("json", resolvers.PairtreeResolver, "gz")
-
  
     def test_json_gz_resolvers_ZiptreeResolver_resolution(self):
         self.combo_test("json", resolvers.ZiptreeResolver, "gz")
@@ -113,6 +113,7 @@ class TestParsing():
 
     def combo_test(self, format, resolver, compression):
         id = "aeu.ark:/13960/t1rf63t52"
+        print(format, resolver, compression)
         basic_resolver = resolvers.LocalResolver(dir = "tests/data", format="json", compression="bz2")
         with tempfile.TemporaryDirectory() as tempdir:
             testing_resolver_write = resolver(dir = tempdir, format = format, compression = compression)

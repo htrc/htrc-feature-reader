@@ -188,12 +188,14 @@ class JsonFileHandler(BaseFileHandler):
             skip_compression = False
             
         json_bytestring = outside_volume.parser._parse_json(object = False, skip_compression = skip_compression)
-        
-        with self.resolver.open(self.id, compression = self.compression, format = 'json',
+
+        with self.resolver as context:
+            with context.open(self.id, compression = self.compression, format = 'json',
                                 skip_compression = skip_compression, mode=mode,
                                 **kwargs) as fout:
-            fout.write(json_bytestring)
-    
+                fout.write(json_bytestring)
+
+
     def read(self, **kwargs):
         '''
         Load JSON for a path. Allows remote files in addition to local ones. 
@@ -408,8 +410,8 @@ class ParquetFileHandler(BaseFileHandler):
         self.resolver = id_resolver
         self.mode = mode
 
-        if self.resolver == "ziptree" or isinstance(self.resolver, resolvers.ZiptreeResolver):
-            raise NotImplementedError("Not yet able to store parquet files in zp")
+#        if self.resolver == "ziptree" or isinstance(self.resolver, resolvers.ZiptreeResolver):
+#            raise NotImplementedError("Not yet able to store parquet files in zp")
         
         super().__init__(id = id, id_resolver = id_resolver, compression = compression, **kwargs)
     
@@ -462,43 +464,52 @@ class ParquetFileHandler(BaseFileHandler):
         if not (meta or tokens or section_features or chars):
             logging.warning("You're not saving anything with save_parquet")
             return
-        
-        if meta:
-            metastring = json.dumps(volume.parser.meta).encode("utf-8")
-            with self.resolver.open( self.id, format = "json",
-                                     compression = None, suffix = 'meta', mode=mode,
-                                     **kwargs) as fout:
-                fout.write(metastring)
-        
-        if tokens:
-            try:
-                if chunked:
-                    feats = volume.chunked_tokenlist(**token_kwargs)
-                else:
-                    feats = volume.tokenlist(**token_kwargs)
-            except:
-                # If the internal representation is incomplete, returning the above may fail,
-                # but the cache may have an acceptable dataset to return
-                feats = volume._tokencounts
-                
-            if not indexed:
-                feats = feats.reset_index()
-                
-            if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'tokens', mode=mode, **kwargs) as fout:
-                    feats.to_parquet(fout, compression=compression)                
-                
-        if section_features:
-            feats = volume.section_features(section='all')
-            if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'section', mode=mode, **kwargs) as fout:
-                    feats.to_parquet(fout, compression=compression)
-            
-        if chars:
-            feats = volume.line_chars()
-            if not feats.empty:
-                with self.resolver.open(id = self.id, suffix = 'chars', mode=mode, **kwargs) as fout:
-                    feats.to_parquet(fout, compression=compression)
+
+        with self.resolver as resolver:
+            """
+            This context handling matters to ensure--eg--zipfiles are closed
+            after writing.
+            """
+            if meta:
+                metastring = json.dumps(volume.parser.meta).encode("utf-8")
+                with resolver.open( self.id, format = "json",
+                                         compression = None, suffix = 'meta', mode=mode,
+                                         **kwargs) as fout:
+                    fout.write(metastring)
+
+        with self.resolver as resolver:                    
+            if tokens:
+                try:
+                    if chunked:
+                        feats = volume.chunked_tokenlist(**token_kwargs)
+                    else:
+                        feats = volume.tokenlist(**token_kwargs)
+                except:
+                    # If the internal representation is incomplete, returning the above may fail,
+                    # but the cache may have an acceptable dataset to return
+                    feats = volume._tokencounts
+                    
+                if not indexed:
+                    feats = feats.reset_index()
+
+                    
+                if not feats.empty:
+                    with resolver.open(id = self.id, suffix = 'tokens', mode=mode, **kwargs) as fout:
+                        feats.to_parquet(fout, compression=compression)
+                        
+        with self.resolver as resolver:
+            if section_features:
+                feats = volume.section_features(section='all')
+                if not feats.empty:
+                    with resolver.open(id = self.id, suffix = 'section', mode=mode, **kwargs) as fout:
+                        feats.to_parquet(fout, compression=compression)
+                        
+        with self.resolver as resolver:
+            if chars:
+                feats = volume.line_chars()
+                if not feats.empty:
+                    with resolver.open(id = self.id, suffix = 'chars', mode=mode, **kwargs) as fout:
+                        feats.to_parquet(fout, compression=compression)
 
     def _make_tokencount_df(self):
         try:
