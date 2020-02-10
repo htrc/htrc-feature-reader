@@ -6,19 +6,19 @@ from htrc_features.parsers import MissingDataError
 from .resolvers import resolver_nicknames
 
 def copy_between_resolvers(id, resolver1, resolver2):
+#    print (resolver1, "--->", resolver2)
     input = Volume(id, id_resolver=resolver1)
     output = Volume(id, id_resolver=resolver2, mode = 'wb')
     output.write(input)
     
 def make_fallback_resolver(preferred, fallback = None, cache = True):
     """
+
     A function to return a constructor that uses 
     a cache.
 
     If 'fallback' is None, the actual fallback creation can be handled by the user (usually by
     attaching an IdResolver to self.fallback).
-
-
 
     """
     if preferred in resolver_nicknames:
@@ -35,7 +35,6 @@ def make_fallback_resolver(preferred, fallback = None, cache = True):
         """
 
         def __init__(self, fallback_kwargs = {}, **preferred_args):
-
             if fallback in resolver_nicknames:
                 self.fallback = resolver_nicknames[fallback](**fallback_kwargs)       
             elif isinstance(fallback, resolvers.IdResolver):
@@ -73,20 +72,17 @@ def make_fallback_resolver(preferred, fallback = None, cache = True):
             try:
                 fout = super().open(id, **kwargs)
                 logging.debug("Successfully returning from cache")
-                
-                
                 return fout
             except (MissingDataError, FileNotFoundError) as e:
                 if self.fallback is None:
                     logging.warning("No fallback defined")
                     raise e
                 if not cache:
-                    print(fallback_kwargs)
                     input = Volume(id, id_resolver=self.fallback, **fallback_kwargs)
                     return input.parser.open(id, **fallback_kwargs)
                 else:
                     copy_between_resolvers(id, self.fallback, self.super)
-                    fout = super().open(id, **fallback_kwargs)
+                    fout = super().open(id, **kwargs)
                     logging.debug("Successfully returning from cache")
                     return fout           
             

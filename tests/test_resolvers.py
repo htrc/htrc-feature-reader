@@ -1,6 +1,7 @@
 import pytest
 from htrc_features.resolvers import IdResolver
 import htrc_features.resolvers as resolvers
+from htrc_features.caching import copy_between_resolvers
 from htrc_features import Volume
 import htrc_features
 import os
@@ -12,12 +13,6 @@ import pyarrow
 
 project_root = Path(htrc_features.__file__).parent.parent
 
-
-def copy_between_resolvers(id, resolver1, resolver2):
-    input = Volume(id, id_resolver=resolver1)
-    output = Volume(id, id_resolver=resolver2, mode = 'wb')
-    output.write(input)
-    
 class TestParsing():
     def test_names(self):
         resolver2 = IdResolver(dir = ".", format = "parquet", compression = "snappy")

@@ -28,16 +28,22 @@ class MissingDataError(Exception):
 
 class BaseFileHandler(object):
     
-    def __init__(self, id = None, id_resolver = None, compression='default', **kwargs):
+    def __init__(self, id = None, id_resolver = None, mode = 'rb', **kwargs):
         '''
         Base class for volume reading.
         '''
 
+        self.id = id
         self.meta = dict(id=id)        
 
         self.args = kwargs
+        self.mode = mode
+
+        # This needs to happen somehwere before here.
+        assert(isinstance(id_resolver, resolvers.IdResolver))
         
-        self.compression = compression
+        # Handle default compression
+        """
         if self.compression == 'default':
             if isinstance(id_resolver, resolvers.IdResolver):
                 # First choice; inherit from the resolver.
@@ -56,21 +62,26 @@ class BaseFileHandler(object):
                 raise
         
         self.resolver = self._init_resolver(id_resolver, compression=self.compression, **kwargs)
+        """
+
+        self.id_resolver = id_resolver
+#        self.compression = id_resolver.compression
         
         if 'load' in self.args and self.args['load'] == False:
             return
         
-        if 'mode' in self.args:
-            mode = self.args['mode']
-            assert( mode in ['wb', 'rb'] )
-            self.mode = mode
-            if mode.startswith('w'):
-                # No need to parse in write mode.
-                return
+        
+        assert( mode in ['wb', 'rb'] )
+        if mode.startswith('w'):
+            # No need to parse in write mode.
+            return
         
         self.parse(**kwargs)
         
-    def _init_resolver(self, id_resolver, format=None, **kwargs):
+    def __init_resolver(self, id_resolver, format=None, **kwargs):
+        """
+        DELETE
+        """
         if not format:
             format = self.format
             
@@ -156,14 +167,13 @@ class JsonFileHandler(BaseFileHandler):
                              'capAlphaSeq', 'sentenceCount']
 
     
-    def __init__(self, id, id_resolver, compression = 'bz2', **kwargs):
+    def __init__(self, id, id_resolver, compression = 'default', **kwargs):
 
         self.meta = dict(id=None, handle_url=None)
         self.format = "json"
         self.id = id
         self._schema = None
         self._pages = None
-        self.compression = 'bz2'
 
 
         # parsing and reading are called here.
@@ -173,24 +183,21 @@ class JsonFileHandler(BaseFileHandler):
     def write(self, outside_volume, compression='default', mode='wb', **kwargs):
 
         if compression == "default":
-            compression = self.compression
+            compression = self.id_resolver.compression
             
         if outside_volume.parser.format != "json":
             raise TypeError("Can only write to json from other json, because"
                             "data is lost in creating the parquet files.")
 
-        if outside_volume.parser.compression == self.compression:
-            if self.compression is not "default":
-                skip_compression = True
-            else:
-                skip_compression = False
+        if (outside_volume.id_resolver.compression == self.id_resolver.compression) and (self.id_resolver.compression != "default"):
+            skip_compression = True
         else:
             skip_compression = False
             
         json_bytestring = outside_volume.parser._parse_json(object = False, skip_compression = skip_compression)
 
-        with self.resolver as context:
-            with context.open(self.id, compression = self.compression, format = 'json',
+        with self.id_resolver as context:
+            with context.open(self.id, compression = context.compression, format = 'json',
                                 skip_compression = skip_compression, mode=mode,
                                 **kwargs) as fout:
                 fout.write(json_bytestring)
@@ -205,9 +212,9 @@ class JsonFileHandler(BaseFileHandler):
     
     def _parse_json(self, compression='default', **kwargs):
         id = self.id
-        resolver = self.resolver
+        resolver = self.id_resolver
         if compression is 'default':
-            compression = self.compression
+            compression = self.id_resolver.compression
         
         for k in self.args:
             if not k in kwargs:
@@ -391,34 +398,36 @@ class ParquetFileHandler(BaseFileHandler):
         vol._tokencounts, vol._line_chars, vol._section_features) so 
         this parser doesn't provide much fanciness beyond loading.
         
-        TO LOAD DATA
-        The loading enforces a filename convention, the path provided
-        to the parser should avoid the file extension. The filename convention is
-            - ../{htid}.meta.json
-            - ../{htid}.tokens.parquet
-            - ../{htid}.chars.parquet
-            - ../{htid}.section.parquet
-      
+        The 'token_kwargs' is used only for writing new files; it sets the rules for what
+        will be written out.
+
+        It is recommended to use an id-based id_resolver with this class. Path-based
+        resolvers cannot transparently resolve all four files with a single file path.
+        
     '''
         
     
-    def __init__(self, id, id_resolver, compression="snappy", mode = 'rb', **kwargs):
+    def __init__(self, id, id_resolver, mode = 'rb', token_kwargs = 'default', compression = 'snappy', **kwargs):
 
         self.format = "parquet"
-        self.id = id
-        self.compression = compression
-        self.resolver = id_resolver
-        self.mode = mode
-
-#        if self.resolver == "ziptree" or isinstance(self.resolver, resolvers.ZiptreeResolver):
-#            raise NotImplementedError("Not yet able to store parquet files in zp")
+#        self.id = id
+#        self.id_resolver = id_resolver
+#        self.mode = mode
+        self.token_kwargs = token_kwargs
+        if self.token_kwargs == 'default':
+            if id_resolver.token_kwargs != 'default':
+                self.token_kwargs = id_resolver.token_kwargs
         
-        super().__init__(id = id, id_resolver = id_resolver, compression = compression, **kwargs)
+        if self.token_kwargs != 'default':
+            logging.debug("Using non-default tokenization for writing")
+
+        super().__init__(id = id, id_resolver = id_resolver, compression = compression,
+                         mode = mode, token_kwargs = token_kwargs, **kwargs)
     
     def parse(self, **kwargs):
         
         try:
-            with self.resolver.open(self.id, suffix = "meta", format = "json", compression = None) as meta_buffer:
+            with self.id_resolver.open(self.id, suffix = "meta", format = "json", compression = None) as meta_buffer:
                 self.meta = json.loads(meta_buffer.read().decode("utf-8"))
         except:
             self.meta = dict(id=self.id, title=self.id)
@@ -432,10 +441,9 @@ class ParquetFileHandler(BaseFileHandler):
         if not 'title' in self.meta or not self.meta['title']:
             self.meta['title'] = self.meta['id']
 
-    def write(self, volume, meta=True, tokens=True, chars=False,
-              section_features=False, mode='wb', chunked = False,
-              compression="default", indexed=True,
-              token_kwargs=dict(section='all', drop_section=False),
+    def write(self, volume, files = ['meta', 'tokens'],
+              mode='wb', compression="default", indexed=True,
+              token_kwargs="default",
               **kwargs):
         '''
 
@@ -445,7 +453,12 @@ class ParquetFileHandler(BaseFileHandler):
         The primary use is for converting the feature files to something more efficient. By default,
         only metadata and tokencounts are saved.
         
-        'volume' is an object of the 'Volume' class which will be used for data.
+        files lists which files you want to get. Default is 'meta', and 'tokens'.
+        Also allowed are 'chars' (character counts) and 'section_features'
+
+
+        'volume' is an object of the 'Volume' class which will be used for data. It will
+        almost certainly need to come from a true JSON file.
 
         Saving page features is currently unsupported, as it's an ill-fit for parquet. This is currently
         just the language-inferences for each page - everything else is in section features 
@@ -457,63 +470,67 @@ class ParquetFileHandler(BaseFileHandler):
         token_kwargs=dict(section='body', drop_section=True, pos=False).
         '''
 
-
+        if token_kwargs == "default":
+            if self.token_kwargs is not None and self.token_kwargs != "default":
+                token_kwargs = self.token_kwargs
+            else:
+                token_kwargs = dict(section='all', drop_section=False)
+                
         if compression == "default":
-            compression = self.compression
+            compression = self.id_resolver.compression
 
-        if not (meta or tokens or section_features or chars):
+        if len(files) == 0:
             logging.warning("You're not saving anything with save_parquet")
             return
 
-        with self.resolver as resolver:
+        for f in files:
+            assert(f in ['meta', 'tokens', 'chars', 'section_features'])
+        
+        with self.id_resolver as resolver:
             """
             This context handling matters to ensure--eg--zipfiles are closed
             after writing.
             """
-            if meta:
+            if 'meta' in files:
                 metastring = json.dumps(volume.parser.meta).encode("utf-8")
                 with resolver.open( self.id, format = "json",
                                          compression = None, suffix = 'meta', mode=mode,
                                          **kwargs) as fout:
                     fout.write(metastring)
 
-        with self.resolver as resolver:                    
-            if tokens:
+        with self.id_resolver as resolver:                    
+            if 'tokens' in files:
                 try:
-                    if chunked:
-                        feats = volume.chunked_tokenlist(**token_kwargs)
-                    else:
-                        feats = volume.tokenlist(**token_kwargs)
+                    feats = volume.tokenlist(**token_kwargs)
                 except:
+                    raise
                     # If the internal representation is incomplete, returning the above may fail,
                     # but the cache may have an acceptable dataset to return
                     feats = volume._tokencounts
-                    
                 if not indexed:
                     feats = feats.reset_index()
-
                     
                 if not feats.empty:
                     with resolver.open(id = self.id, suffix = 'tokens', mode=mode, **kwargs) as fout:
-                        feats.to_parquet(fout, compression=compression)
+                        feats.to_parquet(fout, compression=compression, index = indexed)
                         
-        with self.resolver as resolver:
-            if section_features:
+        with self.id_resolver as resolver:
+            if 'section_features' in files:
                 feats = volume.section_features(section='all')
                 if not feats.empty:
                     with resolver.open(id = self.id, suffix = 'section', mode=mode, **kwargs) as fout:
-                        feats.to_parquet(fout, compression=compression)
+                        feats.to_parquet(fout, compression=compression, index = indexed)
                         
-        with self.resolver as resolver:
-            if chars:
+        with self.id_resolver as resolver:
+            if 'chars' in files:
                 feats = volume.line_chars()
                 if not feats.empty:
                     with resolver.open(id = self.id, suffix = 'chars', mode=mode, **kwargs) as fout:
-                        feats.to_parquet(fout, compression=compression)
+                        feats.to_parquet(fout, compression=compression, index = indexed)
 
     def _make_tokencount_df(self):
         try:
-            with self.resolver.open(id = self.id, suffix = 'tokens', format = 'parquet') as fin:
+            with self.id_resolver.open(id = self.id, suffix = 'tokens', format = 'parquet') as fin:
                 df = pd.read_parquet(fin)
         except IOError:
             raise MissingDataError("No token information available")
@@ -525,7 +542,7 @@ class ParquetFileHandler(BaseFileHandler):
     
     def _make_line_char_df(self):
         try:
-            with self.resolver.open(id = self.id, suffix = 'chars', format = 'parquet') as fin:
+            with self.id_resolver.open(id = self.id, suffix = 'chars', format = 'parquet') as fin:
                 df = pd.read_parquet(fin)
                 return df 
         except IOError:
@@ -533,7 +550,7 @@ class ParquetFileHandler(BaseFileHandler):
         
     def _make_section_feature_df(self):
         try:
-            with self.resolver.open(id = self.id, suffix = 'section', format = 'parquet') as fin:
+            with self.id_resolver.open(id = self.id, suffix = 'section', format = 'parquet') as fin:
                 df = pd.read_parquet(fin)
             return df 
         except IOError:
