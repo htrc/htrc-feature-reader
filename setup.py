@@ -16,7 +16,7 @@ setup(name='htrc-feature-reader',
       author_email='organisciak@gmail.com',
       license='NCSA',
       packages=['htrc_features'],
-      install_requires=['six', 'pandas', 'numpy', 'requests', 'rapidjson', 'pymarc'],
+      install_requires=['six', 'pandas>=0.24', 'numpy', 'requests', 'rapidjson', 'pymarc'],
       setup_requires=['pytest-runner'],
       tests_require=['pytest'],
       entry_points={

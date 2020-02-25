@@ -777,7 +777,6 @@ class Volume(object):
             return_val = return_val.set_index('chunk').join(chunk_bounds).reset_index()
             newindex = ['chunk', 'pstart', 'pend'] + newindex[1:]
 
-        # WTF with the index order here.
         return return_val.set_index(newindex).sort_index()
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
