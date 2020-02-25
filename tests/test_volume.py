@@ -49,7 +49,7 @@ class TestVolume():
         assert type(vol) == htrc_features.feature_reader.Volume
         
     def test_fullparquet_saving(self, volume, tmp_path):
-        volume.save_parquet(tmp_path, meta=True, tokens=True, chars=True, section_features=True)
+        volume.save(tmp_path, format = "parquet", files = ['meta', 'tokens', 'chars', 'section_features'])
         files = os.listdir(tmp_path)
         for ext in ['meta.json', 'tokens.parquet', 'section.parquet', 'chars.parquet']:
             assert '{}.{}'.format(utils.clean_htid(volume.id), ext) in files
@@ -58,7 +58,7 @@ class TestVolume():
         clean_id = utils.clean_htid(volume.id)
         
         # Save only meta
-        volume.save_parquet(tmp_path, meta=True, tokens=False, chars=False, section_features=False)
+        volume.save(tmp_path, format = 'parquet', files = ['meta'])
         metapath = os.path.join(tmp_path, clean_id+'.meta.json')
         assert os.listdir(tmp_path) == [clean_id+'.meta.json']
         with open(metapath, mode='r') as f:
@@ -67,14 +67,14 @@ class TestVolume():
         os.remove(metapath)
         
         # Save only tokens
-        volume.save_parquet(tmp_path, meta=False, tokens=True, chars=False, section_features=False)
+        volume.save(tmp_path, format = 'parquet', files = ['tokens'])
         assert os.listdir(tmp_path) == [clean_id+'.tokens.parquet']
         os.remove(os.path.join(tmp_path, clean_id+'.tokens.parquet'))
         
     def test_partial_tokenlist_saving(self, volume, tmp_path):
         tkwargs = dict(case=False, pos=False, drop_section=True)
-        volume.save_parquet(tmp_path, meta=False, token_kwargs = tkwargs)
-        
+        volume.save(tmp_path, format='parquet', files = ['tokens'], token_kwargs = tkwargs)
+
         path = os.path.join(tmp_path, os.listdir(tmp_path)[0])
         df = pd.read_parquet(path).reset_index()
         assert (df.columns == ['page', 'lowercase', 'count']).all()
@@ -248,7 +248,7 @@ class TestVolume():
 
         longest_page = fullvolume.tokenlist().groupby('page').sum().max().iloc[0]
         for chunk_size in [5000, 10000]:
-            chunked = (fullvolume.chunked_tokenlist(chunk_target=chunk_size)
+            chunked = (fullvolume.tokenlist(chunk=True, chunk_target=chunk_size)
                                  .groupby(level='chunk').sum()
                       )
             assert abs(chunked.mean().iloc[0] - chunk_size) < chunk_size/3 

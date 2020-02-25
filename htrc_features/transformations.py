@@ -64,9 +64,7 @@ def _chunking_algorithm(page_counts, target, even = False, two_sided = True, pro
 
     two_sided = whether to work from both the front and back simultaneously, or *only* from the front. (to operate from the back, just flip the page counts before sending it to this function.
 
-    procrastinate: whether to leave all chunks intact. 
-    
-
+    procrastinate: whether to leave all chunks intact without rebalancing.
     """
 
     # Register front and back offsets. At the beginning, this is the size of the full page counts;

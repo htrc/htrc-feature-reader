@@ -1,8 +1,5 @@
 from __future__ import unicode_literals
 
-import sys
-PY3 = (sys.version_info[0] >= 3)
-
 import logging
 import pandas as pd
 import numpy as np
@@ -11,6 +8,7 @@ from six import iteritems, StringIO, BytesIO
 import codecs
 import os
 import warnings
+import tempfile
 
 from htrc_features import utils
 from htrc_features import parsers, resolvers, transformations
@@ -20,24 +18,14 @@ try:
     import rapidjson as json
 except ImportError:
     import json
+    
 import requests
 
+from urllib.request import urlopen as _urlopen
+from urllib.parse import urlparse as parse_url
+from urllib.error import HTTPError
 
-if PY3:
-    from urllib.request import urlopen as _urlopen
-    from urllib.parse import urlparse as parse_url
-    from urllib.error import HTTPError
-else:
-    from urlparse import urlparse as parse_url
-    from urllib2 import urlopen as _urlopen
-    from urllib2 import HTTPError
-
-try:
-    import bz2file as bz2
-except ImportError:
-    import bz2
-    if not PY3:
-        logging.warning("Loading volumes from a URL will not work in Python 2 unless you install bz2file")
+import bz2
 
 class MissingFieldError(Exception):
     pass
@@ -144,12 +132,7 @@ def fold_pages(page_list, chunkname):
     grouped = chunk.reset_index().groupby(newindex)[['count']].sum()
     return grouped
 
-def default_resolver(id, path, format):
-    if type(id) is list:
-        id = id[0]
-    if type(path) is list:
-        path = path[0]
-        
+def default_resolver(id, path, format, dir):
     if (id is None) or (path is not None):
         return "path"
     else:
@@ -160,12 +143,10 @@ def default_resolver(id, path, format):
         # Don't really need a warning here.
         return "path"
     elif guess == "id" and format == "json":
-        # Pull from the web on an unlisted path by default.
-        # TODO: I think there are much better approaches here; looking in
-        # various places before pinging Hathi, etc.        
-        return "http"
-    elif guess == "id" and format == "parquet":      
+        return "locally_cached_http"
+    elif guess == "id" and format == "parquet" and dir is not None:      
         return "local"
+    
     raise AttributeError("No sensible default for format of {} with ids like {}".format(format, id))
 
 
@@ -203,25 +184,29 @@ def group_linechars(df, section='all', place='all'):
 # CLASSES
 class FeatureReader(object):
 
-    def __init__(self, paths=None, ids=None, format = "default", id_resolver = None, dir=None,
+    def __init__(self, ids=None, paths=None, dir = None, format = "default",
+                 id_resolver = None,
+                 compression = "default",
                  **kwargs):
-        '''
-        A reader for Extracted Features Dataset files.
+        '''A reader for Extracted Features Dataset files.
         
-        parser: a VolumeParser class, or a string for a built in class (e.g.'json' or
-        'parquet').
+        parser: a VolumeParser class, or a string for a built in class
+        (e.g.'json' or 'parquet').
         
-        ids: HathiTrust IDs. Preferred to `paths`. By default will download json files behind the scenes.
+        ids: HathiTrust IDs. Preferred to `paths`. By default will
+        download json files behind the scenes.
 
         paths: Filepaths to dataset files.
  
-        format: "json", "parquet", or "default". ("default" is JSON, but will inherit the
-        format from a passed id_resolver.) For custom use, this can also be a class factory that
-        inherits from BaseFileHandler.
+        format: "json", "parquet", or "default". ("default" is JSON,
+        but will inherit the format from a passed id_resolver.) For
+        custom use, this can also be a class factory that inherits
+        from BaseFileHandler.
 
-        id_resolver: The method used to resolve filenames.
+        id_resolver: The method used to resolve filenames. The most common options
+        are 'local', 'http', or 'pairtree.'
 
-        The other args depend on the parser. For the default jsonVolumeParser.
+        The other args are passed to the parser and its id resolver.
 
         `dir`: The location for local files, pairtree, etc.
 
@@ -231,18 +216,14 @@ class FeatureReader(object):
 
         assert (paths or ids) and not (paths and ids)
 
-        self.resolver = id_resolver
+        if (paths):
+            self.id_resolver = "path"
+            
+        self.id_resolver = id_resolver
+        
         self.dir = dir
-
-        if format == "default":
-            # Allow learning the format from the resolver.
-            if isinstance(id_resolver, resolvers.IdResolver):
-                format = id_resolver.format
-            else:
-                format = "json"
-
-        if self.resolver is None:
-            self.resolver = default_resolver(ids, paths, format)
+        self.format = format
+        self.id_resolver = id_resolver
 
         # Define paths as ids with "path" resolution.        
         if paths is not None:
@@ -252,15 +233,14 @@ class FeatureReader(object):
         self.ids = ids
 
         if self.ids and type(self.ids) is not list:
+            logging.warning("You have passed a single items to 'ids'"
+                            "or 'paths' in a FeatureReader initialization."
+                            "Consider calling 'volume' directly.")
             self.ids = [self.ids]
-        
+                            
         self.index = 0
-        
-        assert format in ["json", "parquet"]
-        
-        self.format = format
-        
         self.parser_kwargs = kwargs
+        self.compression = compression
             
     def __iter__(self):
         return self.volumes()
@@ -274,9 +254,22 @@ class FeatureReader(object):
     def volumes(self):
         ''' Generator for returning Volume objects '''
         for id in self.ids:
-            yield Volume(id=id, format=self.format,
-                         id_resolver=self.resolver, dir=self.dir, **self.parser_kwargs)
-
+            vol = Volume(id=id, format = self.format,
+                         id_resolver=self.id_resolver, dir = self.dir,
+                         compression = self.compression,
+                         **self.parser_kwargs)
+            # Learn the resolver and formats from the Volume instance,
+            # and keep what we've learned for all later volumes we make.
+            yield vol
+            if self.format == 'default':
+                self.format = vol.id_resolver.format
+            if self.id_resolver == 'default':
+                self.id_resolver = vol.id_resolver
+            if self.compression == 'default':
+                self.compression = vol.id_resolver.compression
+            if self.dir != vol.id_resolver.dir:
+                self.dir = vol.id_resolver.dir
+                
     def jsons(self, object = True, decompress = True):
         ''' 
 
@@ -291,13 +284,11 @@ class FeatureReader(object):
 
         '''
         
-        assert self.format == 'json'
-        
         # Can't avoid decompressing if there's an object involved.
         assert ((object and decompress) or (not object))
         
         for id in self.ids:
-            vol = Volume(id = id, format = self.format, id_resolver = self.resolver,
+            vol = Volume(id, format = self.format, id_resolver = self.id_resolver,
                          load = False, dir=self.dir, **self.parser_kwargs)
             if decompress == True:
                 yield vol.parser._parse_json(object = object)
@@ -322,32 +313,54 @@ class FeatureReader(object):
         return "<%d path FeatureReader>" % (len(self.ids))
 
 def filename_or_id(string):
+    """
+    Determine based on suffix is something is a file or an ide.
+    """
     for ending in [".gz", ".bz2", ".json", ".parquet"]:
         if string.endswith(ending):
             return "filename"
     if "." in string[:6]:
+        # All Hathi ids have dots in them.
         return "id"
+    raise NameError("Can't determine if {} is supposed to be a filename or an id.".format(string) + 
+                    "Please explicitly name your first argument to Volume 'id' or 'path'.")
 
-def retrieve_parser(id, format, resolver, compression, dir=None, file_handler=None, **kwargs):
+def retrieve_parser(id, format, id_resolver, compression, dir=None,
+                    file_handler=None, **kwargs):
+    
     """
-    Retrieve a parser based on kwargs. Used in both Volume and FeatureReader.
+    Retrieve a parser based on kwargs.
     """
 
-    # When would this be useful?
     if file_handler:
         return file_handler
+
     elif format == "json":
-        return parsers.JsonFileHandler(id, id_resolver = resolver, compression = compression,
-                                       dir=dir, **kwargs)
+        Handler = parsers.JsonFileHandler
     elif format == "parquet":
-        return parsers.ParquetFileHandler(id, id_resolver = resolver, compression = compression,
-                                          dir=dir, **kwargs)
+        Handler = parsers.ParquetFileHandler
     else:
-        raise NotImplementedError("Must pass a parser. Currently JSON or Parquet are supported.")
+        raise NotImplementedError("Must pass a format. Currently 'json' and 'parquet' are supported.")
+    
+    return Handler(id, id_resolver = id_resolver, dir = dir,
+                   compression = compression, **kwargs)
 
+def create_resolver(id_resolver, dir, format,
+                    compression, token_kwargs,
+                    mode = 'rb'):
+    
+    if isinstance(id_resolver, resolvers.IdResolver):
+        # We have a fully-formed resolver already
+        return id_resolver
+    if isinstance(id_resolver, str):
+        id_resolver = resolvers.resolver_nicknames[id_resolver]
+        
+    assert(issubclass(id_resolver, resolvers.IdResolver))
 
+    return id_resolver(dir = dir, mode = mode, token_kwargs = token_kwargs,
+                       format = format, compression = compression)
+        
 class Volume(object):
-
     def __init__(self, id = None,
                     format = "default",
                     id_resolver = None,
@@ -355,6 +368,8 @@ class Volume(object):
                     path = None,
                     compression = 'default',
                     dir = None,
+                    token_kwargs = 'default',
+                 
                      **kwargs):
         '''
         The Volume allows simplified, Pandas-based access to the HTRC
@@ -381,6 +396,9 @@ class Volume(object):
         self._section_features = pd.DataFrame()
         self._extra_metadata = None
 
+        if "resolver" in kwargs:
+            raise NameError("Caught 'resolver' arg: did you mean to pass 'id_resolver'?")
+        
         if id == False:
             warnings.warn("Please use None to indicate lack of an id", DeprecationWarning)
             id = None
@@ -394,44 +412,70 @@ class Volume(object):
                 compression = None
             elif kwargs['compressed'] == True:
                 compression = 'bz2'
-            
-        resolver = id_resolver
-
-
+                
         if format == "default":
             # Allow learning the format from the resolver.
             if isinstance(id_resolver, resolvers.IdResolver):
                 format = id_resolver.format
                 if (dir is not None) and (dir != id_resolver.dir):
-                    warn.warning("You provided a dir argument ({} )and id_resolver instance with a "
+                    warn.warning("You provided a dir argument ({}) and id_resolver instance with a "
                                  "different dir ({}).".format(dir, id_resolver.dir))
+                # Why accept the resolver's dir? Anyone know?
                 dir = id_resolver.dir
             else:
+                # The actual default
                 format = "json"
-        
-        if resolver is None:
-            resolver = default_resolver(id, path, format)
+                
+        assert format in ["json", "parquet"]
+
+        if compression == 'default':
+            if isinstance(id_resolver, resolvers.IdResolver):
+                compression = id_resolver.compression
+            else:
+                if id_resolver == 'http':
+                    compression = None
+                elif format == 'parquet':
+                    compression = 'snappy'
+                elif format == 'json':
+                    compression = "bz2"
+
+        if id_resolver is None:
+            id_resolver = default_resolver(id, path, format, dir)
             
-        if resolver == 'http':
+        if id_resolver == "locally_cached_http":
+            if dir is None:
+                dir = tempfile.gettempdir()
+                
+        if id_resolver == 'http':
             compression = None
 
-        self.resolver = resolver
-            
+        id_resolver = create_resolver(id_resolver, dir = dir,
+                                   format = format,
+                                   compression = compression,
+                                   token_kwargs = token_kwargs,
+                                   mode = 'rb')
+        
+        self.id_resolver = id_resolver
         if path:
             id = path
         
         self.default_page_section = default_page_section
-
-        assert format in ["json", "parquet"]
-
-        self.parser = retrieve_parser(id, format, resolver, compression, dir, **kwargs)
         
+        # Sanity checks.
+
+        if isinstance(id_resolver, resolvers.IdResolver):
+            if id_resolver.format != format:
+                raise TypeError("You have passed an id resolver for {} files,"
+                                "but requested {} files".format(id_resolver.format, format))
+            
+        self.parser = retrieve_parser(id, format, id_resolver, compression, dir, **kwargs)
+
         self.args = kwargs
         
         self._update_meta_attrs()
     
     def _update_meta_attrs(self):
-        ''' Takes metadata from the parser's metadata variable and 
+        ''' Takes metadata from the parser's id metadata variable and 
         assigns it to attributes in the Volume '''
         for k, v in self.parser.meta.items():
             setattr(self, k, v)
@@ -486,7 +530,7 @@ class Volume(object):
             return df.groupby(level='page').sum()
         else:
             raise Exception("Bad Section Arg")
-
+        
     def write(self, volume, **kwargs):
         self.parser.write(volume, **kwargs)
         
@@ -507,7 +551,7 @@ class Volume(object):
 
         See: https://www.hathitrust.org/bib_api
 
-        :return: A `pymarc` record. See pymarc's documentation for details on using it.
+        return: A `pymarc` record. See pymarc's documentation for details on using it.
         """
         if not self._extra_metadata:
             logging.debug("Looking up full metadata for {0}".format(self.id))
@@ -585,7 +629,7 @@ class Volume(object):
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False, page_select=False, drop_section=False,
-                  htid=False, **kwargs):
+                  htid=False, chunk = False, overflow_strategy="ends", chunk_target = 10000, **kwargs):
 
         ''' Get or set tokencounts DataFrame
 
@@ -612,9 +656,29 @@ class Volume(object):
         drop_section[bool]: Whether to drop the index level refering to the section.
 
         htid[bool]: whether to add an index level with the htid included.
+
+        chunk[bool]: whether to divide the text into equal-sized chunks. All remaining options 
+
+        chunk_target: the target size--in number of words--of each chunk.
+
+        - pages are collected together until their word count is > chunk_target
+        - chunk_target is adjusted slightly to minimize the size of straggler chunks
+
+        - overflow_strategy: How to handle cases in which the total number of words does not divide directly into the chosen chunk_target.
+           - "ends" allows the first and last chunks -- which, in books, are often the messiest -- to vary greatly in length
+             while keeping the middle sections as close to `chunk_target` in length as possible given the page lengths.
+           - "even" sets preset targets based on the document length, and creates chunks that are of approximately even size within each book.
+             There may be great variability in chunk length *between* books using this method.
+           - "last" keeps all but the last chunk at the desired length, but allows huge variability in the final chunk.
+
         '''
         assert not (page_select and not pages)
 
+        if chunk:
+            return self._chunked_tokenlist(section=section, case=case, pos=pos,
+                  page_freq=page_freq, page_select=page_select, drop_section=drop_section,
+                                           htid=htid, overflow_strategy = overflow_strategy,
+                                           chunk_target = chunk_target)
         # Create the internal representation if it does not already
         # exist. This will only need to exist once
         if self._tokencounts.empty:
@@ -678,21 +742,10 @@ class Volume(object):
                                   values='count')\
                            .fillna(0)
                            
-    def chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, **kwargs):
+    def _chunked_tokenlist(self, chunk_target = 10000, overflow_strategy = "ends", page_ref=False, **kwargs):
         '''
         Return a tokenlist dataframe grouped by numbered 'chunks', each of which has roughly `chunk_target` words.
 
-        chunk_target: the target size--in number of words--of each chunk.
-
-        - pages are collected together until their word count is > chunk_target
-        - chunk_target is adjusted slightly to minimize the size of straggler chunks
-
-        - overflow_strategy: How to handle cases in which the total number of words does not divide directly into the chosen chunk_target.
-           - "ends" allows the first and last chunks -- which, in books, are often the messiest -- to vary greatly in length
-             while keeping the middle sections as close to `chunk_target` in length as possible given the page lengths.
-           - "even" sets preset targets based on the document length, and creates chunks that are of approximately even size within each book.
-             There may be great variability in chunk length *between* books using this method.
-           - "last" keeps all but the last chunk at the desired length, but allows huge variability in the final chunk.
 
         - also takes tokenlist() arguments, such as case, drop_section, pos
 
@@ -724,7 +777,7 @@ class Volume(object):
             return_val = return_val.set_index('chunk').join(chunk_bounds).reset_index()
             newindex = ['chunk', 'pstart', 'pend'] + newindex[1:]
 
-        return return_val.set_index(newindex)
+        return return_val.set_index(newindex).sort_index()
 
     def term_volume_freqs(self, page_freq=True, pos=True, case=True):
         ''' Return a list of each term's frequency in the entire volume '''
@@ -772,58 +825,35 @@ class Volume(object):
 
         return group_linechars(df, section=section, place=place)
     
-    def save_parquet(self, path, meta=True, tokens=True, chars=False, 
-                     section_features=False, compression='snappy', chunked=False,
-                     token_kwargs=dict(section='all', drop_section=False)
-                     ):
+    def save(self, dir, format = 'parquet', **kwargs):
         '''
-        Save the internal representations of feature data to parquet, and the metadata to json,
-        using the naming convention used by parquetVolumeParser.
         
-        The primary use is for converting the feature files to something more efficient. By default,
-        only metadata and tokencounts are saved.
+        A wrapper around the 'write' method of all IdResolvers, 
+        that allows you to quickly declare a div, a format, and other
+        kwargs.
+
+        The primary use is for converting the feature files to
+        a more efficient parquet format. By default, only metadata and
+        tokencounts are saved, using the naming convention used by
+        parquetVolumeParser.
         
-        Saving page features is currently unsupported, as it's an ill-fit for parquet. This is currently
-        just the language-inferences for each page - everything else is in section features 
-        (page by body/header/footer).
+        Saving page features is currently unsupported, as it's an
+        ill-fit for parquet. This is currently just the
+        language-inferences for each page - everything else is in
+        section features (page by body/header/footer).
         
-        Since Volumes partially support incomplete dataframes, you can pass Volume.tokenlist arguments
-        as a dict with token_kwargs. For example, if you want to save a representation with only body
-        information, drop the 'section' level of the index, and fold part-of-speech counts, you can pass
-        token_kwargs=dict(section='body', drop_section=True, pos=False).
+        Since Volumes partially support incomplete dataframes, you can
+        pass Volume.tokenlist arguments as a dict with
+        token_kwargs. For example, if you want to save a
+        representation with only body information, drop the 'section'
+        level of the index, and fold part-of-speech counts, you can
+        pass token_kwargs=dict(section='body', drop_section=True,
+        pos=False).
+
         '''
-        fname_root = os.path.join(path, utils.clean_htid(self.id))
-        
-        if not (meta or tokens or section_features or chars):
-            logging.warning("You're not saving anything with save_parquet")
-            return
-        
-        if meta:
-            with open(fname_root + '.meta.json', mode='w') as f:
-                json.dump(self.parser.meta, f)
-        
-        if tokens:
-            try:
-                if chunked:
-                    feats = self.chunked_tokenlist(**token_kwargs)
-                else:
-                    feats = self.tokenlist(**token_kwargs)
-            except:
-                # In the internal representation is incomplete, returning the above may fail,
-                # but the cache may have an acceptable dataset to return
-                feats = self._tokencounts
-            if not feats.empty:
-                feats.to_parquet(fname_root + '.tokens.parquet', compression=compression)
-            
-        if section_features:
-            feats = self.section_features(section='all')
-            if not feats.empty:
-                feats.to_parquet(fname_root + '.section.parquet', compression=compression)
-            
-        if chars:
-            feats = self.line_chars()
-            if not feats.empty:
-                feats.to_parquet(fname_root + '.chars.parquet', compression=compression)
+
+        new_vol = Volume(self.id, dir = dir, format = format, id_resolver = "local", mode = 'wb', **kwargs)
+        new_vol.write(self, **kwargs)
     
     def __str__(self):
         def truncate(s, maxlen):
