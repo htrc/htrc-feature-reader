@@ -104,7 +104,6 @@ class IdResolver():
         elif compression == "gz":
             return gzip.open(buffer, mode)
 
-
         
     def __enter__(self):
         return self

@@ -91,7 +91,7 @@ class BaseFileHandler(object):
     def _init_resolver(self, id_resolver, format=None, **kwargs):
         if not format:
             format = self.format
-            
+        
         if isinstance(id_resolver, resolvers.IdResolver):
             return id_resolver
             
@@ -115,7 +115,8 @@ class BaseFileHandler(object):
                 return resolver_nicknames[id_resolver](format = format, **kwargs)
             except KeyError:
                 raise TypeError("""Id resolver must be a function, htrc_features.IdResolver, or
-                one of the strings {}""".format(", ".join(list(resolver_nicknames.keys()))))
+                one of the strings {}. If you think you did it correctly, it's possible you're using
+                reloading code with a relative import.""".format(", ".join(list(resolver_nicknames.keys()))))
 
     def parse(self, **kwargs):
         '''

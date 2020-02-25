@@ -28,7 +28,7 @@ requirements:
     - pytest-runner
     - setuptools
     - six
-    - pandas
+    - pandas>=0.24
     - numpy
     - pymarc
     - requests
@@ -38,7 +38,7 @@ requirements:
   run:
     - python
     - six
-    - pandas
+    - pandas>=0.24
     - numpy
     - pymarc
     - requests
