@@ -415,9 +415,6 @@ class ParquetFileHandler(BaseFileHandler):
 #        self.id_resolver = id_resolver
 #        self.mode = mode
         self.token_kwargs = token_kwargs
-        if self.token_kwargs == 'default':
-            if id_resolver.token_kwargs != 'default':
-                self.token_kwargs = id_resolver.token_kwargs
         
         if self.token_kwargs != 'default':
             logging.debug("Using non-default tokenization for writing")

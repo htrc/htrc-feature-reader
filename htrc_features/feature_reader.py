@@ -629,7 +629,8 @@ class Volume(object):
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False, page_select=False, drop_section=False,
-                  htid=False, chunk = False, overflow_strategy="ends", chunk_target = 10000, **kwargs):
+                  htid=False, chunk = False, overflow_strategy="ends", chunk_target = 10000,
+                  page_ref=False, **kwargs):
 
         ''' Get or set tokencounts DataFrame
 
@@ -656,9 +657,13 @@ class Volume(object):
         drop_section[bool]: Whether to drop the index level refering to the section.
 
         htid[bool]: whether to add an index level with the htid included.
+        
+        # Chunking specific arguments
 
         chunk[bool]: whether to divide the text into equal-sized chunks. All remaining options 
 
+        page_ref[bool]: Include first and last page of chunk in the output
+        
         chunk_target: the target size--in number of words--of each chunk.
 
         - pages are collected together until their word count is > chunk_target
@@ -678,7 +683,7 @@ class Volume(object):
             return self._chunked_tokenlist(section=section, case=case, pos=pos,
                   page_freq=page_freq, page_select=page_select, drop_section=drop_section,
                                            htid=htid, overflow_strategy = overflow_strategy,
-                                           chunk_target = chunk_target)
+                                           chunk_target = chunk_target, page_ref=page_ref)
         # Create the internal representation if it does not already
         # exist. This will only need to exist once
         if self._tokencounts.empty:
