@@ -5,16 +5,16 @@ EF_CHECK_URL= "http://data.htrc.illinois.edu/htrc-ef-access/get?action=check-exi
 
 def _id_encode(id):
     '''
-    :param id: A Pairtree ID. If it's a Hathitrust ID, this is the part about the library
-                code.
-    :return: A sanitized id.
+    :param id: A Pairtree ID. If it's a Hathitrust ID, this is the part after the library
+        code; e.g. the part after the first period for vol.123/456.
+    :return: A sanitized id. e.g., 123/456 will return as 123=456 to avoid filesystem issues.
     '''
     return id.replace(":", "+").replace("/", "=").replace(".", ",")
 
 def _id_decode(id):
     '''
-    :param id: An Hathitrust ID, decoded from a sanitized pairtree ID.
-    :return: A hathitrust id.
+    :param id: A sanitized Pairtree ID.
+    :return: An original Pairtree ID.
     '''
     return id.replace("+", ":").replace("=", "/").replace(",", ".")
 
@@ -72,7 +72,6 @@ def _id2path(id):
         val, clean_id = clean_id[:2], clean_id[2:]
         path.append(val)
     return path
-#     return '/'.join(path)
 
 
 def download_file(htids, outdir='./', keep_dirs=False, silent=True):
