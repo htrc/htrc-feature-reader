@@ -333,8 +333,7 @@ def retrieve_parser(id, format, id_resolver, compression, dir=None,
     """
 
     if file_handler:
-        return file_handler
-
+        Handler = file_handler
     elif format == "json":
         Handler = parsers.JsonFileHandler
     elif format == "parquet":
@@ -369,7 +368,7 @@ class Volume(object):
                     compression = 'default',
                     dir = None,
                     token_kwargs = 'default',
-                 
+                    file_handler = None,
                      **kwargs):
         '''
         The Volume allows simplified, Pandas-based access to the HTRC
@@ -467,11 +466,11 @@ class Volume(object):
             if id_resolver.format != format:
                 raise TypeError("You have passed an id resolver for {} files,"
                                 "but requested {} files".format(id_resolver.format, format))
-            
-        self.parser = retrieve_parser(id, format, id_resolver, compression, dir, **kwargs)
-
-        self.args = kwargs
         
+        self.parser = retrieve_parser(id, format, id_resolver, compression, dir, 
+                                      file_handler=file_handler, **kwargs)
+        
+        self.args = kwargs
         self._update_meta_attrs()
     
     def _update_meta_attrs(self):
