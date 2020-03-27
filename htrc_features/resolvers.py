@@ -8,6 +8,7 @@ import gzip
 import logging
 import sys
 from pathlib import Path
+from .utils import _id_encode
 
 
 MINOR_VERSION = (sys.version_info[1])
@@ -223,8 +224,47 @@ class PairtreeResolver(IdResolver):
                 return full_path.open(mode=mode)
             else:
                 raise
-        
 
+class StubbytreeResolver(IdResolver):
+    '''
+    An alternative to pairtree that uses loc/code, where the code is every third digit of the ID.
+    '''
+    def __init__(self, dir=None, **kwargs):
+        if not dir:
+            raise NameError("You must specify a directory with 'dir'")
+        super().__init__(dir=dir, **kwargs)
+            
+    def id_to_stubbydir(self, htid):
+        '''
+        Take an HTRC id and convert it to a 'stubbytree' location.
+
+        '''
+        libid, volid = htid.split('.', 1)
+        volid_clean = _id_encode(volid)
+
+        path = os.path.join(libid, volid_clean[::3])
+
+        return path
+        
+    def _open(self, id, mode = 'rb', format=None, compression='default', suffix=None, **kwargs):
+        assert(mode.endswith('b'))
+        
+        if not format:
+            format = self.format
+        if compression == 'default':
+            compression = self.compression
+
+        path = self.id_to_stubbydir(id)
+        fname = self.fname(id, format= format, suffix = suffix, compression = compression)
+        full_path = Path(self.dir, path, fname)
+        try:
+            return full_path.open(mode=mode)
+        except FileNotFoundError:
+            if mode.startswith('w'):
+                full_path.parent.mkdir(parents=True, exist_ok=True)
+                return full_path.open(mode=mode)
+            else:
+                raise
     
 class ZiptreeResolver(IdResolver):
     """
@@ -323,6 +363,7 @@ class resolver_dict(dict):
        
 resolver_nicknames = resolver_dict({
     "path": PathResolver,
+    "stubbytree": StubbytreeResolver,
     "pairtree": PairtreeResolver,
     "ziptree": ZiptreeResolver,
     "local": LocalResolver,
