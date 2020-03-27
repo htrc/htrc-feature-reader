@@ -135,29 +135,9 @@ class BaseFileHandler(object):
     
     def _parse_meta(self):
         pass
-    
-class JsonFileHandler(BaseFileHandler):
-    SUPPORTED_SCHEMA = ['3.0']
-    METADATA_FIELDS = [('schemaVersion', 'schema_version'), ('dateCreated', 'date_created'),
-                       ('title', 'title'), ('pubDate', 'pub_date'), ('language', 'language'),
-                       ('htBibUrl', 'ht_bib_url'), ('handleUrl', 'handle_url'),
-                       ('oclc', 'oclc'), ('imprint', 'imprint'), ('names', 'names'),
-                       ('classification', 'classification'),
-                       ('typeOfResource', 'type_of_resource'), ('issuance', 'issuance'),
-                       ('genre', 'genre'), ("bibliographicFormat", "bibliographic_format"),
-                       ("pubPlace", "pub_place"), ("governmentDocument", "government_document"),
-                       ("sourceInstitution", "source_institution"),
-                       ("enumerationChronology", "enumeration_chronology"),
-                       ("hathitrustRecordNumber", "hathitrust_record_number"),
-                       ("rightsAttributes", "rights_attributes"),
-                       ("accessProfile", "access_profile"),
-                       ("volumeIdentifier", "volume_identifier"),
-                       ("sourceInstitutionRecordNumber", "source_institution_record_number"),
-                       ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"),
-                       ("lastUpdateDate", "last_update_date")
-                      ]
-    ''' List of metadata fields, with their pythonic name mapping. '''
-    
+
+class JsonBaseFileHandler(BaseFileHandler):
+
     BASIC_FIELDS = [('pageCount', 'page_count')]
     ''' List of fields which return primitive values in the schema, as tuples
     with (CamelCase, lower_with_under) mapping.
@@ -175,7 +155,6 @@ class JsonFileHandler(BaseFileHandler):
         self.id = id
         self._schema = None
         self._pages = None
-
 
         # parsing and reading are called here.
         super().__init__(id, id_resolver = id_resolver, compression = compression, **kwargs)
@@ -229,39 +208,6 @@ class JsonFileHandler(BaseFileHandler):
             if isinstance(rawjson, BytesIO):
                 rawjson = rawjson.decode()
             return json.loads(rawjson)
-        
-    def parse(self, **kwargs):
-        
-        obj = self._parse_json()
-
-        self._schema = obj['features']['schemaVersion']
-        if self._schema not in self.SUPPORTED_SCHEMA:
-            logging.warning('Schema version of imported (%s) file does not match '
-                         'the supported versions (%s). Update your files or use an older '
-                         'version of the library' %
-                         (obj['features']['schemaVersion'],
-                          self.SUPPORTED_SCHEMA))
-            
-        self._pages = obj['features']['pages']
-        
-        # Anything in self.meta becomes an attribute in the volume
-        self.meta = dict(id=obj['id'])
-        
-        # Expand basic values to properties
-        for key, pythonkey in self.METADATA_FIELDS:
-            if key in obj['metadata']:
-                self.meta[pythonkey] = obj['metadata'][key]
-        for key, pythonkey in self.BASIC_FIELDS:
-            if key in obj['features']:
-                self.meta[pythonkey] = obj['features'][key]
-        
-        if 'language' in self.meta:
-            if (self._schema in ['2.0', '3.0']) and (self.meta['language'] in ['jpn', 'chi']):
-                logging.warning("This version of the EF dataset has a tokenization bug "
-                            "for Chinese and Japanese. See " "https://wiki.htrc.illinois.edu/display/COM/Extracted+Features+Dataset#ExtractedFeaturesDataset-issues")
-        
-        # TODO collect while iterating earlier
-        self.seqs = [int(page['seq']) for page in self._pages]
     
     def _parse_meta(self):
         pass
@@ -285,6 +231,8 @@ class JsonFileHandler(BaseFileHandler):
         collector = []
         for page in self._pages:
             for sec in SECREF:
+                if page[sec] is None:
+                    continue
                 row = { feat: page[sec][feat] 
                        for feat in self.SECTION_FIELDS }
                 row['page'] = int(page['seq'])
@@ -326,6 +274,8 @@ class JsonFileHandler(BaseFileHandler):
         i = 0
         for page in pages:
             for sec in ['header', 'body', 'footer']:
+                if page[sec] is None:
+                    continue
                 for token, posvalues in iteritems(page[sec][tname]):
                     for pos, value in iteritems(posvalues):
                         arr[i] = (page['seq'], sec, token, pos, value)
@@ -356,11 +306,11 @@ class JsonFileHandler(BaseFileHandler):
             pages = self._pages
 
         if self._schema == '3.0':
-            logging.warning("Adapted to erroneous key names in schema 3.0.")
             place_key = [('begin', 'beginCharCounts'), ('end', 'endCharCount')]
+        elif self._schema == 'https://schemas.hathitrust.org/EF_Schema_FeaturesSubSchema_v_3.0':
+            place_key = [('begin', 'beginCharCount'), ('end', 'endCharCount')]
         else:
             place_key = [('begin', 'beginLineChars'), ('end', 'endLineChars')]
-           
         
         # Make structured numpy array
         # Because it is typed, this approach is ~40x faster than earlier
@@ -374,7 +324,11 @@ class JsonFileHandler(BaseFileHandler):
         i = 0
         for page in pages:
             for sec in ['header', 'body', 'footer']:
-                for place, json_key in  place_key:
+                if page[sec] is None:
+                        continue
+                for place, json_key in place_key:
+                    if page[sec][json_key] is None:
+                        continue
                     for char, value in iteritems(page[sec][json_key]):
                         arr[i] = (page['seq'], sec, place, char, value)
                         i += 1
@@ -385,6 +339,88 @@ class JsonFileHandler(BaseFileHandler):
         df.sort_index(0, inplace=True)
         return df
     
+class JsonNewFileHandler(JsonBaseFileHandler):
+    SUPPORTED_SCHEMA = ['3.0', 'https://schemas.hathitrust.org/EF_Schema_FeaturesSubSchema_v_3.0']
+
+    ''' List of metadata fields, with their pythonic name mapping. Intent is to be explicit here,
+    for safety because metadata gets mapped to attributes in the Volume.
+    '''
+    METADATA_FIELDS = [('schemaVersion', 'schema_version'),
+                       ("sourceInstitution", "source_institution"),
+                       ("pubPlace", "pub_place"),
+                       ("enumerationChronology", "enumeration_chronology"),
+                       ('typeOfResource', 'type_of_resource'),
+                       ('title', 'title'),
+                       ('dateCreated', 'date_created'),
+                       ('pubDate', 'pub_date'), ('language', 'language'),
+                       ('genre', 'genre'),
+                       ("accessProfile", "access_profile"),
+                       ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"),
+                       ('oclc', 'oclc'),
+                      ]
+    
+    METADATA_FIELD_1_3 = [('htBibUrl', 'ht_bib_url'), ('handleUrl', 'handle_url'),
+                       , ('imprint', 'imprint'), ('names', 'names'),
+                       ('classification', 'classification'),
+                        ('issuance', 'issuance'),
+                       , ("bibliographicFormat", "bibliographic_format"),
+                       ("governmentDocument", "government_document"),
+                       ("hathitrustRecordNumber", "hathitrust_record_number"),
+                       ("rightsAttributes", "rights_attributes"),
+                       ("volumeIdentifier", "volume_identifier"),
+                       ("sourceInstitutionRecordNumber", "source_institution_record_number"),
+                       ("lastUpdateDate", "last_update_date")
+                      ]
+    
+    METADATA_FIELDS_3_0 = [('accessRights', 'access_rights'),
+                     ('alternateTitle','alternate_title')
+                     ('category','category')
+                     ('contributor','contributor')
+                     ('id','ef_id')
+                     ('isPartOf','is_part_of')
+                     ('lastRightsUpdateDate','last_rights_update_date')
+                     ('lcc','lcc')
+                     ('mainEntityOfPage','main_entity_of_page')
+                     ('publisher','publisher')
+                     ('type', 'type')]
+    
+    def parse(self, **kwargs):
+        
+        obj = self._parse_json()
+
+        self._schema = obj['features']['schemaVersion']
+        if self._schema not in self.SUPPORTED_SCHEMA:
+            logging.warning('Schema version of imported file (%s) does not match '
+                         'the supported versions (%s). Update your files or use an older '
+                         'version of the library' %
+                         (obj['features']['schemaVersion'],
+                          self.SUPPORTED_SCHEMA))
+            
+        self._pages = obj['features']['pages']
+        
+        # Anything in self.meta becomes an attribute in the volume
+        if self._schema in ['2.0', '3.0']:
+            self.meta = dict(id=obj['id'])
+        else:
+            self.meta = dict(id=obj['htid'])
+        
+        # Expand basic values to properties
+        for key, pythonkey in self.METADATA_FIELDS:
+            if key in obj['metadata']:
+                self.meta[pythonkey] = obj['metadata'][key]
+        for key, pythonkey in self.BASIC_FIELDS:
+            if key in obj['features']:
+                self.meta[pythonkey] = obj['features'][key]
+        
+        # TODO collect while iterating earlier
+        self.seqs = [int(page['seq']) for page in self._pages]
+        
+        if 'language' in self.meta:
+            if (self._schema in ['2.0', '3.0']) and (self.meta['language'] in ['jpn', 'chi']):
+                logging.warning("This version of the EF dataset has a tokenization bug "
+                            "for Chinese and Japanese. Use newer EF files.")
+
+
 class ParquetFileHandler(BaseFileHandler):
     '''
         This Volume parser allows for Feature Reader data to be loaded from a
