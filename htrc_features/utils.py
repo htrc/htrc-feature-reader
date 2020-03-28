@@ -209,20 +209,13 @@ def id_to_stubbytree(htid, format = None, suffix = None, compression = None):
     path = os.path.join(libid, volid_clean[::3], filename)
     return path
     
-def id_to_rsync(htid, **kwargs):
+def id_to_rsync(htid, format="stubbytree"):
     '''
     Take an HTRC id and convert it to an Rsync location for syncing Extracted
     Features.
     '''
-    if 'kind' in kwargs:
-        logging.warning("The basic/advanced split with extracted features files "
-                     "was removed in schema version 3.0. This function only "
-                     "supports the current format for Rsync URLs, if you "
-                     "would like to see the legacy 2.0 format, see Github: "
-                     "https://github.com/htrc/htrc-feature-reader/blob/3e100ae"
-                     "9ea45317443ae05f43a188b12afe2e69a/htrc_features/utils.py"
-                     )
-    path = id_to_pairtree(htid, format = "json", compression = "bz2")
+    id_to_path_func = id_to_pairtree if format == "pairtree" else id_to_stubbytree
+    path = id_to_path_func(htid, format = "json", compression = "bz2")
     return path
 
 
@@ -239,7 +232,7 @@ def _htid2rsync_argparser():
     import argparse
     import sys
     parser = argparse.ArgumentParser(description='Convert a HathiTrust ID to '
-                                     'a pairtree path for Rsyncing that id\'s '
+                                     'a stubbytree path for Rsyncing that id\'s '
                                      'Extracted Features dataset file. This '
                                      'does not check if the file exists.')
     
@@ -251,6 +244,9 @@ def _htid2rsync_argparser():
                         const='-',
                        help="Read volume ids from an external file. Use as flag or supply - to read from stdin.")
     
+    parser.add_argument('--oldstyle', '-s', action="store_true",
+                       help="Whether to use the pre-EF2.0 file structure (pairtree) rather than the current stubbytree.")
+    
     parser.add_argument('--outfile', '-o', nargs='?', type=argparse.FileType('w'),
                         default=sys.stdout,
                         help="File to save to. By default it writes to standard out."
@@ -260,19 +256,20 @@ def _htid2rsync_argparser():
 def _htid2rsync_parse_args(parser, in_args):
     import sys
     args = parser.parse_args(in_args)
+    style = ("pairtree" if args.oldstyle else "stubbytree")
     if (args.id and len(args.id) > 0) and args.from_file:
         sys.stderr.write("ERROR: Can't combine id arguments with --from-file. Only use one. \n-----\n")
         parser.print_help()
         sys.exit(2)
         return
     elif args.id and len(args.id) > 0:
-        urls = [id_to_rsync(htid) for htid in args.id]
+        urls = [id_to_rsync(htid, format=style) for htid in args.id]
         for url in urls:
             args.outfile.write(url+"\n")
     elif args.from_file:
         try:
             for line in args.from_file.readlines():
-                url = id_to_rsync(line.strip())
+                url = id_to_rsync(line.strip(), format=style)
                 args.outfile.write(url+"\n")
         except KeyboardInterrupt:
             pass

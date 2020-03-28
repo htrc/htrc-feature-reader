@@ -876,7 +876,10 @@ class Volume(object):
                 return s[:maxlen].strip() + "..."
             else:
                 return s.strip()
-        return "<Volume: %s (%s) by %s>" % (truncate(self.title, 30), self.year, truncate(self.author[0], 40))
+        if len(self.author) > 0:
+            return "<Volume: %s (%s) by %s>" % (truncate(self.title, 30), self.year, truncate(self.author[0], 40))
+        else:
+            return "<Volume: %s (%s) without a listed author>" % (truncate(self.title, 30), self.year)
 
 class Page:
 
