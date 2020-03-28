@@ -195,6 +195,19 @@ def id_to_pairtree(htid, format = None, suffix = None, compression = None):
     path = os.path.join(*[libid, 'pairtree_root', * _id2path(volid),
                      volid_clean, filename])
     return path
+
+def id_to_stubbytree(htid, format = None, suffix = None, compression = None):
+    '''
+    Take an HTRC id and convert it to a 'stubbytree' location.
+
+    '''
+    libid, volid = htid.split('.', 1)
+    volid_clean = _id_encode(volid)
+
+    suffixes = [s for s in [format, compression] if s is not None]
+    filename = ".".join([clean_htid(htid), *suffixes])
+    path = os.path.join(libid, volid_clean[::3], filename)
+    return path
     
 def id_to_rsync(htid, **kwargs):
     '''

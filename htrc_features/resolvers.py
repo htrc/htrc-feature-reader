@@ -213,9 +213,9 @@ class PairtreeResolver(IdResolver):
         if compression == 'default':
             compression = self.compression
 
-        dir = Path(htrc_features.utils.id_to_pairtree(id, format, suffix, compression)).parent
+        path = Path(htrc_features.utils.id_to_pairtree(id, format, suffix, compression)).parent
         fname = self.fname(id = id, format = format, suffix = suffix, compression = compression)
-        full_path = Path(self.dir, dir, fname)
+        full_path = Path(self.dir, path, fname)
         try:
             return full_path.open(mode=mode)
         except FileNotFoundError:
@@ -233,18 +233,6 @@ class StubbytreeResolver(IdResolver):
         if not dir:
             raise NameError("You must specify a directory with 'dir'")
         super().__init__(dir=dir, **kwargs)
-            
-    def id_to_stubbydir(self, htid):
-        '''
-        Take an HTRC id and convert it to a 'stubbytree' location.
-
-        '''
-        libid, volid = htid.split('.', 1)
-        volid_clean = _id_encode(volid)
-
-        path = os.path.join(libid, volid_clean[::3])
-
-        return path
         
     def _open(self, id, mode = 'rb', format=None, compression='default', suffix=None, **kwargs):
         assert(mode.endswith('b'))
@@ -254,7 +242,7 @@ class StubbytreeResolver(IdResolver):
         if compression == 'default':
             compression = self.compression
 
-        path = self.id_to_stubbydir(id)
+        path = Path(htrc_features.utils.id_to_stubbytree(id, format, suffix, compression)).parent
         fname = self.fname(id, format= format, suffix = suffix, compression = compression)
         full_path = Path(self.dir, path, fname)
         try:
