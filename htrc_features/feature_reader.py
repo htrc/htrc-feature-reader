@@ -140,7 +140,6 @@ def default_resolver(id, path, format, dir):
         
     ### First arg.
     if guess == "filename":
-        # Don't really need a warning here.
         return "path"
     elif guess == "id" and format == "json":
         return "locally_cached_http"
@@ -204,23 +203,22 @@ class FeatureReader(object):
         from BaseFileHandler.
 
         id_resolver: The method used to resolve filenames. The most common options
-        are 'local', 'http', or 'pairtree.'
+        are 'local', 'http', 'stubbytree', or 'pairtree.'
 
         The other args are passed to the parser and its id resolver.
 
-        `dir`: The location for local files, pairtree, etc.
+        `dir`: The location for local files, stubbytree root, pairtree root, etc.
 
         '''
         
         # only one of paths or ids can be selected - otherwise it's not clear what to iterate over. 
-
+        print(paths)
+        print(ids)
         assert (paths or ids) and not (paths and ids)
 
         if (paths):
             self.id_resolver = "path"
-            
-        self.id_resolver = id_resolver
-        
+
         self.dir = dir
         self.format = format
         self.id_resolver = id_resolver
@@ -541,10 +539,10 @@ class Volume(object):
     @property
     def author(self):
         ''' A friendlier name wrapping Volume.names or Volume.contributor.'''
-        if hasattr(self, "names"):
-            return self.names
-        elif hasattr(self, "contributor"):
+        if hasattr(self, "contributor"):
             return self.contributor
+        elif hasattr(self, "names"):
+            return self.names
         else:
             raise KeyError("This volume does not have metadata for 'names' or 'contributor'")
             

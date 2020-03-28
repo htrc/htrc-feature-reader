@@ -173,7 +173,7 @@ class JsonFileHandler(BaseFileHandler):
                            ('mainEntityOfPage','main_entity_of_page'), ('publisher','publisher_ld')
                      ]
     
-    PAGE_FIELDS =  ['seq', 'languages']
+    PAGE_FIELDS =  ['seq', 'languages', 'calculatedLanguage', 'version']
     SECTION_FIELDS =  ['tokenCount', 'lineCount', 'emptyLineCount',
                              'capAlphaSeq', 'sentenceCount']
 
@@ -203,7 +203,7 @@ class JsonFileHandler(BaseFileHandler):
             
         self._pages = obj['features']['pages']
         
-        fields = self.METADATA_FIELDS
+        fields = self.METADATA_FIELDS.copy()
         # Anything in self.meta becomes an attribute in the volume
         if self._schema in ['2.0', '3.0']:
             fields += self.METADATA_FIELDS_1_3
