@@ -489,7 +489,7 @@ class Volume(object):
     def _repr_html_(self):
         html_template = "<strong><a href='%s'>%s</a></strong> by <em>%s</em> (%s, %s pages) - <code>%s</code>"
         try:
-            return html_template % (self.handle_url, self.title, ",".join(self.author), self.year, self.page_count, self.id)
+            return html_template % (self.handle_url, self.title, ", ".join(self.author), self.year, self.page_count, self.id)
         except:
             try:
                 return "<strong><a href='%s'>%s</a></strong>" % (self.handle_url, self.title)
@@ -538,14 +538,21 @@ class Volume(object):
     
     @property
     def author(self):
-        ''' A friendlier name wrapping Volume.names or Volume.contributor.'''
+        ''' A friendlier name wrapping Volume.names or Volume.contributor.
+        Returns a list.
+        '''
         if hasattr(self, "contributor"):
-            return self.contributor
+            author = self.contributor
         elif hasattr(self, "names"):
-            return self.names
+            author = self.names
         else:
             raise KeyError("This volume does not have metadata for 'names' or 'contributor'")
-            
+        
+        if author is None:
+            return []
+        elif type(author) is not list:
+                author = [author]
+        return author
 
     @property
     def metadata(self):
