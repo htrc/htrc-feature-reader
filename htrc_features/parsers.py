@@ -142,13 +142,13 @@ class JsonFileHandler(BaseFileHandler):
     ''' List of metadata fields, with their pythonic name mapping. Intent is to be explicit here,
     for safety because metadata gets mapped to attributes in the Volume.
     '''
-    METADATA_FIELDS = [('schemaVersion', 'schema_version'),
+    METADATA_FIELDS = [('schemaVersion', 'metadata_schema_version'),
                        ("enumerationChronology", "enumeration_chronology"),
                        ('typeOfResource', 'type_of_resource'), ('title', 'title'),
                        ('dateCreated', 'date_created'), ('pubDate', 'pub_date'), 
                        ('language', 'language'), ('genre', 'genre'), ("accessProfile", "access_profile"),
                        ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"), ('oclc', 'oclc'),
-                       ('features.pageCount', 'page_count')
+                       ('features.pageCount', 'page_count'), ("features.schemaVersion", "feature_schema_version")
                       ]
     
     METADATA_FIELDS_1_3 = [('htBibUrl', 'ht_bib_url'), ('handleUrl', 'handle_url'),

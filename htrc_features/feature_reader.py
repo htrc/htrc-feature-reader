@@ -540,8 +540,14 @@ class Volume(object):
     
     @property
     def author(self):
-        ''' A friendlier name wrapping Volume.names. Returns list. '''
-        return self.names
+        ''' A friendlier name wrapping Volume.names or Volume.contributor.'''
+        if hasattr(self, "names"):
+            return self.names
+        elif hasattr(self, "contributor"):
+            return self.contributor
+        else:
+            raise KeyError("This volume does not have metadata for 'names' or 'contributor'")
+            
 
     @property
     def metadata(self):
