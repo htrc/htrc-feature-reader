@@ -494,10 +494,7 @@ class ParquetFileHandler(BaseFileHandler):
         '''
 
         if token_kwargs == "default":
-            if self.token_kwargs is not None and self.token_kwargs != "default":
-                token_kwargs = self.token_kwargs
-            else:
-                token_kwargs = dict(section='all', drop_section=False)
+            token_kwargs = dict(section='all', drop_section=False)
                 
         if compression == "default":
             compression = self.id_resolver.compression
