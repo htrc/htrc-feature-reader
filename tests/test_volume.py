@@ -103,7 +103,6 @@ class TestVolume():
           "accessProfile": "open",
           "volumeIdentifier": "uc2.ark:/13960/t1xd0sc6x",
           "dateCreated": "2016-06-19T02:14:20.7051367Z",
-          "schemaVersion": "1.3",
           "sourceInstitutionRecordNumber": "2480325",
           "oclc": [
             "320127250"
