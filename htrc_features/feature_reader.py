@@ -863,8 +863,9 @@ class Volume(object):
 
         '''
 
-        new_vol = Volume(self.id, dir = dir, format = format, id_resolver = "local", mode = 'wb', **kwargs)
-        new_vol.write(self, **kwargs)
+        new_vol = Volume(self.id, dir = dir, format = format, id_resolver = "local",
+                         mode = 'wb', **kwargs)
+        new_vol.write(self, token_kwargs=token_kwargs, **kwargs)
     
     def __str__(self):
         def truncate(s, maxlen):

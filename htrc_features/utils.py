@@ -74,7 +74,7 @@ def _id2path(id):
     return path
 
 
-def download_file(htids, outdir='./', keep_dirs=False, silent=True):
+def download_file(htids, outdir='./', keep_dirs=False, silent=True, format='stubbytree'):
     '''
     A function for downloading one or more Extracted Features files by ID.
     
@@ -145,11 +145,11 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
 
     if isinstance(htids, string_types):
         # Download a single file
-        dest_file = id_to_rsync(htids)
+        dest_file = id_to_rsync(htids, format=format)
         args = ["data.analytics.hathitrust.org::features/" + dest_file]
     else:
         # Download a list of files
-        paths = [id_to_rsync(htid) for htid in htids]
+        paths = [id_to_rsync(htid, format=format) for htid in htids]
         
         fdescrip, tmppath =  tempfile.mkstemp()
         with open(tmppath, mode='w') as f:
