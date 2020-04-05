@@ -214,7 +214,12 @@ def id_to_rsync(htid, format="stubbytree"):
     Take an HTRC id and convert it to an Rsync location for syncing Extracted
     Features.
     '''
-    id_to_path_func = id_to_pairtree if format == "pairtree" else id_to_stubbytree
+    if format == 'stubbytree':
+        id_to_path_func = id_to_stubbytree
+    elif format == "pairtree":
+        id_to_path_func = id_to_pairtree
+    else:
+        raise ValueError("Unknown format for id_to_rsync")
     path = id_to_path_func(htid, format = "json", compression = "bz2")
     return path
 
