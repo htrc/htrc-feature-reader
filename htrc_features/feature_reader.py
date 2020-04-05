@@ -343,8 +343,7 @@ def retrieve_parser(id, format, id_resolver, compression, dir=None,
                    compression = compression, **kwargs)
 
 def create_resolver(id_resolver, dir, format,
-                    compression, token_kwargs,
-                    mode = 'rb'):
+                    compression, mode = 'rb'):
     
     if isinstance(id_resolver, resolvers.IdResolver):
         # We have a fully-formed resolver already
@@ -354,8 +353,7 @@ def create_resolver(id_resolver, dir, format,
         
     assert(issubclass(id_resolver, resolvers.IdResolver))
 
-    return id_resolver(dir = dir, mode = mode, token_kwargs = token_kwargs,
-                       format = format, compression = compression)
+    return id_resolver(dir = dir, mode = mode, format = format, compression = compression)
         
 class Volume(object):
     def __init__(self, id = None,
@@ -365,7 +363,6 @@ class Volume(object):
                     path = None,
                     compression = 'default',
                     dir = None,
-                    token_kwargs = 'default',
                     file_handler = None,
                      **kwargs):
         '''
@@ -449,7 +446,6 @@ class Volume(object):
         id_resolver = create_resolver(id_resolver, dir = dir,
                                    format = format,
                                    compression = compression,
-                                   token_kwargs = token_kwargs,
                                    mode = 'rb')
         
         self.id_resolver = id_resolver
@@ -840,7 +836,7 @@ class Volume(object):
 
         return group_linechars(df, section=section, place=place)
     
-    def save(self, dir, format = 'parquet', **kwargs):
+    def save(self, dir, format = 'parquet', token_kwargs="default", **kwargs):
         '''
         
         A wrapper around the 'write' method of all IdResolvers, 

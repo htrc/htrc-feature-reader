@@ -5,31 +5,26 @@ from pathlib import Path
 import random
 import numpy as np
 from collections import Counter
-import tempfile
 import pandas as pd
 
 class TestChunking():
 
-    def test_write_to_chunked_parquet_sectionless(self):
+    def test_write_to_chunked_parquet_sectionless(self, tmpdir):
         dir = "tests/data"
         vol_in = Volume(id='aeu.ark:/13960/t1rf63t52', dir = str(dir), id_resolver = 'local')
-        with tempfile.TemporaryDirectory() as test:
-            output = Volume(id='foo.123', format = 'parquet', mode = 'wb', token_kwargs = {"chunk": True,"drop_section": True, "pos":False}, id_resolver='local', dir = test )
-            output.write(vol_in)
-            read = pd.read_parquet(Path(test, "foo.123.tokens.parquet")).reset_index()
-            print(read.columns)
-            assert("chunk" in read.columns)
+        output = Volume(id='foo.123', format = 'parquet', mode = 'wb', id_resolver='local', dir = tmpdir )
+        output.write(vol_in, token_kwargs = {"chunk": True,"drop_section": True, "pos":False})
+        read = pd.read_parquet(Path(tmpdir, "foo.123.tokens.parquet")).reset_index()
+        print(read.columns)
+        assert("chunk" in read.columns)
     
-    def test_write_to_chunked_parquet(self):
+    def test_write_to_chunked_parquet(self, tmpdir):
         dir = "tests/data"
         vol_in = Volume(id='aeu.ark:/13960/t1rf63t52', dir = str(dir), id_resolver = 'local')
-        with tempfile.TemporaryDirectory() as test:
-            output = Volume(id='foo.123', dir = test, format = 'parquet', mode = 'wb',
-                            token_kwargs = {"chunk": True})
-            output.write(vol_in)
-            read = pd.read_parquet(Path(test, "foo.123.tokens.parquet")).reset_index()
-            print(read.columns)
-            assert("chunk" in read.columns)
+        output = Volume(id='foo.123', dir = tmpdir, format = 'parquet', mode = 'wb')
+        output.write(vol_in, token_kwargs = {"chunk": True})
+        read = pd.read_parquet(Path(tmpdir, "foo.123.tokens.parquet")).reset_index()
+        assert("chunk" in read.columns)
             
     def test_even_chunking(self):
         # All methods should solve it when pages are only one thing long.

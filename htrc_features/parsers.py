@@ -433,9 +433,6 @@ class ParquetFileHandler(BaseFileHandler):
         These are essentially what is held internally in a Volume (vol.parser.meta,
         vol._tokencounts, vol._line_chars, vol._section_features) so 
         this parser doesn't provide much fanciness beyond loading.
-        
-        The 'token_kwargs' is used only for writing new files; it sets the rules for what
-        will be written out.
 
         It is recommended to use an id-based id_resolver with this class. Path-based
         resolvers cannot transparently resolve all four files with a single file path.
@@ -443,19 +440,12 @@ class ParquetFileHandler(BaseFileHandler):
     '''
         
     
-    def __init__(self, id, id_resolver, mode = 'rb', token_kwargs = 'default', compression = 'snappy', **kwargs):
+    def __init__(self, id, id_resolver, mode = 'rb', compression = 'snappy', **kwargs):
 
         self.format = "parquet"
-#        self.id = id
-#        self.id_resolver = id_resolver
-#        self.mode = mode
-        self.token_kwargs = token_kwargs
-        
-        if self.token_kwargs != 'default':
-            logging.debug("Using non-default tokenization for writing")
 
         super().__init__(id = id, id_resolver = id_resolver, compression = compression,
-                         mode = mode, token_kwargs = token_kwargs, **kwargs)
+                         mode = mode,  **kwargs)
     
     def parse(self, **kwargs):
         
