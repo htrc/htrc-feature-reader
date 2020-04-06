@@ -146,12 +146,12 @@ class JsonFileHandler(BaseFileHandler):
                        ("enumerationChronology", "enumeration_chronology"),
                        ('typeOfResource', 'type_of_resource'), ('title', 'title'),
                        ('dateCreated', 'date_created'), ('pubDate', 'pub_date'), 
-                       ('language', 'language'), ('genre', 'genre'), ("accessProfile", "access_profile"),
+                       ('language', 'language'), ("accessProfile", "access_profile"),
                        ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"), ('oclc', 'oclc'),
                        ('features.pageCount', 'page_count'), ("features.schemaVersion", "feature_schema_version")
                       ]
     
-    METADATA_FIELDS_1_3 = [('htBibUrl', 'ht_bib_url'), ('handleUrl', 'handle_url'),
+    METADATA_FIELDS_1_3 = [('htBibUrl', 'ht_bib_url'), ('genre', 'genre'), ('handleUrl', 'handle_url'),
                           ('imprint', 'imprint'), ('names', 'names'), ('.id', 'id'),
                           ("sourceInstitution", "source_institution"),
                           ('classification', 'classification'), ('issuance', 'issuance'),
@@ -165,7 +165,7 @@ class JsonFileHandler(BaseFileHandler):
                          ]
     
     METADATA_FIELDS_3_0 = [('accessRights', 'access_rights'), ('alternateTitle','alternate_title'), 
-                           ('category','category'), ('contributor','contributor_ld'), ('.htid', 'id'),
+                           ('category','category'), ('genre', 'genre_ld'), ('contributor','contributor_ld'), ('.htid', 'id'),
                            ('id','handle_url'), ("sourceInstitution", "source_institution_ld"),
                            ('lcc','lcc'), ('type', 'type'), ('isPartOf','is_part_of'), 
                            ('lastRightsUpdateDate','last_rights_update_date'),
@@ -225,7 +225,16 @@ class JsonFileHandler(BaseFileHandler):
                     break
             self.meta[pythonkey] = ptr
             if pythonkey.endswith('_ld'):
-                if ptr is None:
+                if pythonkey == 'genre_ld':
+                    self.meta['genre'] = []
+                    if type(ptr) is not list:
+                        ptr = [ptr]
+                    for genre in ptr:
+                        if genre.startswith("http://id.loc.gov/vocabulary/marcgt/") and genre[36:] in utils.LOC_MARCGT_REFERENCE:
+                            self.meta['genre'].append(utils.LOC_MARCGT_REFERENCE[genre[36:]])
+                        else:
+                            self.meta['genre'].append(genre)
+                elif ptr is None:
                     self.meta[pythonkey[:-3]] = None
                 elif (type(ptr) is dict) and ('name' in ptr):
                     self.meta[pythonkey[:-3]] = ptr['name']

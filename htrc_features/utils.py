@@ -3,6 +3,9 @@ import os
 
 EF_CHECK_URL= "http://data.htrc.illinois.edu/htrc-ef-access/get?action=check-exists&ids={}"
 
+# Genre reference for the genres using the MARC Genre Terms schema, hardcoded to avoid excessive dependencies. From http://id.loc.gov/vocabulary/marcgt/
+LOC_MARCGT_REFERENCE = {"rev": "review", "atl": "atlas", "lan": "language instruction", "mot": "motion picture", "dra": "drama", "com": "computer program", "ins": "instruction", "his": "history", "fon": "font", "sur": "survey of literature", "art": "article", "num": "numeric data", "lec": "legal case and case notes", "han": "handbook", "map": "map", "sta": "statistics", "pro": "programmed text", "loo": "loose-leaf", "doc": "document (computer)", "reh": "rehearsal", "pos": "postcard", "fin": "finding aid", "mem": "memoir", "law": "law report or digest", "arr": "art reproduction", "rea": "realia", "ess": "essay", "aro": "art original", "lea": "legal article", "enc": "encyclopedia", "ser": "series", "stp": "standard or specification", "hum": "humor, satire", "vid": "videorecording", "wal": "wall map", "sli": "slide", "mic": "microscope slide", "off": "offprint", "dir": "directory", "rem": "remote sensing image", "man": "manuscript", "kit": "kit", "boo": "book", "gov": "government publication", "poe": "poetry", "rep": "representational", "web": "web site", "tra": "transparency", "inm": "interactive multimedia", "dio": "diorama", "iss": "issue", "puz": "puzzle", "pat": "patent", "leg": "legislation", "per": "periodical", "ons": "online system or service", "nos": "nonmusical sound", "fla": "flash card", "cal": "calendar", "yea": "yearbook", "scr": "script", "gra": "graphic", "new": "newspaper", "rpt": "reporting", "glo": "globe", "sho": "short story", "fol": "folktale", "dic": "dictionary", "fes": "festschrift", "gam": "game", "ind": "index", "toy": "toy", "cpb": "conference publication", "jou": "journal", "spe": "speech", "bib": "bibliography", "the": "thesis", "ter": "technical report", "dis": "discography", "dtb": "database", "fil": "filmography", "int": "interview", "sou": "sound", "bio": "biography", "abs": "abstract or summary", "pic": "picture", "cha": "chart", "fls": "filmstrip", "ted": "technical drawing", "mod": "model", "cat": "catalog", "cgn": "comic or graphic novel", "pla": "playing cards", "let": "letter", "cod": "comedy", "fic": "fiction", "bda": "bibliographic data", "aut": "autobiography", "nov": "novel", "tre": "treaty"}
+
 def _id_encode(id):
     '''
     :param id: A Pairtree ID. If it's a Hathitrust ID, this is the part after the library
@@ -282,7 +285,6 @@ def _htid2rsync_parse_args(parser, in_args):
         sys.stderr.write("ERROR: Need to supply volume ids, either through positional arguments or a file with --from-file. Run with --help for details. \n-----\n")
         parser.print_help()
         sys.exit(2)
-
 
 if __name__ == '__main__':
     htid2rsync_cmd()
