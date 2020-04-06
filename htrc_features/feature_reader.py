@@ -526,6 +526,7 @@ class Volume(object):
         
     def write(self, volume, **kwargs):
         self.parser.write(volume, **kwargs)
+        self._update_meta_attrs()
         
     @property
     def year(self):
