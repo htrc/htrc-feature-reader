@@ -1,4 +1,3 @@
-
 HTRC-Features [![Build Status](https://travis-ci.org/htrc/htrc-feature-reader.svg?branch=master)](https://travis-ci.org/htrc/htrc-feature-reader) [![PyPI version](https://badge.fury.io/py/htrc-feature-reader.svg)](https://badge.fury.io/py/htrc-feature-reader) [![Anaconda-Server Badge](https://anaconda.org/htrc/htrc-feature-reader/badges/installer/conda.svg)](https://anaconda.org/htrc/htrc-feature-reader)
 =============
 
@@ -26,7 +25,7 @@ To install,
     pip install htrc-feature-reader
 ```
 
-That's it! This library is written for Python 2.7 and 3.0+. For Python beginners, you'll need [pip](https://pip.pypa.io/en/stable/installing/).
+That's it! This library is written for Python 3.0+. For Python beginners, you'll need [pip](https://pip.pypa.io/en/stable/installing/).
 
 Alternately, if you are using [Anaconda](https://www.continuum.io/downloads), you can install with
 
@@ -46,64 +45,33 @@ Optional: [installing the development version](#Installing-the-development-versi
 
 ### Reading feature files
 
-The easiest way to start using this library is to use the [FeatureReader](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.FeatureReader) interface, which takes a list to Extracted Features files.
+The easiest way to start using this library is to use the Volume interface, which takes a path to an Extracted Features file.
 
 
 ```python
-import glob
-import pandas as pd
-from htrc_features import FeatureReader
-paths = glob.glob('data/PZ-volumes/*.json.bz2')
-# Here we're loading five paths, for brevity
-fr = FeatureReader(paths[:5])
-for vol in fr.volumes():
-    print("%s - %s" % (vol.id, vol.title))
-```
-
-    hvd.32044010273894 - The ballet dancer, and On guard,
-    hvd.hwquxe - The man from Glengarry : a tale of the Ottawa / by Ralph Connor.
-    hvd.hwrevu - The lady with the dog, and other stories,
-    hvd.hwrqs8 - Mr. Rutherford's children. By the authors of "The wide, wide world," "Queechy,", "Dollars and cents," etc., etc.
-    mdp.39015028036104 - Russian short stories, ed. for school use,
-
-
-Iterating on `FeatureReader` returns `Volume` objects. This is simply an easy way to access `feature_reader.volumes()`.
-Wherever possible, this library tries not to hold things in memory, so most of the time you want to iterate rather than casting to a list.
-In addition to memory issues, since each volume needs to be read from a file and initialized, it will be slow. 
-_Woe to whomever tries `list(FeatureReader.volumes())`_.
-
-The method for creating a path list with 'glob' is just one way to do so.
-For large sets, it's better to just have a text file of your paths, and read it line by line.
-
-In addition to iterating on `feature_reader.volumes()`, there is a convenient function to grab the first volume in a feature reader. This helps in testing code, and is what we'll do to continue this introduction:
-
-
-```python
-vol = fr.first()
+from htrc_features import Volume
+vol = Volume('data/ef2-stubby/hvd/34926/hvd.32044093320364.json.bz2')
 vol
 ```
 
 
 
 
-    <htrc_features.feature_reader.Volume at 0x24d7b8b7390>
+<strong><a href='http://hdl.handle.net/2027/hvd.32044093320364'>The Nautilus.</a></strong> by <em>Delaware Museum of Natural History.</em> (1904, 222 pages) - <code>hvd.32044093320364</code>
 
 
-
-### Online downloading by volume id (new in v.1.90)
 
 The FeatureReader can also download files at read time, by reference to a HathiTrust volume id. For example, if I want [both of volumes of Pride and Prejudice](https://catalog.hathitrust.org/Record/100323335), I can see that the URLs are babel.hathitrust.org/cgi/pt?id=__hvd.32044013656053__ and babel.hathitrust.org/cgi/pt?id=__hvd.32044013656061__. In the FeatureReader, these can be called with the `ids=[]` argument, as follows:
 
 
 ```python
-fr = FeatureReader(ids=["hvd.32044013656053", "hvd.32044013656061"])
-
-for vol in fr:
-    print(vol.title)
+for htid in ["hvd.32044013656053", "hvd.32044013656061"]:
+    vol = Volume(htid)
+    print(vol.title, vol.enumeration_chronology)
 ```
 
-    Pride and prejudice.
-    Pride and prejudice.
+    Pride and prejudice. v.1
+    Pride and prejudice. v.2
 
 
 This downloads the file temporarily, using the HTRC's web-based download link (e.g. https://data.analytics.hathitrust.org/features/get?download-id={{URL}}). One good pairing with this feature is the [HTRC Python SDK](https://github.com/htrc/HTRC-PythonSDK)'s functionality for downloading collections. 
@@ -117,13 +85,6 @@ volids = workset.load_hathitrust_collection('https://babel.hathitrust.org/cgi/mb
 FeatureReader(ids=volids).first().title
 ```
 
-
-
-
-    'A good yarn / Debbie Macomber.'
-
-
-
 Remember that for large jobs, it is faster to download your dataset beforehand, using the `rsync` method.
 
 ### Volume
@@ -132,80 +93,180 @@ A [Volume](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reade
 
 
 ```python
-"Volume %s is a %s page text written in %s. You can doublecheck at %s" % (vol.id, vol.page_count,
-                                                                          vol.language, vol.handle_url)
+"Volume {} is a {} page text from {} written in {}. You can doublecheck at {}".format(vol.id, vol.page_count, 
+                                                                                      vol.year, vol.language, 
+                                                                                      vol.handle_url)
 ```
 
 
 
 
-    'Volume hvd.32044010273894 is a 284 page text written in eng. You can doublecheck at http://hdl.handle.net/2027/hvd.32044010273894'
+    'Volume hvd.32044013656061 is a 306 page text from 1903 written in eng. You can doublecheck at http://hdl.handle.net/2027/hvd.32044013656061'
 
 
 
-As a convenience, `Volume.year` returns `Volume.pub_date`:
+This is the *Extracted Features* dataset, so the features are easily accessible. To most popular is token counts, which are returned as a Pandas DataFrame:
 
 
 ```python
-"%s == %s" % (vol.pub_date, vol.year)
+df = vol.tokenlist()
+df.sample(10)
 ```
 
 
 
 
-    '1901 == 1901'
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>count</th>
+    </tr>
+    <tr>
+      <th>page</th>
+      <th>section</th>
+      <th>token</th>
+      <th>pos</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>201</th>
+      <th>body</th>
+      <th>abode</th>
+      <th>NN</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>117</th>
+      <th>body</th>
+      <th>head</th>
+      <th>NN</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>126</th>
+      <th>body</th>
+      <th>for</th>
+      <th>IN</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>210</th>
+      <th>body</th>
+      <th>three</th>
+      <th>CD</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>224</th>
+      <th>body</th>
+      <th>would</th>
+      <th>MD</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>89</th>
+      <th>body</th>
+      <th>The</th>
+      <th>DT</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>283</th>
+      <th>body</th>
+      <th>any</th>
+      <th>DT</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>63</th>
+      <th>body</th>
+      <th>surprise</th>
+      <th>NN</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>152</th>
+      <th>body</th>
+      <th>make</th>
+      <th>VB</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>170</th>
+      <th>body</th>
+      <th>I</th>
+      <th>PRP</th>
+      <td>3</td>
+    </tr>
+  </tbody>
+</table>
+</div>
 
 
 
-`Volume` objects have an page genrator method for pages, through `Volume.pages()`. Iterating through pages using this generator only keeps one page at a time in memory, and again it is preferable to reading all the pages into the list at once. Unlike volumes, your computer can probably hold all the pages of a single volume in memory, so it is not dire if you try to read them into a list.
+Other extracted features are discussed below.
 
-Like with the `FeatureReader`, you can also access the page generator by iterating directly on the object (i.e. `for page in vol`). Python beginners may find that using `vol.pages()` is more clear as to what is happening.
+The full included metadata can be seen with `vol.parser.meta`:
 
 
 ```python
-# Let's skip ahead some pages
-i = 0
-for page in vol:
-    # Same as `for page in vol.pages()`
-    i += 1
-    if i >= 16:
-        break
-print(page)
+vol.parser.meta.keys()
 ```
 
-    <page 00000016 of volume hvd.32044010273894>
 
 
-If you want to pass arguments to page initialization, such as changing the page's default section from 'body' to 'group' (which returns header+footer+body), it can be done with `for page in vol.pages(default_section='group')`.
-     
-Finally, if the minimal metadata included with the extracted feature files is insufficient, you can fetch HT's metadata record from the Bib API with `vol.metadata`.
-Remember that this calls the HTRC servers for each volume, so can add considerable overhead. The result is a MARC file, returns as a [pymarc](https://github.com/edsu/pymarc) record object. For example, to get the publisher information from field `260`:
+
+    dict_keys(['id', 'metadata_schema_version', 'enumeration_chronology', 'type_of_resource', 'title', 'date_created', 'pub_date', 'language', 'access_profile', 'isbn', 'issn', 'lccn', 'oclc', 'page_count', 'feature_schema_version', 'ht_bib_url', 'genre', 'handle_url', 'imprint', 'names', 'source_institution', 'classification', 'issuance', 'bibliographic_format', 'government_document', 'hathitrust_record_number', 'rights_attributes', 'pub_place', 'volume_identifier', 'source_institution_record_number', 'last_update_date'])
+
+
+
+These fields are mapped to attributes in `Volume`, so `vol.oclc` will return the oclc field from that metadata. As a convenience, `Volume.year` returns the `pub_date` information and `Volume.author` returns the `contributor information`.
 
 
 ```python
-for vol in fr.volumes():
-    print(vol.metadata['260'].value())
+vol.year, vol.author
 ```
 
 
-    ---------------------------------------------------------------------------
 
-    KeyError                                  Traceback (most recent call last)
 
-    <ipython-input-7-8bc5f5c0f945> in <module>()
-          1 for vol in fr.volumes():
-    ----> 2     print(vol.metadata['published'][0])
-    
+    ('1903', ['Austen, Jane 1775-1817 '])
 
-    KeyError: 'published'
 
+
+If the minimal metadata included with the extracted feature files is insufficient, you can fetch HT's metadata record from the Bib API with `vol.metadata`.
+Remember that this calls the HTRC servers for each volume, so can add considerable overhead. The result is a MARC file, returned as a [pymarc](https://github.com/edsu/pymarc) record object. For example, to get the publisher information from field `260`:
 
 
 ```python
-print("METADATA FIELDS: " + ", ".join(vol.metadata.keys()))
+vol.metadata['260'].value()
 ```
 
-    METADATA FIELDS: _version_, htrc_charCount, title, htrc_volumePageCountBin, publishDate, title_a, mainauthor, author_only, oclc, authorSort, country_of_pub, author, htrc_gender, language, ht_id, publisher, author_top, publishDateRange, htrc_pageCount, title_top, callnosort, publication_place, topic, htsource, htrc_wordCount, title_ab, callnumber, fullrecord, htrc_volumeWordCountBin, format, lccn, genre, htrc_genderMale, topic_subject, topicStr, geographic, published, sdrnum, id
+
+
+
+    'Boston : Little, Brown, 1903.'
+
 
 
 _At large-scales, using `vol.metadata` is an impolite and inefficient amount of server pinging; there are better ways to query the API than one volume at a time. Read about the [HTRC Solr Proxy](https://wiki.htrc.illinois.edu/display/COM/Solr+Proxy+API+User+Guide)._
@@ -220,245 +281,769 @@ vol.ht_bib_url
 
 
 
-    'http://catalog.hathitrust.org/api/volumes/full/htid/mdp.39015028036104.json'
+    'http://catalog.hathitrust.org/api/volumes/full/htid/hvd.32044013656061.json'
 
 
 
 Volumes also have direct access to volume-wide info of features stored in pages. For example, you can get a list of words per page through [Volume.tokens_per_page()](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Volume.tokens_per_page). We'll discuss these features [below](#Volume-stats-collecting), after looking first at Pages.
 
-## Pages
-
-A page contains the meat of the HTRC's extracted features, including information for:
-
-- Part of speech tagged token counts, through `Page.tokenlist()`
-- Counts of the characters occurred at the start and end of physical lines, though `Page.lineCounts()`
-- Sentence counts, line counts (referring to the physical line on the page)
-- And more, seen in the docs for [Page](http://htrc.github.io/htrc-feature-reader/htrc_features/feature_reader.m.html#htrc_features.feature_reader.Page)
-
-
-```python
-print("The body has %s lines, %s empty lines, and %s sentences" % (page.line_count(),
-                                                                   page.empty_line_count(),
-                                                                   page.sentence_count()))
-```
-
-    The body has 30 lines, 0 empty lines, and 9 sentences
-
-
-Since the HTRC provides information by header/body/footer, most methods take a `section=` argument. If not specified, this defaults to `"body"`, or whatever argument is supplied to `Page.default_section`.
-
-
-```python
-print("%s tokens in the default section, %s" % (page.token_count(), page.default_section))
-print("%s tokens in the header" % (page.token_count(section='header')))
-print("%s tokens in the footer" % (page.token_count(section='footer')))
-```
-
-    294 tokens in the default section, body
-    3 tokens in the header
-    0 tokens in the footer
-
-
-There are also two special arguments that can be given to `section`: `"all"` and "`group`". 'all' returns information for each section separately, when appropriate, while 'group' returns information for all header, body, and footer combined.
-
-
-```python
-print("%s tokens on the full page" % (page.token_count(section='group')))
-assert(page.token_count(section='group') == (page.token_count(section='header') +
-                                             page.token_count(section='body') + 
-                                             page.token_count(section='footer')))
-```
-
-    297 tokens on the full page
-
-
 Note that for the most part, the properties of the `Page` and `Volume` objects aligns with the names in the HTRC Extracted Features schema, except they are converted to follow [Python naming conventions](https://google.github.io/styleguide/pyguide.html?showone=Naming#Naming): converting the `CamelCase` of the schema to `lowercase_with_underscores`. E.g. `beginLineChars` from the HTRC data is accessible as `Page.begin_line_chars`.
 
 ## The fun stuff: playing with token counts and character counts
 
-Token counts are returned by `Page.tokenlist()`. By default, part-of-speech tagged, case-sensitive counts are returned for the body.
+Token counts are returned by `Volume.tokenlist()` (or `Page.tokenlist()`. By default, part-of-speech tagged, case-sensitive counts are returned for the body.
 
 The token count information is returned as a DataFrame with a MultiIndex (page, section, token, and part of speech) and one column (count).
 
 
 ```python
-print(page.tokenlist()[:3])
+print(vol.tokenlist()[:3])
 ```
 
-                               count
-    page section token    pos       
-    16   body    !        .        1
-                 '        ''       1
-                 'Flowers NNS      1
+                             count
+    page section token  pos       
+    1    body    Austen .        1
+                 Pride  NNP      1
+                 and    CC       1
 
 
 `Page.tokenlist()` can be manipulated in various ways. You can case-fold, for example:
 
 
 ```python
-df = page.tokenlist(case=False)
-print(df[15:18])
+tl = vol.tokenlist(case=False)
+tl.sample(5)
 ```
 
-                                count
-    page section lowercase pos       
-    16   body    ancient   JJ       1
-                 and       CC      12
-                 any       DT       1
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>count</th>
+    </tr>
+    <tr>
+      <th>page</th>
+      <th>section</th>
+      <th>lowercase</th>
+      <th>pos</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>218</th>
+      <th>body</th>
+      <th>what</th>
+      <th>WP</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>30</th>
+      <th>body</th>
+      <th>pemberley</th>
+      <th>NNP</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>213</th>
+      <th>body</th>
+      <th>comes</th>
+      <th>VBZ</th>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>183</th>
+      <th>body</th>
+      <th>took</th>
+      <th>VBD</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>51</th>
+      <th>body</th>
+      <th>necessary</th>
+      <th>JJ</th>
+      <td>1</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
 
 
 Or, you can combine part of speech counts into a single integer.
 
 
 ```python
-df = page.tokenlist(pos=False)
-print(df[15:18])
+tl = vol.tokenlist(pos=False)
+tl.sample(5)
 ```
 
-                           count
-    page section token          
-    16   body    Naples        1
-                 November      1
-                 October       1
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>count</th>
+    </tr>
+    <tr>
+      <th>page</th>
+      <th>section</th>
+      <th>token</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>264</th>
+      <th>body</th>
+      <th>family</th>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>47</th>
+      <th>body</th>
+      <th>journey</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>98</th>
+      <th>body</th>
+      <th>Perhaps</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>49</th>
+      <th>body</th>
+      <th>at</th>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>227</th>
+      <th>body</th>
+      <th>so</th>
+      <td>1</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
 
 
 Section arguments are valid here: 'header', 'body', 'footer', 'all', and 'group'
 
 
 ```python
-df = page.tokenlist(section="header", case=False, pos=False)
-print(df)
+tl = vol.tokenlist(section="header", case=False, pos=False)
+tl.head(5)
 ```
 
-                            count
-    page section lowercase       
-    16   header  ballet         1
-                 dancer         1
-                 the            1
 
 
-The MultiIndex makes it easy to slice the results, and it is althogether more memory-efficient. If you are new to Pandas DataFrames, you might find it easier to learn by converting the index to columns.
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>count</th>
+    </tr>
+    <tr>
+      <th>page</th>
+      <th>section</th>
+      <th>lowercase</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="5" valign="top">9</th>
+      <th rowspan="5" valign="top">header</th>
+      <th>'s</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>and</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>austen</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>jane</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>prejudice</th>
+      <td>1</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+You can also drop the section index altogether if you're content with the default 'body'.
 
 
 ```python
-df = page.tokenlist()
-# Slicing on Multiindex: get all Signular or Mass Nouns (NN)
-idx = pd.IndexSlice
-nouns = df.loc[idx[:,:,:,'NN'],]
-print(nouns[:3])
-print("With index reset: ")
-print(nouns.reset_index()[:2])
+vol.tokenlist(drop_section=True, case=False, pos=False).sample(2)
 ```
 
-                                   count
-    page section token        pos       
-    16   body    benefactress NN       1
-                 bitterness   NN       1
-                 case         NN       1
-    With index reset: 
-       page section         token pos  count
-    0    16    body  benefactress  NN      1
-    1    16    body    bitterness  NN      1
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>count</th>
+    </tr>
+    <tr>
+      <th>page</th>
+      <th>lowercase</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>247</th>
+      <th>suppose</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>76</th>
+      <th>would</th>
+      <td>2</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+The MultiIndex makes it easy to slice the results, and it is althogether more memory-efficient. For example, to return just the nouns (`NN`):
+
+
+```python
+tl = vol.tokenlist()
+tl.xs('NN', level='pos').head(4)
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>count</th>
+    </tr>
+    <tr>
+      <th>page</th>
+      <th>section</th>
+      <th>token</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>1</th>
+      <th>body</th>
+      <th>prejudiceJane</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <th>body</th>
+      <th>Volume</th>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <th>body</th>
+      <th>vol</th>
+      <td>3</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <th>body</th>
+      <th>./■</th>
+      <td>1</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+If you are new to Pandas DataFrames, you might find it easier to learn by converting the index to columns.
+
+
+```python
+simpler_tl = df.reset_index()
+simpler_tl[simpler_tl.pos == 'NN']
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>page</th>
+      <th>section</th>
+      <th>token</th>
+      <th>pos</th>
+      <th>count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>3</th>
+      <td>1</td>
+      <td>body</td>
+      <td>prejudiceJane</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>19</th>
+      <td>9</td>
+      <td>body</td>
+      <td>Volume</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>40</th>
+      <td>10</td>
+      <td>body</td>
+      <td>vol</td>
+      <td>NN</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <th>51</th>
+      <td>12</td>
+      <td>body</td>
+      <td>./■</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>53</th>
+      <td>12</td>
+      <td>body</td>
+      <td>/</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>43178</th>
+      <td>297</td>
+      <td>body</td>
+      <td>spite</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>43187</th>
+      <td>297</td>
+      <td>body</td>
+      <td>uncle</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>43191</th>
+      <td>297</td>
+      <td>body</td>
+      <td>warmest</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>43195</th>
+      <td>297</td>
+      <td>body</td>
+      <td>wife</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>43226</th>
+      <td>305</td>
+      <td>body</td>
+      <td>NON-RECEIPT</td>
+      <td>NN</td>
+      <td>1</td>
+    </tr>
+  </tbody>
+</table>
+<p>7224 rows × 5 columns</p>
+</div>
+
 
 
 If you prefer not to use Pandas, you can always convert the object, with methods like `to_dict` and `to_csv`).
 
 
 ```python
-df[:3].to_dict()
+tl[:3].to_csv()
 ```
 
 
 
 
-    {'count': {(16, 'body', '!', '.'): 1,
-      (16, 'body', "'", "''"): 1,
-      (16, 'body', "'Flowers", 'NNS'): 1}}
+    'page,section,token,pos,count\n1,body,Austen,.,1\n1,body,Pride,NNP,1\n1,body,and,CC,1\n'
 
 
 
-To get just the unique tokens, `Page.tokens` provides them as a list.
+To get just the unique tokens, `Volume.tokens` provides them as a set. Here I select a specific page for brevity and a minimum count, but you can run the method without arguments.
 
 
 ```python
-page.tokens()[:7]
+vol.tokens(page_select=21, min_count=5)
 ```
 
 
 
 
-    ['!', "'", "'Flowers", "'s", ',', '.', '6']
+    {'"', ',', '.', 'You', 'been', 'have', 'his', 'in', 'of', 'the', 'you'}
 
 
 
-In addition to token lists, you can also access `Page.begin_line_chars` and `Section.end_line_chars`, which are DataFrames of character counts that occur at the start or end of a line.
-
-### Volume stats collecting
-
-The Volume object has a number of methods for collecting information from all its pages.
-
-`Volume.tokenlist()` works identically the page tokenlist method, except it returns information for the full volume:
+In addition to token lists, you can also access other section features:
 
 
 ```python
-# Print case-insensitive occurrances of the word `she`
-all_vol_token_counts = vol.tokenlist(pos=False, case=False)
-print(all_vol_token_counts.loc[idx[:,'body', 'she'],][:3])
+vol.section_features()
 ```
 
-                            count
-    page section lowercase       
-    38   body    she            1
-    39   body    she            1
-    42   body    she            1
 
 
-Note that a Volume-wide tokenlist is not crunched until you need it, then it will stay cached in case you need it. If you try to access `Page.tokenlist()` _after_ accessing `Volume.tokenlist()`, the Page object will return that page from the Volume's cached representation, rather than preparing it itself.
 
-`Volume.tokens()`, and `Volume.tokens_per_page()` give easy access to the full vocabulary of the volume, and the token counts per page.
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>tokenCount</th>
+      <th>lineCount</th>
+      <th>emptyLineCount</th>
+      <th>capAlphaSeq</th>
+      <th>sentenceCount</th>
+    </tr>
+    <tr>
+      <th>page</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>1</th>
+      <td>4</td>
+      <td>1</td>
+      <td>0</td>
+      <td>1</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>15</td>
+      <td>10</td>
+      <td>4</td>
+      <td>2</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>302</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>303</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>304</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>305</th>
+      <td>49</td>
+      <td>11</td>
+      <td>2</td>
+      <td>3</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <th>306</th>
+      <td>2</td>
+      <td>3</td>
+      <td>1</td>
+      <td>1</td>
+      <td>1</td>
+    </tr>
+  </tbody>
+</table>
+<p>306 rows × 5 columns</p>
+</div>
+
+
+
+### Chunking
+
+If you're working in an instance where you hope to have comparably sized document units, you can use 'chunking' to roll pages into chunks that aim for a specific length. e.g.
 
 
 ```python
-vol.tokens()[:10]
+by_chunk = vol.tokenlist(chunk=True, chunk_target=10000)
+print(by_chunk.sample(4))
+# Count words per chunk
+by_chunk.groupby(level='chunk').sum()
 ```
 
+                                  count
+    chunk section token      pos       
+    5     body    husbands   NNS      3
+    2     body    frequently RB       3
+                  domestic   JJ       3
+    3     body    :          :       10
 
 
 
-    ['"', '.', ':', 'Fred', 'Newton', 'Scott', 'gift', 'i', 'ii', 'iiiiISI']
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>count</th>
+    </tr>
+    <tr>
+      <th>chunk</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>1</th>
+      <td>12453</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>9888</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>9887</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>10129</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>10054</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>10065</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>12327</td>
+    </tr>
+  </tbody>
+</table>
+</div>
 
 
 
-If you prefer a DataFrame structured like a term-document matrix (where pages are the 'documents'), `vol.term_page_freqs()` will return it.
-
-By default, this returns a page-frequency rather than term-frequency, which is to say it counts `1` when a term occurs on a page, regardless of how much it occurs on that page. For a term frequency, pass `page_freq=False`.
-
-
-```python
-a = vol.term_page_freqs()
-print(a.loc[10:11,['the','and','is','he', 'she']])
-a = vol.term_page_freqs(page_freq=False)
-print(a.loc[10:11,['the','and','is', 'he', 'she']])
-```
-
-    token  the  and   is   he  she
-    page                          
-    10     0.0  1.0  0.0  0.0  0.0
-    11     1.0  1.0  1.0  0.0  0.0
-    token   the  and   is   he  she
-    page                           
-    10      0.0  1.0  0.0  0.0  0.0
-    11     22.0  7.0  4.0  0.0  0.0
-
-
-
-```python
-data/da
-```
-
-Volume.term_page_freqs provides a wide DataFrame resembling a matrix, where terms are listed as columns, pages are listed as rows, and the values correspond to the term frequency (or page page frequency with `page_freq=true`).
-Volume.term_volume_freqs() simply sums these.
- 
 ### Multiprocessing
 
 For large jobs, you'll want to use multiprocessing or multithreading to speed up your process. This is left up to your preferred method, either within Python or by spawning multiple scripts from the command line. Here are two approaches that I like.
