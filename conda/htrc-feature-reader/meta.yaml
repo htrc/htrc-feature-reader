@@ -28,22 +28,20 @@ requirements:
     - pytest-runner
     - setuptools
     - six
-    - pandas
+    - pandas>=0.24
     - numpy
     - pymarc
     - requests
-    - ujson
-    - bz2file
+    - rapidjson
 
   run:
     - python
     - six
-    - pandas
+    - pandas>=0.24
     - numpy
     - pymarc
     - requests
-    - ujson
-    - bz2file
+    - rapidjson
 
 test:
   # Python imports

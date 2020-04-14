@@ -1,14 +1,25 @@
 import logging
+import os
 
 EF_CHECK_URL= "http://data.htrc.illinois.edu/htrc-ef-access/get?action=check-exists&ids={}"
 
+# Genre reference for the genres using the MARC Genre Terms schema, hardcoded to avoid excessive dependencies. From http://id.loc.gov/vocabulary/marcgt/
+LOC_MARCGT_REFERENCE = {"rev": "review", "atl": "atlas", "lan": "language instruction", "mot": "motion picture", "dra": "drama", "com": "computer program", "ins": "instruction", "his": "history", "fon": "font", "sur": "survey of literature", "art": "article", "num": "numeric data", "lec": "legal case and case notes", "han": "handbook", "map": "map", "sta": "statistics", "pro": "programmed text", "loo": "loose-leaf", "doc": "document (computer)", "reh": "rehearsal", "pos": "postcard", "fin": "finding aid", "mem": "memoir", "law": "law report or digest", "arr": "art reproduction", "rea": "realia", "ess": "essay", "aro": "art original", "lea": "legal article", "enc": "encyclopedia", "ser": "series", "stp": "standard or specification", "hum": "humor, satire", "vid": "videorecording", "wal": "wall map", "sli": "slide", "mic": "microscope slide", "off": "offprint", "dir": "directory", "rem": "remote sensing image", "man": "manuscript", "kit": "kit", "boo": "book", "gov": "government publication", "poe": "poetry", "rep": "representational", "web": "web site", "tra": "transparency", "inm": "interactive multimedia", "dio": "diorama", "iss": "issue", "puz": "puzzle", "pat": "patent", "leg": "legislation", "per": "periodical", "ons": "online system or service", "nos": "nonmusical sound", "fla": "flash card", "cal": "calendar", "yea": "yearbook", "scr": "script", "gra": "graphic", "new": "newspaper", "rpt": "reporting", "glo": "globe", "sho": "short story", "fol": "folktale", "dic": "dictionary", "fes": "festschrift", "gam": "game", "ind": "index", "toy": "toy", "cpb": "conference publication", "jou": "journal", "spe": "speech", "bib": "bibliography", "the": "thesis", "ter": "technical report", "dis": "discography", "dtb": "database", "fil": "filmography", "int": "interview", "sou": "sound", "bio": "biography", "abs": "abstract or summary", "pic": "picture", "cha": "chart", "fls": "filmstrip", "ted": "technical drawing", "mod": "model", "cat": "catalog", "cgn": "comic or graphic novel", "pla": "playing cards", "let": "letter", "cod": "comedy", "fic": "fiction", "bda": "bibliographic data", "aut": "autobiography", "nov": "novel", "tre": "treaty"}
+
 def _id_encode(id):
     '''
-    :param id: A Pairtree ID. If it's a Hathitrust ID, this is the part about the library
-                code.
-    :return: A sanitized id.
+    :param id: A Pairtree ID. If it's a Hathitrust ID, this is the part after the library
+        code; e.g. the part after the first period for vol.123/456.
+    :return: A sanitized id. e.g., 123/456 will return as 123=456 to avoid filesystem issues.
     '''
     return id.replace(":", "+").replace("/", "=").replace(".", ",")
+
+def _id_decode(id):
+    '''
+    :param id: A sanitized Pairtree ID.
+    :return: An original Pairtree ID.
+    '''
+    return id.replace("+", ":").replace("=", "/").replace(",", ".")
 
 def files_available(ids):
     """
@@ -23,6 +34,24 @@ def files_available(ids):
     url = EF_CHECK_URL.format(",".join(ids))
     result = requests.get(url).json()
     return result
+
+def extract_htid(filename):
+    """
+    Inverse of clean_htid, that also strips file suffixes
+    """
+    def trim(string, suffix):
+        if string.endswith(suffix):
+            return string[:-len(suffix)]
+        return string
+    
+    for suffix in [".gz", ".bz2"]:
+        filename = trim(filename, suffix)
+    for suffix in [".json", ".parquet"]:
+        filename = trim(filename, suffix)
+    for suffix in [".meta", ".tokens", ".chars", ".section"]:
+        filename = trim(filename, suffix)
+                       
+    return _id_decode(filename)
 
 def clean_htid(htid):
     '''
@@ -45,10 +74,10 @@ def _id2path(id):
     while len(clean_id) > 0:
         val, clean_id = clean_id[:2], clean_id[2:]
         path.append(val)
-    return '/'.join(path)
+    return path
 
 
-def download_file(htids, outdir='./', keep_dirs=False, silent=True):
+def download_file(htids, outdir='./', keep_dirs=False, silent=True, format='stubbytree'):
     '''
     A function for downloading one or more Extracted Features files by ID.
     
@@ -119,11 +148,11 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
 
     if isinstance(htids, string_types):
         # Download a single file
-        dest_file = id_to_rsync(htids)
+        dest_file = id_to_rsync(htids, format=format)
         args = ["data.analytics.hathitrust.org::features/" + dest_file]
     else:
         # Download a list of files
-        paths = [id_to_rsync(htid) for htid in htids]
+        paths = [id_to_rsync(htid, format=format) for htid in htids]
         
         fdescrip, tmppath =  tempfile.mkstemp()
         with open(tmppath, mode='w') as f:
@@ -154,25 +183,47 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True):
         
     return out
 
+def id_to_pairtree(htid, format = None, suffix = None, compression = None):
+    '''
+    Take an HTRC id and convert it to a pairtree location.
+
+    suffix: a filename suffix to add to the end.
+
+    '''
+    libid, volid = htid.split('.', 1)
+    volid_clean = _id_encode(volid)
     
-def id_to_rsync(htid, **kwargs):
+    suffixes = [s for s in [format, compression] if s is not None]
+    filename = ".".join([clean_htid(htid), *suffixes]) 
+    path = os.path.join(*[libid, 'pairtree_root', * _id2path(volid),
+                     volid_clean, filename])
+    return path
+
+def id_to_stubbytree(htid, format = None, suffix = None, compression = None):
+    '''
+    Take an HTRC id and convert it to a 'stubbytree' location.
+
+    '''
+    libid, volid = htid.split('.', 1)
+    volid_clean = _id_encode(volid)
+
+    suffixes = [s for s in [format, compression] if s is not None]
+    filename = ".".join([clean_htid(htid), *suffixes])
+    path = os.path.join(libid, volid_clean[::3], filename)
+    return path
+    
+def id_to_rsync(htid, format="stubbytree"):
     '''
     Take an HTRC id and convert it to an Rsync location for syncing Extracted
     Features.
     '''
-    if 'kind' in kwargs:
-        logging.warning("The basic/advanced split with extracted features files "
-                     "was removed in schema version 3.0. This function only "
-                     "supports the current format for Rsync URLs, if you "
-                     "would like to see the legacy 2.0 format, see Github: "
-                     "https://github.com/htrc/htrc-feature-reader/blob/3e100ae"
-                     "9ea45317443ae05f43a188b12afe2e69a/htrc_features/utils.py"
-                     )
-    libid, volid = htid.split('.', 1)
-    volid_clean = _id_encode(volid)
-    filename = clean_htid(htid) + '.json.bz2'
-    path = '/'.join([libid, 'pairtree_root', _id2path(volid).replace('\\', '/'),
-                     volid_clean, filename])
+    if format == 'stubbytree':
+        id_to_path_func = id_to_stubbytree
+    elif format == "pairtree":
+        id_to_path_func = id_to_pairtree
+    else:
+        raise ValueError("Unknown format for id_to_rsync")
+    path = id_to_path_func(htid, format = "json", compression = "bz2")
     return path
 
 
@@ -189,7 +240,7 @@ def _htid2rsync_argparser():
     import argparse
     import sys
     parser = argparse.ArgumentParser(description='Convert a HathiTrust ID to '
-                                     'a pairtree path for Rsyncing that id\'s '
+                                     'a stubbytree path for Rsyncing that id\'s '
                                      'Extracted Features dataset file. This '
                                      'does not check if the file exists.')
     
@@ -201,6 +252,9 @@ def _htid2rsync_argparser():
                         const='-',
                        help="Read volume ids from an external file. Use as flag or supply - to read from stdin.")
     
+    parser.add_argument('--oldstyle', '-s', action="store_true",
+                       help="Whether to use the pre-EF2.0 file structure (pairtree) rather than the current stubbytree.")
+    
     parser.add_argument('--outfile', '-o', nargs='?', type=argparse.FileType('w'),
                         default=sys.stdout,
                         help="File to save to. By default it writes to standard out."
@@ -210,19 +264,20 @@ def _htid2rsync_argparser():
 def _htid2rsync_parse_args(parser, in_args):
     import sys
     args = parser.parse_args(in_args)
+    style = ("pairtree" if args.oldstyle else "stubbytree")
     if (args.id and len(args.id) > 0) and args.from_file:
         sys.stderr.write("ERROR: Can't combine id arguments with --from-file. Only use one. \n-----\n")
         parser.print_help()
         sys.exit(2)
         return
     elif args.id and len(args.id) > 0:
-        urls = [id_to_rsync(htid) for htid in args.id]
+        urls = [id_to_rsync(htid, format=style) for htid in args.id]
         for url in urls:
             args.outfile.write(url+"\n")
     elif args.from_file:
         try:
             for line in args.from_file.readlines():
-                url = id_to_rsync(line.strip())
+                url = id_to_rsync(line.strip(), format=style)
                 args.outfile.write(url+"\n")
         except KeyboardInterrupt:
             pass
@@ -230,7 +285,6 @@ def _htid2rsync_parse_args(parser, in_args):
         sys.stderr.write("ERROR: Need to supply volume ids, either through positional arguments or a file with --from-file. Run with --help for details. \n-----\n")
         parser.print_help()
         sys.exit(2)
-
 
 if __name__ == '__main__':
     htid2rsync_cmd()
