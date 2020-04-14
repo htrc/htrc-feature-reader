@@ -580,14 +580,11 @@ class Volume(object):
         Get unique tokens as a set. Setting min_count increases processing.
         '''
         tokencolname = 'token' if case else 'lowercase'
-        if min_count <= 1:
-            return set(self.tokenlist(case=case).reset_index()[tokencolname])
-        else:
-            tokencounts = (self.tokenlist(case=case).reset_index()
-                               .groupby(tokencolname)['count'].sum()
-                          )
-            tokencounts = tokencounts[tokencounts >= min_count]
-            return set(tokencounts.index)
+        tl = self.tokenlist(case=case, page_select=page_select).reset_index()
+        if min_count > 1:
+            matches = tl.groupby(tokencolname)['count'].transform('sum').ge(min_count)
+            tl = tl[matches]
+        return set(tl[tokencolname])
 
     def pages(self, **kwargs):
         ''' Iterate through Page objects with a reference to this class.
