@@ -1,6 +1,6 @@
 package:
   name: htrc-feature-reader
-  version: "1.99"
+  version: "2.0.6"
 
 source:
   path: ../..
@@ -28,20 +28,18 @@ requirements:
     - pytest-runner
     - setuptools
     - six
-    - pandas>=0.24
-    - numpy
+    - pandas
     - pymarc
     - requests
-    - rapidjson
+    - python-rapidjson
 
   run:
     - python
     - six
-    - pandas>=0.24
-    - numpy
+    - pandas
     - pymarc
     - requests
-    - rapidjson
+    - python-rapidjson
 
 test:
   # Python imports

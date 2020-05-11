@@ -77,7 +77,7 @@ def _id2path(id):
     return path
 
 
-def download_file(htids, outdir='./', keep_dirs=False, silent=True, format='stubbytree'):
+def download_file(htids, outdir='./', keep_dirs=False, silent=True, rsync_endpoint='ef-latest', format='stubbytree'):
     '''
     A function for downloading one or more Extracted Features files by ID.
     
@@ -95,6 +95,9 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, format='stub
     keep_dirs:
         Whether to keep the remote pairtree file structure or save just the files to outdir.
         Defaults to False (flattening).
+        
+    rsync_endpoint:
+        Location of rsync endpoint directory, *or* one of ['ef-latest', 'ef-2.0', 'ef-1.5'] to point to HTRC servers.
         
     silent:
         If False, return the rsync stdout.
@@ -120,12 +123,19 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, format='stub
     ```
     utils.download_file(htids='nyp.33433042068894', outdir='/tmp')
     ```
-    
-    Download file to current directory, keeping pairtree directory structure;
-    i.e. './nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2':
+
+    Download to current directory (EF 2.0 format), keeping stubbytree directory structure;
+    i.e. './nyp/33469/nyp.33433042068894.json.bz2':
     
     ```
     utils.download_file(htids='nyp.33433042068894', keep_dirs=True)
+    ```
+    
+    Download EF 1.5 file to current directory, keeping pairtree directory structure;
+    i.e. './nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2':
+    
+    ```
+    utils.download_file(htids='nyp.33433042068894', keep_dirs=True, rsyncroot='ef1.5', format='pairtree')
     ```
     
     '''
@@ -145,11 +155,21 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, format='stub
         relative = '--relative'
     else:
         relative = '--no-relative'
+        
+    if rsync_endpoint == 'ef-latest':
+        rsync_endpoint = "data.analytics.hathitrust.org::features/"
+    elif rsync_endpoint == 'ef-2.0':
+        rsync_endpoint = "data.analytics.hathitrust.org::features-2020.03/"
+    elif rsync_endpoint == 'ef-1.5':
+        if format == 'stubbytree':
+            logging.warn("ef-1.5 does not use {} format; forcing pairtree")
+            format = "pairtree"
+        rsync_endpoint = "data.analytics.hathitrust.org::features-2018.01/"
 
     if isinstance(htids, string_types):
         # Download a single file
         dest_file = id_to_rsync(htids, format=format)
-        args = ["data.analytics.hathitrust.org::features/" + dest_file]
+        args = [rsync_endpoint + '/' + dest_file]
     else:
         # Download a list of files
         paths = [id_to_rsync(htid, format=format) for htid in htids]
@@ -157,7 +177,7 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, format='stub
         fdescrip, tmppath =  tempfile.mkstemp()
         with open(tmppath, mode='w') as f:
             f.write("\n".join(paths))
-        args = ["--files-from=%s" % tmppath, "data.analytics.hathitrust.org::features/"]
+        args = ["--files-from=%s" % tmppath, rsync_endpoint + '/']
 
     cmd = ["rsync", relative, "-a","-v"] + args + [outdir]
     

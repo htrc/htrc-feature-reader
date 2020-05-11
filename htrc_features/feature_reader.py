@@ -212,8 +212,6 @@ class FeatureReader(object):
         '''
         
         # only one of paths or ids can be selected - otherwise it's not clear what to iterate over. 
-        print(paths)
-        print(ids)
         assert (paths or ids) and not (paths and ids)
 
         if (paths):
