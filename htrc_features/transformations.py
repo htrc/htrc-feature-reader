@@ -8,10 +8,10 @@ def chunk_to_wem(chunk_tl, model, vocab=None, stop=True, log=True, min_ncount=10
     elif 'lowercase' in chunk_tl.columns and not 'lowercase' in chunk_tl.index.names:
         chunk_tl = chunk_tl.set_index('lowercase')[['count']]
 
-    n_dim = 300
+    n_dim = model.vector_size
     placeholder = np.array(n_dim * [None])
 
-    tl = chunk_tl.copy() #Avoidable?
+    tl = chunk_tl #.copy() #Avoidable?
     tcolname = 'token' if 'token' in tl.index.names else 'lowercase'
     tl.index = tl.index.get_level_values(tcolname)
 
@@ -40,7 +40,8 @@ def chunk_to_wem(chunk_tl, model, vocab=None, stop=True, log=True, min_ncount=10
         raise BaseException("Counts and all_vecs don't align. Likely, this means there are duplicated tokens in the data"
                            " e.g. Passing in a dataframe with counts for multiple pages/chunks")
 
-    doc_wem = np.dot(all_vecs.T, counts)
+    #doc_wem = np.dot(all_vecs.T, counts)
+    doc_wem = np.average(all_vecs, weights=counts, axis=0)
     
     return doc_wem
 
