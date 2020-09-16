@@ -1,6 +1,5 @@
 import os
 import zipfile
-import htrc_features.utils
 import hashlib
 from io import BytesIO
 import bz2
@@ -8,7 +7,8 @@ import gzip
 import logging
 import sys
 from pathlib import Path
-from .utils import _id_encode
+from string import Formatter
+from .utils import _id_encode, id_to_pairtree, id_to_stubbytree, clean_htid
 
 
 MINOR_VERSION = (sys.version_info[1])
@@ -55,7 +55,7 @@ class IdResolver():
         No defaults because this should always be fully described.
 
         """
-        clean_id = htrc_features.utils.clean_htid(id)
+        clean_id = clean_htid(id)
         if format == "parquet":
             # Because it's not in the parquet filename.
             compression = None
@@ -146,12 +146,13 @@ class IdResolver():
 
 class HttpResolver(IdResolver):
     
-    def __init__(self, url = "http://data.htrc.illinois.edu/htrc-ef-access/get?action=download-ids&id={id}&output=json", dir=None, format='json', compression=None, **kwargs):
+    def __init__(self, url='http://data.analytics.hathitrust.org/features-2020.03/{stubbypath}', dir=None, format='json', compression='bz2', **kwargs):
         """
-        Initialize with a url; it must contain the string "{id}" in it somewhere, and that will be replaced with the id in the get call.
+        Initialize with a url; it must contain the string "{id}", "{stubbypath}", or "{pairtreepath}" in it somewhere, and that will be replaced with the id/path in the get call.
         """
         self.url = url
         self.compression = compression
+        self.format = format
         if dir is not None:
             raise ValueError("HTTP Resolver doesn't work with `dir`. Are you sure you meant to try to load "
                              "from HTTP? If not, make sure you're explicit about id_resolver or your format "
@@ -160,16 +161,26 @@ class HttpResolver(IdResolver):
         super().__init__(dir=dir, format=format, compression=self.compression, **kwargs)
     
     def _open(self, id = None, mode = 'rb', compression='default', **kwargs):
+        formatter = Formatter()
+        fields = [f[1] for f in formatter.parse(self.url)]
+        assert len(set(fields).intersection(['id', 'stubbypath', 'pairtreepath'])) > 0
+        
         if compression == 'default':
             compression = self.compression
-        if compression == 'bz2':
-            raise Exception("You have requested to read from HTTP with bz2 compression, but at time of writing this was not supported.")
         if mode == 'wb':
             raise NotImplementedError("Mode is not defined")
-        path_or_url = self.url.format(id = id)
+        
+        stubbypath, pairtreepath = None, None
+        if 'stubbypath' in fields:
+            stubbypath = id_to_stubbytree(id, format=self.format, compression=compression)
+        if 'pairtreepath' in fields:
+            pairtreepath = id_to_pairtree(id, format=self.format, compression=compression)
+            
+        path_or_url = self.url.format(id = id, stubbypath=stubbypath, pairtreepath=pairtreepath)
 
         try:
-            req = BytesIO(_urlopen(path_or_url).read())
+            byt = _urlopen(path_or_url).read()
+            req = BytesIO(byt)
         except HTTPError:
             logging.exception("HTTP Error accessing %s" % path_or_url)
             raise
@@ -213,7 +224,7 @@ class PairtreeResolver(IdResolver):
         if compression == 'default':
             compression = self.compression
 
-        path = Path(htrc_features.utils.id_to_pairtree(id, format, suffix, compression)).parent
+        path = Path(id_to_pairtree(id, format, suffix, compression)).parent
         fname = self.fname(id = id, format = format, suffix = suffix, compression = compression)
         full_path = Path(self.dir, path, fname)
         try:
@@ -242,7 +253,7 @@ class StubbytreeResolver(IdResolver):
         if compression == 'default':
             compression = self.compression
 
-        path = Path(htrc_features.utils.id_to_stubbytree(id, format, suffix, compression)).parent
+        path = Path(id_to_stubbytree(id, format, suffix, compression)).parent
         fname = self.fname(id, format= format, suffix = suffix, compression = compression)
         full_path = Path(self.dir, path, fname)
         try:

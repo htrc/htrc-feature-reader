@@ -1,6 +1,6 @@
 package:
   name: htrc-feature-reader
-  version: "2.0.6"
+  version: "2.0.7"
 
 source:
   path: ../..
@@ -60,7 +60,7 @@ test:
     # - nose
 
 about:
-  home: https://github.com/organisciak/htrc-feature-reader
+  home: https://github.com/htrc/htrc-feature-reader
   license: University of Illinois/NCSA Open Source License
   summary: 'Library for working with the HTRC Extracted Features dataset'
   license_family: Proprietary

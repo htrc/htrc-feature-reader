@@ -157,19 +157,19 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, rsync_endpoi
         relative = '--no-relative'
         
     if rsync_endpoint == 'ef-latest':
-        rsync_endpoint = "data.analytics.hathitrust.org::features/"
+        rsync_endpoint = "data.analytics.hathitrust.org::features-2020.03"
     elif rsync_endpoint == 'ef-2.0':
-        rsync_endpoint = "data.analytics.hathitrust.org::features-2020.03/"
+        rsync_endpoint = "data.analytics.hathitrust.org::features-2020.03"
     elif rsync_endpoint == 'ef-1.5':
         if format == 'stubbytree':
-            logging.warn("ef-1.5 does not use {} format; forcing pairtree")
+            logging.warn("ef-1.5 does not use stubbytree format; forcing pairtree")
             format = "pairtree"
-        rsync_endpoint = "data.analytics.hathitrust.org::features-2018.01/"
+        rsync_endpoint = "data.analytics.hathitrust.org::features-2018.01"
 
     if isinstance(htids, string_types):
         # Download a single file
         dest_file = id_to_rsync(htids, format=format)
-        args = [rsync_endpoint + '/' + dest_file]
+        args = [rsync_endpoint.strip('/') + '/' + dest_file]
     else:
         # Download a list of files
         paths = [id_to_rsync(htid, format=format) for htid in htids]
@@ -177,7 +177,7 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, rsync_endpoi
         fdescrip, tmppath =  tempfile.mkstemp()
         with open(tmppath, mode='w') as f:
             f.write("\n".join(paths))
-        args = ["--files-from=%s" % tmppath, rsync_endpoint + '/']
+        args = ["--files-from=%s" % tmppath, rsync_endpoint.strip('/') + '/']
 
     cmd = ["rsync", relative, "-a","-v"] + args + [outdir]
     

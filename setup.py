@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
     
 setup(name='htrc-feature-reader',
-      version='2.0.6',
+      version='2.0.7',
       description='Library for working with the HTRC Extracted Features dataset',
       long_description=long_description,
       long_description_content_type="text/markdown",

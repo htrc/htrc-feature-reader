@@ -342,15 +342,20 @@ def retrieve_parser(id, format, id_resolver, compression, dir=None,
 
 def create_resolver(id_resolver, dir, format,
                     compression, mode = 'rb'):
-    
+
     if isinstance(id_resolver, resolvers.IdResolver):
         # We have a fully-formed resolver already
         return id_resolver
     if isinstance(id_resolver, str):
         id_resolver = resolvers.resolver_nicknames[id_resolver]
+    
+    try:
+        assert(issubclass(id_resolver, resolvers.IdResolver))
+    except:
+        # There are class issues with the FallbackResolver, so ignore this check for now
+        # and assume that it was an instance of something
+        return id_resolver
         
-    assert(issubclass(id_resolver, resolvers.IdResolver))
-
     return id_resolver(dir = dir, mode = mode, format = format, compression = compression)
         
 class Volume(object):
@@ -425,7 +430,7 @@ class Volume(object):
                 compression = id_resolver.compression
             else:
                 if id_resolver == 'http':
-                    compression = None
+                    compression = "bz2"
                 elif format == 'parquet':
                     compression = 'snappy'
                 elif format == 'json':
@@ -437,9 +442,6 @@ class Volume(object):
         if id_resolver == "locally_cached_http":
             if dir is None:
                 dir = tempfile.gettempdir()
-                
-        if id_resolver == 'http':
-            compression = None
 
         id_resolver = create_resolver(id_resolver, dir = dir,
                                    format = format,

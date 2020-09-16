@@ -51,7 +51,7 @@ class TestFeatureReader():
 
         for i, vol in enumerate(feature_reader):
             assert type(vol) == htrc_features.feature_reader.Volume
-            assert vol.title == titles[i]
+            assert vol.title == titles[i].split(' L.M.')[0] # Remote file is newer
 
     def test_parquet_reading(self, ids, titles):
         dirpath = os.path.join('tests', 'data', 'partialparq')
