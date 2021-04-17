@@ -572,7 +572,6 @@ class Volume(object):
         if not self._extra_metadata:
             logging.debug("Looking up full metadata for {0}".format(self.id))
             data = requests.get(self.ht_bib_url).json()
-            print(self.ht_bib_url)
             record_id = data['items'][0]['fromRecord']
             marc = data['records'][record_id]['marc-xml']
 
@@ -600,7 +599,6 @@ class Volume(object):
             import pyarrow as pa
             from pyarrow import parquet
         if self.parser.format == "parquet":
-            print(columns)
             tb = self.parser.pq.read(columns = columns)
             if len(kwargs) > 0:
                 # We have to roundtrip through pandas because something
@@ -633,7 +631,6 @@ class Volume(object):
         if include_metadata:
             metadata_h = json.dumps(self.parser.meta).encode('utf-8')
             try:
-                print(self.parser._make_page_feature_df()['calculatedLanguage'])
                 languages = list(self.parser._make_page_feature_df()['calculatedLanguage'])
                 languages = obj_to_gz(languages)
                 metadata = {b"hathi_metadata": metadata_h, b"page_languages_gzipped_json": languages}
