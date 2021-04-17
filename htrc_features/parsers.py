@@ -435,30 +435,72 @@ class ParquetFileHandler(BaseFileHandler):
         global parquet
         if parquet is None:
             from pyarrow import parquet
-
+        self._meta = None
+        self._pq = None
         super().__init__(id = id, id_resolver = id_resolver, compression = compression,
                          mode = mode,  **kwargs)
 
+    @property
+    def path(self):
+        """
+        Returns the most important parquet path, the one with
+        metadata and parquet files.
+        """
+        try:
+            return self.id_resolver._path(self.id, "parquet", None, "tokens")
+        except:
+            raise TypeError("Poor coding by Ben Schmidt caused this")
+
+    @property
+    def pq(self):
+        """
+        An Apache arrow ParquetFile object for quick
+        access to data and metadata. Handles the tokens and metadata files
+        by default.
+        """
+        if self._pq is not None:
+            return self._pq
+        # NB: this leaves the file open. Do we have to close it somewhere?
+
+        fin = self.id_resolver.open(id = self.id, suffix = 'tokens', format = 'parquet')
+        self._pq = parquet.ParquetFile(fin)
+        return self._pq
+
+    @property
+    def file_metadata(self):
+        try:
+            return self.pq.schema_arrow.metadata[b'hathi_metadata']
+        except:
+            raise KeyError("Parquet file has no schema_arrow or no hathi_metadata")
+
+    @property
+    def meta_from_parquet(self):
+        if self._meta is not None:
+            return self._meta
+        meta = self.file_metadata.decode("utf-8")
+
+        self._meta = json.loads(meta)
+        return self._meta
 
     def parse(self, **kwargs):
         try:
-            tokens = self.id_resolver.open(id = self.id, suffix = 'tokens')
-            m = parquet.read_metadata(tokens).to_dict()
-            self.meta = json.loads(m['hathi_metadata'].decode("utf-8"))
-        except KeyError:
+            self.meta = self.meta_from_parquet
+            return self.meta_from_parquet
+        except KeyError: # An old version won't have hathi_metadata
             try:
                 with self.id_resolver.open(self.id, suffix = "meta", format = "json", compression = None) as meta_buffer:
                     self.meta = json.loads(meta_buffer.read().decode("utf-8"))
             except:
                 id = utils.extract_htid(self.id)
                 self.meta = dict(id=id, title=self.id)
-        except FileNotFoundError:
+        except FileNotFoundError: # Someone might create only .json, not .tokens.parquet
             try:
                 with self.id_resolver.open(self.id, suffix = "meta", format = "json", compression = None) as meta_buffer:
                     self.meta = json.loads(meta_buffer.read().decode("utf-8"))
             except:
                 id = utils.extract_htid(self.id)
                 self.meta = dict(id=id, title=self.id)
+
         return self.meta
 
         if not 'handle_url' in self.meta or not self.meta['handle_url']:
@@ -542,14 +584,18 @@ class ParquetFileHandler(BaseFileHandler):
 
     def _make_tokencount_df(self):
         try:
-            with self.id_resolver.open(id = self.id, suffix = 'tokens', format = 'parquet') as fin:
-                df = pd.read_parquet(fin)
+            names = self.pq.schema.names
+            keep_set = set(['page', 'chunk', 'section', 'token', 'lowercase', 'pos', 'count'])
+            arrow = self.pq.read(columns = [n for n in names if n in keep_set])
         except IOError:
             raise MissingDataError("No token information available")
+        df = arrow.to_pandas()
 
-        indcols = [col for col in ['page', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
+        indcols = [col for col in ['page', 'chunk', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
+
         if len(indcols):
             df = df.set_index(indcols)
+
         return df
 
     def _make_line_char_df(self):
@@ -569,7 +615,12 @@ class ParquetFileHandler(BaseFileHandler):
             raise MissingDataError("No section information available")
 
     def _make_page_feature_df(self):
-        raise Exception("parquet parser doesn't support non-token, non-section page features")
+        try:
+            gzipped = self.pq.schema_arrow.metadata[b'page_languages_gzipped_json']
+            languages = utils.gz_to_obj(gzipped)
+            return pd.DataFrame({"page": range(len(languages)), "calculatedLanguage": languages})
+        except:
+            raise Exception("Old version of parquet parser doesn't support page-language features")
 
     def _parse_meta(self):
         pass

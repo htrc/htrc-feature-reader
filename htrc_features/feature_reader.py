@@ -11,10 +11,13 @@ import warnings
 import tempfile
 import json
 from functools import lru_cache
-pa = None # placeholder for pyarrow
+
+# placeholders for optional pyarrow imports
+pa = None
 parquet = None
 
 from htrc_features import utils
+from htrc_features.utils import gz_to_obj, obj_to_gz
 from htrc_features import parsers, resolvers, transformations
 from htrc_features.parsers import JsonFileHandler, BaseFileHandler, ParquetFileHandler, MissingDataError, SECREF
 
@@ -582,7 +585,7 @@ class Volume(object):
         return self._extra_metadata
 
     @lru_cache(maxsize = 5)
-    def arrow_counts(self, columns = None, **kwargs):
+    def arrow_counts(self, columns = None, include_metadata = True, **kwargs):
         """
         columns: the names of a subset of columns to read.
 
@@ -596,7 +599,7 @@ class Volume(object):
             from pyarrow import parquet
 
         if self.parser.format == "parquet":
-            tb = parquet.read_table(columns = columns)
+            tb = parquet.read_table(self.parser.path, columns = columns)
             if len(kwargs) > 0:
                 # We have to roundtrip through pandas because something
                 # fancy is being requested.
@@ -622,7 +625,16 @@ class Volume(object):
         # Gotta get it from the tokens.
 
         df = self.tokenlist(**kwargs).reset_index()
-        metadata = json.dumps(self.parser.meta).encode('utf-8')
+        if include_metadata:
+            metadata = json.dumps(self.parser.meta).encode('utf-8')
+            try:
+                languages = list(self.parser._make_page_feature_df()['calculatedLanguage'])
+                languages = obj_to_gz(languages)
+                metadata = {b"hathi_metadata": metadata, b"page_languages_gzipped_json": languages}
+            except KeyError:
+                metadata = {b"hathi_metadata": metadata}
+        else:
+            metadata = {}
         if (columns is None):
             columns = [k for k in df.columns if k in types]
         df = df.loc[: , columns]
@@ -631,7 +643,7 @@ class Volume(object):
             df['count'] = np.array([], dtype=np.uint32)
         schema = pa.schema(
             {k:v for k,v in types.items() if k in df.columns},
-            metadata = {b"hathi_metadata": metadata})
+            metadata = metadata)
         return pa.table(df, schema)
 
     def tokens(self, section='default', case=True, page_select=False, min_count=1):
@@ -689,8 +701,6 @@ class Volume(object):
     def sentence_counts(self, **kwargs):
         ''' Return a list of sentence counts, per page '''
         return self.section_features(feature='sentenceCount', **kwargs)
-
-
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False, page_select=False, drop_section=False,

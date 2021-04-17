@@ -1,5 +1,8 @@
 import logging
 import os
+import gzip
+import io
+import json
 
 EF_CHECK_URL= "http://data.htrc.illinois.edu/htrc-ef-access/get?action=check-exists&ids={}"
 
@@ -43,14 +46,14 @@ def extract_htid(filename):
         if string.endswith(suffix):
             return string[:-len(suffix)]
         return string
-    
+
     for suffix in [".gz", ".bz2"]:
         filename = trim(filename, suffix)
     for suffix in [".json", ".parquet"]:
         filename = trim(filename, suffix)
     for suffix in [".meta", ".tokens", ".chars", ".section"]:
         filename = trim(filename, suffix)
-                       
+
     return _id_decode(filename)
 
 def clean_htid(htid):
@@ -80,45 +83,45 @@ def _id2path(id):
 def download_file(htids, outdir='./', keep_dirs=False, silent=True, rsync_endpoint='ef-latest', format='stubbytree'):
     '''
     A function for downloading one or more Extracted Features files by ID.
-    
+
     This uses a subprocess call to 'rsync', so will only work if rsync is available
     on your system and accessible in the same environment as Python.
-    
+
     Returns (return code, stdout) tuple.
-    
+
     htids:
         A string or list of strings, comprising HathiTrust identifiers.
-        
+
     outdir:
         Location to save the file(s). Defaults to current directory.
-        
+
     keep_dirs:
         Whether to keep the remote pairtree file structure or save just the files to outdir.
         Defaults to False (flattening).
-        
+
     rsync_endpoint:
         Location of rsync endpoint directory, *or* one of ['ef-latest', 'ef-2.0', 'ef-1.5'] to point to HTRC servers.
-        
+
     silent:
         If False, return the rsync stdout.
-        
-     
+
+
     Usage
     -------
-    
+
     Download one file to the current directory:
-    
+
     ```
     utils.download_file(htids='nyp.33433042068894')
     ```
-    
+
     Download multiple files to the current directory:
-    
+
     ```
     ids = ['nyp.33433042068894', 'nyp.33433074943592', 'nyp.33433074943600']
     utils.download_file(htids=ids)
     ```
-    
+
     Download file to `/tmp`:
     ```
     utils.download_file(htids='nyp.33433042068894', outdir='/tmp')
@@ -126,18 +129,18 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, rsync_endpoi
 
     Download to current directory (EF 2.0 format), keeping stubbytree directory structure;
     i.e. './nyp/33469/nyp.33433042068894.json.bz2':
-    
+
     ```
     utils.download_file(htids='nyp.33433042068894', keep_dirs=True)
     ```
-    
+
     Download EF 1.5 file to current directory, keeping pairtree directory structure;
     i.e. './nyp/pairtree_root/33/43/30/42/06/88/94/33433042068894/nyp.33433042068894.json.bz2':
-    
+
     ```
     utils.download_file(htids='nyp.33433042068894', keep_dirs=True, rsyncroot='ef1.5', format='pairtree')
     ```
-    
+
     '''
     import subprocess
     import tempfile
@@ -147,15 +150,15 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, rsync_endpoi
 
     tmppath = None
     sub_kwargs = dict()
-    
+
     if not outdir.endswith("/"):
         outdir += "/"
-    
+
     if keep_dirs:
         relative = '--relative'
     else:
         relative = '--no-relative'
-        
+
     if rsync_endpoint == 'ef-latest':
         rsync_endpoint = "data.analytics.hathitrust.org::features-2020.03"
     elif rsync_endpoint == 'ef-2.0':
@@ -173,14 +176,14 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, rsync_endpoi
     else:
         # Download a list of files
         paths = [id_to_rsync(htid, format=format) for htid in htids]
-        
+
         fdescrip, tmppath =  tempfile.mkstemp()
         with open(tmppath, mode='w') as f:
             f.write("\n".join(paths))
         args = ["--files-from=%s" % tmppath, rsync_endpoint.strip('/') + '/']
 
     cmd = ["rsync", relative, "-a","-v"] + args + [outdir]
-    
+
     major, minor = sys.version_info[:2]
     if (major >= 3 and minor >=5):
         # Recommended use for 3.5+ is subprocess.run
@@ -195,12 +198,12 @@ def download_file(htids, outdir='./', keep_dirs=False, silent=True, rsync_endpoi
     else:
         # Support older Python, currently without error catching
         out = (subprocess.call(cmd), None)
-    
+
     if tmppath:
         f.close()
         os.close(fdescrip)
         os.remove(tmppath)
-        
+
     return out
 
 def id_to_pairtree(htid, format = None, suffix = None, compression = None):
@@ -212,9 +215,9 @@ def id_to_pairtree(htid, format = None, suffix = None, compression = None):
     '''
     libid, volid = htid.split('.', 1)
     volid_clean = _id_encode(volid)
-    
+
     suffixes = [s for s in [format, compression] if s is not None]
-    filename = ".".join([clean_htid(htid), *suffixes]) 
+    filename = ".".join([clean_htid(htid), *suffixes])
     path = os.path.join(*[libid, 'pairtree_root', * _id2path(volid),
                      volid_clean, filename])
     return path
@@ -231,7 +234,7 @@ def id_to_stubbytree(htid, format = None, suffix = None, compression = None):
     filename = ".".join([clean_htid(htid), *suffixes])
     path = os.path.join(libid, volid_clean[::3], filename)
     return path
-    
+
 def id_to_rsync(htid, format="stubbytree"):
     '''
     Take an HTRC id and convert it to an Rsync location for syncing Extracted
@@ -263,18 +266,18 @@ def _htid2rsync_argparser():
                                      'a stubbytree path for Rsyncing that id\'s '
                                      'Extracted Features dataset file. This '
                                      'does not check if the file exists.')
-    
+
     #group = parser.add_mutually_exclusive_group()
     parser.add_argument('id', type=str, nargs='*',
                         help="A HathiTrust id or multiple ids to convert.")
-    
+
     parser.add_argument('--from-file', '-f', nargs='?', type=argparse.FileType('r'),
                         const='-',
                        help="Read volume ids from an external file. Use as flag or supply - to read from stdin.")
-    
+
     parser.add_argument('--oldstyle', '-s', action="store_true",
                        help="Whether to use the pre-EF2.0 file structure (pairtree) rather than the current stubbytree.")
-    
+
     parser.add_argument('--outfile', '-o', nargs='?', type=argparse.FileType('w'),
                         default=sys.stdout,
                         help="File to save to. By default it writes to standard out."
@@ -305,6 +308,28 @@ def _htid2rsync_parse_args(parser, in_args):
         sys.stderr.write("ERROR: Need to supply volume ids, either through positional arguments or a file with --from-file. Run with --help for details. \n-----\n")
         parser.print_help()
         sys.exit(2)
+
+
+# Borrowed from https://gist.github.com/Garrett-R/dc6f08fc1eab63f94d2cbb89cb61c33d
+# For quickly pickling data against the parquet file.
+
+def gzip_str(string_: str) -> bytes:
+    out = io.BytesIO()
+
+    with gzip.GzipFile(fileobj=out, mode='w') as fo:
+        fo.write(string_.encode())
+
+    bytes_obj = out.getvalue()
+    return bytes_obj
+
+def gunzip_bytes_obj(bytes_obj: bytes) -> str:
+    return gzip.decompress(bytes_obj).decode()
+
+def obj_to_gz(input):
+    return gzip_str(json.dumps(input))
+
+def gz_to_obj(input):
+    return json.loads(gunzip_bytes_obj(input))
 
 if __name__ == '__main__':
     htid2rsync_cmd()

@@ -87,6 +87,12 @@ class IdResolver():
             buffer.close()
         self.active_buffers = []
 
+    def path(self, **kwargs):
+        """
+        an alias to open that returns a pathlib.Path instead of an open
+        file. For certain non-local resolvers (e.g., zipfile, http) this may fail.
+        """
+
     def open(self, id, suffix = None, format=None, mode = 'rb',
              skip_compression = False, compression = 'default',
              **kwargs):
@@ -139,10 +145,14 @@ class IdResolver():
     def _open(self, id, compression=None, format=None, mode='rb'):
         """
         Each method should define '_open' for itself. The class's
-        'open' method will then handle the method.
+        'open' method will then handle the method. Classes that use
+        an on-disk structure or are otherwise capable of returning a
+        pathlib.Path object should subclass FilesystemResolver and
+        instead define a _path method that returns a pathlib.path object.
         """
         raise NotImplementedError("An IdResolver superclass must overwrite the "
                                   "'_open' method to return an io.Buffer object")
+
 
 class HttpResolver(IdResolver):
 
@@ -186,47 +196,22 @@ class HttpResolver(IdResolver):
             raise
         return req
 
-class LocalResolver(IdResolver):
+class FilesystemResolver(IdResolver):
+    """
+    Stubbytree, local, and pairtree all share some methods on the local
+    filesystem.
+    """
+    def _path(self, id, format, compression, suffix, dir = None):
+        raise NotImplementedError("An IdResolver superclass must overwrite the "
+                                  "'_path' method to return a pathlib.Path object")
 
-    def __init__(self, dir, **kwargs):
-        super().__init__(dir = dir, **kwargs)
-
-    def _open(self, id, format = None, mode = 'rb', compression='default', dir=None, suffix=None, **kwargs):
-
-        if compression == 'default':
-            compression = self.compression
-        if not dir:
-            dir = self.dir
-
-        filename = self.fname(id, format = format, compression = compression, suffix = suffix)
-        return Path(dir, filename).open(mode = mode)
-
-class PathResolver(IdResolver):
-    # A path is the simplest form of id storage. These are not HTIDs, and so aren't stored.
-    # We could check to make sure the pathname makes sense. But we don't.
-    def _open(self, id, mode = 'rb', compression=None, **kwargs):
-        self.compression = compression
-        return open(id, mode)
-
-class PairtreeResolver(IdResolver):
-    def __init__(self, dir=None, **kwargs):
-        if not dir:
-            raise NameError("You must specify a directory with 'dir'")
-        super().__init__(dir=dir, **kwargs)
-
-    def _open(self, id, mode = 'rb', format=None, compression='default', suffix=None, **kwargs):
+    def _open(self, id, mode, format=None, compression='default', suffix=None, **kwargs):
         assert(mode.endswith('b'))
-
-        if not format:
-            format = self.format
         if compression == 'default':
             compression = self.compression
-
-        path = Path(id_to_pairtree(id, format, suffix, compression)).parent
-        fname = self.fname(id = id, format = format, suffix = suffix, compression = compression)
-        full_path = Path(self.dir, path, fname)
+        full_path = self._path(id, format, compression, suffix)
         try:
-            return full_path.open(mode=mode)
+            return full_path.open(mode = mode)
         except FileNotFoundError:
             if mode.startswith('w'):
                 full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -234,7 +219,44 @@ class PairtreeResolver(IdResolver):
             else:
                 raise
 
-class StubbytreeResolver(IdResolver):
+
+class LocalResolver(FilesystemResolver):
+
+    def __init__(self, dir, **kwargs):
+        super().__init__(dir = dir, **kwargs)
+#        compression = kwargs.get("compression", None)
+#        suffix = kwargs.get("suffix", None)
+#        full_path =  self._path(id, format, compression, suffix)
+
+    def _path(self, id, format, compression, suffix, dir = None):
+        if not dir:
+            dir = self.dir
+        filename = self.fname(id, format = format, compression = compression, suffix = suffix)
+        return Path(dir, filename)
+
+class PathResolver(FilesystemResolver):
+    # A path is the simplest form of id storage. These are not HTIDs, and so aren't stored.
+    # We could check to make sure the pathname makes sense. But we don't.
+    def _path(self, id, format, compression = None, suffix = None, dir = None):
+        return Path(id)
+
+class PairtreeResolver(FilesystemResolver):
+    def __init__(self, dir=None, **kwargs):
+        if not dir:
+            raise NameError("You must specify a directory with 'dir'")
+        super().__init__(dir=dir, **kwargs)
+
+    def _path(self, id, format, compression = None, suffix = None, dir = None):
+        if dir is None:
+            dir = self.dir
+        path = Path(id_to_pairtree(id, format, suffix, compression)).parent
+        fname = self.fname(id = id, format = format, suffix = suffix, compression = compression)
+        full_path = Path(self.dir, path, fname)
+        return full_path
+
+
+
+class StubbytreeResolver(FilesystemResolver):
     '''
     An alternative to pairtree that uses loc/code, where the code is every third digit of the ID.
     '''
@@ -243,24 +265,20 @@ class StubbytreeResolver(IdResolver):
             raise NameError("You must specify a directory with 'dir'")
         super().__init__(dir=dir, **kwargs)
 
-    def _open(self, id, mode = 'rb', format=None, compression='default', suffix=None, **kwargs):
-        assert(mode.endswith('b'))
+    def _path(self, id, format = None, compression = 'default', suffix = None):
+        """
+        Returns a pathlib.Path object.
+        """
 
         if not format:
             format = self.format
-        if compression == 'default':
-            compression = self.compression
+
         path = Path(id_to_stubbytree(id, format, suffix, compression)).parent
-        fname = self.fname(id, format= format, suffix = suffix, compression = compression)
+        fname = self.fname(id, format = format, suffix = suffix, compression = compression)
         full_path = Path(self.dir, path, fname)
-        try:
-            return full_path.open(mode=mode)
-        except FileNotFoundError:
-            if mode.startswith('w'):
-                full_path.parent.mkdir(parents=True, exist_ok=True)
-                return full_path.open(mode=mode)
-            else:
-                raise
+        return full_path
+
+
 
 class ZiptreeResolver(IdResolver):
     """
@@ -370,27 +388,34 @@ resolver_nicknames = resolver_dict({
 def chain_resolver(dicts = None):
     """
     dicts: a list of arguments to make into resolvers. E.g.
-    {"method": "stubbytree", "dir": "~/hathi-features", "format": "parquet"}
+    [{"method": "stubbytree", "dir": "~/hathi-features", "format": "parquet"},
+     {"method": "http", "format": "json", "compression": "bz2"}
+    ]
 
-    If no input is passed, looks for a file called ".htrc-config.yaml"
+    Requested ids are sought at each of these origins in turn. If not found,
+    they are sought down the chain and cached to every higher location if possible.
+
+    If no input is passed, looks for a file called ".htrc-config.yaml" and
+    reads that into the above format.
 
     Returns a resolver that calls
     each one in order, starting with the first. Usually you will want to
     include caching on the first one.
     """
     if dicts is None:
-        default = Path("~/.htrc-config.yaml").expanduser()
-        if default.exists():
-            import yaml
-            dicts = yaml.safe_load(default.open())
-        for parent in Path(".").parents:
-            if (parent / ".htrc-config.yaml").exists():
+        # Default is user global
+        default = Path("~").expanduser()
+        # But prefer parent directories of cwd.
+        parents = [*Path(".").parents]
+        parents.reverse() # So the last place looked is the current directory.
+        for path in [default, *parents, Path(".")]:
+            if (path / ".htrc-config.yaml").exists():
                 import yaml
-                dicts = yaml.safe_load((parent / ".htrc-config.yaml").open())
-                break
-            if (parent / ".htrc-config.json").exists():
+                dicts = yaml.safe_load((path / ".htrc-config.yaml").open())
+
+            if (path / ".htrc-config.json").exists():
                 import json
-                dicts = json.load((parent / ".htrc-config.json").open())
+                dicts = json.load((path / ".htrc-config.json").open())
                 break
         if dicts is None:
             raise ValueError("You must initiate a chain resolver with"
@@ -408,13 +433,13 @@ def chain_resolver(dicts = None):
     # This import has to wait until here to avoid circular dependencies.
     from .caching import make_fallback_resolver
 
-    starting_dict = dicts.pop(0)
+    starting_dict = dicts.pop()
     starting_format = starting_dict["method"]
     del starting_dict["method"]
     current_resolver = resolver_nicknames[starting_format](**starting_dict)
 
     while len(dicts):
-        next_layer = dicts.pop(0)
+        next_layer = dicts.pop()
         cache_resolver = make_fallback_resolver(resolver_nicknames[next_layer['method']], current_resolver)
         del next_layer["method"]
         current_resolver = cache_resolver(**next_layer)
