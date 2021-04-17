@@ -12,6 +12,7 @@ import tempfile
 import json
 from functools import lru_cache
 pa = None # placeholder for pyarrow
+parquet = None
 
 from htrc_features import utils
 from htrc_features import parsers, resolvers, transformations
@@ -588,9 +589,11 @@ class Volume(object):
         **kwargs: passed to Volume.tokenlist.
         """
         global pa
+        global parquet
 
         if pa is None:
             import pyarrow as pa
+            from pyarrow import parquet
 
         if self.parser.format == "parquet":
             tb = parquet.read_table(columns = columns)
