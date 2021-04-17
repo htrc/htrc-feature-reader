@@ -14,7 +14,7 @@ def paths():
 @pytest.fixture(scope="module")
 def ids():
     return ["uc2.ark:/13960/t1xd0sc6x", "hvd.hn6ltf"]
-    
+
 @pytest.fixture(scope="module")
 def titles():
     return ['Anne of Green Gables / L.M. Montgomery.',
@@ -37,7 +37,7 @@ class TestFeatureReader():
         for i, vol in enumerate(feature_reader):
             assert type(vol) == htrc_features.feature_reader.Volume
             assert vol.title == titles[i]
-            
+
     def test_id_remote_load(self, ids):
         id = ids[0]
         feature_reader = FeatureReader(ids=id)
@@ -56,14 +56,14 @@ class TestFeatureReader():
     def test_parquet_reading(self, ids, titles):
         dirpath = os.path.join('tests', 'data', 'partialparq')
         feature_reader = FeatureReader(ids=ids, format='parquet', dir=dirpath)
-        
+
         vol = next(feature_reader.volumes())
         assert type(vol) == htrc_features.feature_reader.Volume
 
         for i, vol in enumerate(feature_reader):
             assert type(vol) == htrc_features.feature_reader.Volume
             assert vol.title == titles[i]
-        
+
     def test_json_only_load(self, paths):
         path = paths[0]
         feature_reader = FeatureReader(path)
