@@ -584,12 +584,14 @@ class Volume(object):
             self._extra_metadata = xml_record
         return self._extra_metadata
 
-    @lru_cache(maxsize = 5)
     def arrow_counts(self, columns = None, include_metadata = True, **kwargs):
         """
         columns: the names of a subset of columns to read.
 
-        **kwargs: passed to Volume.tokenlist.
+        include_metadata: whether to include hathi metadata on the pyarrow schema.
+
+        **kwargs: passed to Volume.tokenlist. Doing so slows things down a bit.
+
         """
         global pa
         global parquet
@@ -597,16 +599,17 @@ class Volume(object):
         if pa is None:
             import pyarrow as pa
             from pyarrow import parquet
-
         if self.parser.format == "parquet":
-            tb = parquet.read_table(self.parser.path, columns = columns)
+            print(columns)
+            tb = self.parser.pq.read(columns = columns)
             if len(kwargs) > 0:
                 # We have to roundtrip through pandas because something
                 # fancy is being requested.
                 self._tokencounts = tb.to_pandas()
             else:
                 # Cool! Didn't ask for very much, so we can return
-                # quickly.
+                # quickly. Might accidentally include metadata, but the cost
+                # of that is low here.
                 return tb
 
         # If we get this far, we're going to have to work
@@ -623,16 +626,19 @@ class Volume(object):
         }
 
         # Gotta get it from the tokens.
-
-        df = self.tokenlist(**kwargs).reset_index()
+        if len(kwargs) > 0:
+            df = self.tokenlist(**kwargs).reset_index()
+        else:
+            df = self.parser._make_tokencount_df(indexed = False)
         if include_metadata:
-            metadata = json.dumps(self.parser.meta).encode('utf-8')
+            metadata_h = json.dumps(self.parser.meta).encode('utf-8')
             try:
+                print(self.parser._make_page_feature_df()['calculatedLanguage'])
                 languages = list(self.parser._make_page_feature_df()['calculatedLanguage'])
                 languages = obj_to_gz(languages)
-                metadata = {b"hathi_metadata": metadata, b"page_languages_gzipped_json": languages}
+                metadata = {b"hathi_metadata": metadata_h, b"page_languages_gzipped_json": languages}
             except KeyError:
-                metadata = {b"hathi_metadata": metadata}
+                metadata = {b"hathi_metadata": metadata_h}
         else:
             metadata = {}
         if (columns is None):

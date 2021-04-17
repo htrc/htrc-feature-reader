@@ -1,12 +1,7 @@
 import pytest
 from htrc_features import Volume, MissingDataError, MissingFieldError
-import htrc_features
-import htrc_features.resolvers
-import tempfile
 import os
 import pandas as pd
-from pathlib import Path
-project_root = Path(htrc_features.__file__).parent.parent
 
 class TestParsing():
 
@@ -29,20 +24,7 @@ class TestParsing():
         assert type(vol.tokenlist()) is pd.core.frame.DataFrame
         assert type(vol.begin_line_chars()) is pd.core.frame.DataFrame
         assert type(vol.section_features(section='all')) is pd.core.frame.DataFrame
-        
-    def test_new_parquet(self):
-        resolver1 = htrc_features.resolvers.LocalResolver(dir = Path(project_root, "tests", "data"), format = "json", compression = "bz2")
-        with tempfile.TemporaryDirectory() as tempdir:
-            resolver2 = htrc_features.resolvers.LocalResolver(dir = tempdir, format = "parquet", compression = "snappy")
-            id = "aeu.ark:/13960/t1rf63t52"
-            bz_vol = Volume(id, id_resolver = resolver1)
-            parquet_vol = Volume(id, id_resolver = resolver2, mode = "wb")
-            parquet_vol.write(bz_vol)
-            print("BAAAAA", [*Path(tempdir).glob("*")])
-            parquet_vol = Volume(id, id_resolver = resolver2)        
-            parquet_vol.parser.parse()
-            print("\n\n\nFOOOO\n\n\n\n", parquet_vol.parser.meta)
-        
+
     def test_token_only_parquet(self):
         htid = 'uc2.ark:/13960/t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'justtokens')
@@ -54,6 +36,8 @@ class TestParsing():
         # Only basic metadata is inferred from ID
         with pytest.raises(KeyError):
             vol.parser.meta['language']
+        # Note--if this parquet file is rewritten with the
+        # new format, this test should break.
         with pytest.raises(AttributeError):
             vol.language
 
@@ -62,7 +46,7 @@ class TestParsing():
         for method in ['section_features', 'begin_line_chars']:
             with pytest.raises(MissingDataError):
                 getattr(vol, method)()
-
+    
     def test_token_only_parquet(self):
         htid = 'uc2.ark:/13960/t1xd0sc6x'
         filepath = os.path.join('tests', 'data', 'justtokens')

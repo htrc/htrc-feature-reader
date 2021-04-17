@@ -319,12 +319,15 @@ class JsonFileHandler(BaseFileHandler):
             self._token_freqs = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
         return self._token_freqs
 
-    def _make_tokencount_df(self, pages=False):
+    def _make_tokencount_df(self, pages=False, indexed = True):
         '''
         Returns a Pandas dataframe of:
             page / section / place(i.e. begin/end) / char / count
 
         If no page JSON is provided, internal representation will be used.
+
+        Indexed: whether to apply pandas indexes before returning.
+                 May be faster to skip in some cases.
         '''
         if not pages:
             pages = self._pages
@@ -356,9 +359,11 @@ class JsonFileHandler(BaseFileHandler):
                                           "to let the library author know!")
 
         # Create a DataFrame
-        df = pd.DataFrame(arr[:i]).set_index(['page', 'section',
-                                              'token', 'pos'])
-        df.sort_index(inplace=True, level=0, sort_remaining=True)
+        df = pd.DataFrame(arr[:i])
+
+        if indexed:
+            df.set_index(['page', 'section','token','pos'], inplace=True)
+            df.sort_index(inplace=True, level=0, sort_remaining=True)
         return df
 
     def _make_line_char_df(self, pages=False):
@@ -616,6 +621,7 @@ class ParquetFileHandler(BaseFileHandler):
 
     def _make_page_feature_df(self):
         try:
+            print(self.pq.schema_arrow.metadata)
             gzipped = self.pq.schema_arrow.metadata[b'page_languages_gzipped_json']
             languages = utils.gz_to_obj(gzipped)
             return pd.DataFrame({"page": range(len(languages)), "calculatedLanguage": languages})
