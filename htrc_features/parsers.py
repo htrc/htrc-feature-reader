@@ -18,6 +18,7 @@ except ImportError:
 
 # placeholder
 parquet = None
+pa = None
 
 import requests
 
@@ -319,7 +320,7 @@ class JsonFileHandler(BaseFileHandler):
             self._token_freqs = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
         return self._token_freqs
 
-    def _make_tokencount_df(self, pages=False, indexed = True):
+    def _make_tokencount_df(self, pages=False, indexed = True, format = "pandas"):
         '''
         Returns a Pandas dataframe of:
             page / section / place(i.e. begin/end) / char / count
@@ -333,33 +334,47 @@ class JsonFileHandler(BaseFileHandler):
             pages = self._pages
 
         tname = 'tokenPosCount'
+        pagenums, sections, tokens, poses, counts = [[],[], [], [], []]
 
-        # Make structured numpy array
-        # Because it is typed, this approach is ~40x faster than earlier
-        # methods
         m = sum([page['tokenCount'] for page in pages])
-        arr = np.zeros(m, dtype=[(str('page'), str('u8')),
-                                 (str('section'), str('U6')),
-                                 (str('token'), str('U64')),
-                                 (str('pos'), str('U6')),
-                                 (str('count'), str('u4'))])
+        pagenums = np.zeros(m, np.uint64)
+        sections = np.zeros(m, 'U6')
         i = 0
         for page in pages:
+            page_start = i
+            pname = page['seq']
             for sec in ['header', 'body', 'footer']:
+                section_start = i
                 if page[sec] is None:
                     continue
-                for token, posvalues in iteritems(page[sec][tname]):
-                    for pos, value in iteritems(posvalues):
-                        arr[i] = (page['seq'], sec, token, pos, value)
+                for token, posvalues in page[sec][tname].items():
+                    for pos, value in posvalues.items():
                         i += 1
-                        if (i > m+1):
-                            logging.error("This volume has more token info "
-                                          "than the internal representation "
-                                          "allows. Email organisciak@gmail.com"
-                                          "to let the library author know!")
+                        tokens.append(token)
+                        poses.append(pos)
+                        counts.append(value)
+                sections[section_start:i].fill(sec)
+            pagenums[page_start:i].fill(pname)
 
-        # Create a DataFrame
-        df = pd.DataFrame(arr[:i])
+        if format == "arrow":
+            if pa is None:
+                import pyarrow as pa
+            return pa.table(
+                {
+                  'page': pa.array(pagenums[:i], pa.uint64()),
+                  'section': pa.array(sections[:i], pa.utf8()),
+                  'token': pa.array(tokens),
+                  'pos': pa.array(poses),
+                  'count': pa.array(counts, pa.uint32())
+                })
+
+        df = pd.DataFrame({
+            "page": pagenums[:i],
+            'section': sections[:i],
+            'token': tokens,
+            'pos': poses,
+            'counts': counts
+        })
 
         if indexed:
             df.set_index(['page', 'section','token','pos'], inplace=True)
@@ -594,6 +609,8 @@ class ParquetFileHandler(BaseFileHandler):
             arrow = self.pq.read(columns = [n for n in names if n in keep_set])
         except IOError:
             raise MissingDataError("No token information available")
+
+            
         df = arrow.to_pandas()
 
         indcols = [col for col in ['page', 'chunk', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
@@ -621,7 +638,6 @@ class ParquetFileHandler(BaseFileHandler):
 
     def _make_page_feature_df(self):
         try:
-            print(self.pq.schema_arrow.metadata)
             gzipped = self.pq.schema_arrow.metadata[b'page_languages_gzipped_json']
             languages = utils.gz_to_obj(gzipped)
             return pd.DataFrame({"page": range(len(languages)), "calculatedLanguage": languages})
