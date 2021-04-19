@@ -334,7 +334,7 @@ class JsonFileHandler(BaseFileHandler):
             pages = self._pages
 
         tname = 'tokenPosCount'
-        pagenums, sections, tokens, poses, counts = [[],[], [], [], []]
+        tokens, poses, counts = [[], [], []]
 
         m = sum([page['tokenCount'] for page in pages])
         pagenums = np.zeros(m, np.uint64)
@@ -373,12 +373,13 @@ class JsonFileHandler(BaseFileHandler):
             'section': sections[:i],
             'token': tokens,
             'pos': poses,
-            'counts': counts
+            'count': counts
         })
 
         if indexed:
             df.set_index(['page', 'section','token','pos'], inplace=True)
             df.sort_index(inplace=True, level=0, sort_remaining=True)
+
         return df
 
     def _make_line_char_df(self, pages=False):
@@ -610,7 +611,7 @@ class ParquetFileHandler(BaseFileHandler):
         except IOError:
             raise MissingDataError("No token information available")
 
-            
+
         df = arrow.to_pandas()
 
         indcols = [col for col in ['page', 'chunk', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
