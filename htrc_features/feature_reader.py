@@ -11,10 +11,8 @@ import warnings
 import tempfile
 import json
 from functools import lru_cache
-
-# placeholders for optional pyarrow imports
-pa = None
-parquet = None
+import pyarrow as pa
+from pyarrow import parquet
 
 from htrc_features import utils
 from htrc_features.utils import gz_to_obj, obj_to_gz
@@ -304,7 +302,7 @@ class FeatureReader(object):
         testing.'''
         return next(self.volumes())
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if len(self.ids) > 1:
             return "<%d path FeatureReader (%s to %s)>" % (len(self.ids), self.ids[0], self.ids[-1])
         elif len(self.ids) == 0:
@@ -315,7 +313,7 @@ class FeatureReader(object):
     def __str__(self):
         return "<%d path FeatureReader>" % (len(self.ids))
 
-def filename_or_id(string):
+def filename_or_id(string) -> str:
     """
     Determine based on suffix is something is a file or an ide.
     """
@@ -342,6 +340,7 @@ def retrieve_parser(id, format, id_resolver, compression, dir=None,
     elif format == "parquet":
         Handler = parsers.ParquetFileHandler
     else:
+        print(format)
         raise NotImplementedError("Must pass a format. Currently 'json' and 'parquet' are supported.")
 
     return Handler(id, id_resolver = id_resolver, dir = dir,
@@ -583,7 +582,7 @@ class Volume(object):
             self._extra_metadata = xml_record
         return self._extra_metadata
 
-    def arrow_counts(self, columns = None, include_metadata = True, **kwargs):
+    def arrow_counts(self, columns = None, include_metadata = True, **kwargs) -> pa.Table:
         """
         columns: the names of a subset of columns to read.
 
@@ -592,12 +591,7 @@ class Volume(object):
         **kwargs: passed to Volume.tokenlist. Doing so slows things down a bit.
 
         """
-        global pa
-        global parquet
 
-        if pa is None:
-            import pyarrow as pa
-            from pyarrow import parquet
         if self.parser.format == "parquet":
             tb = self.parser.pq.read(columns = columns)
             if len(kwargs) > 0:
