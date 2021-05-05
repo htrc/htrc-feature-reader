@@ -16,9 +16,8 @@ try:
 except ImportError:
     import json
 
-# placeholder
-parquet = None
-pa = None
+import pyarrow as pa
+from pyarrow import parquet
 
 import requests
 
@@ -356,10 +355,7 @@ class JsonFileHandler(BaseFileHandler):
                 sections[section_start:i].fill(sec)
             pagenums[page_start:i].fill(pname)
 
-        if format == "arrow":
-            if pa is None:
-                import pyarrow as pa
-            return pa.table(
+        df = pa.table(
                 {
                   'page': pa.array(pagenums[:i], pa.uint64()),
                   'section': pa.array(sections[:i], pa.utf8()),
@@ -367,16 +363,13 @@ class JsonFileHandler(BaseFileHandler):
                   'pos': pa.array(poses),
                   'count': pa.array(counts, pa.uint32())
                 })
+        if format=="arrow":
+            return df
 
-        df = pd.DataFrame({
-            "page": pagenums[:i],
-            'section': sections[:i],
-            'token': tokens,
-            'pos': poses,
-            'count': counts
-        })
+        df = df.to_pandas()
 
         if indexed:
+
             df.set_index(['page', 'section','token','pos'], inplace=True)
             df.sort_index(inplace=True, level=0, sort_remaining=True)
 
