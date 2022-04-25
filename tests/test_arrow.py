@@ -47,12 +47,19 @@ class TestParsing():
             assert(f2.title == f1.title)
             assert(f1.parser._make_page_feature_df().shape[0] == f2.parser._make_page_feature_df().shape[0])
 
+    def test_aframe(self):
+        id = "aeu.ark:/13960/t1rf63t52"
+        resolver1 = htrc_features.resolvers.LocalResolver(dir = Path(project_root, "tests", "data"), format = "json", compression = "bz2")
+        f1 = Volume(id, id_resolver = resolver1)
+        counts = f1._aframe(['token', 'pos'], section = 'body')
+        assert(counts['count'].to_numpy().sum() > 100)
+
     def test_json_to_arrow(self):
         id = "aeu.ark:/13960/t1rf63t52"
         resolver1 = htrc_features.resolvers.LocalResolver(dir = Path(project_root, "tests", "data"), format = "json", compression = "bz2")
         f1 = Volume(id, id_resolver = resolver1)
-        counts = f1.parser._make_tokencount_df()
-        assert(counts['count'].sum() > 100)
+        counts = f1.parser._make_tokencount_df(arrow=True)
+        assert(counts['count'].as_numpy().sum() > 100)
 
     def test_arrow_export(self):
         """

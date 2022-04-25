@@ -1,5 +1,5 @@
 import os
-import zipfile
+import tarfile
 import hashlib
 from io import BytesIO
 import bz2
@@ -278,31 +278,28 @@ class StubbytreeResolver(FilesystemResolver):
         full_path = Path(self.dir, path, fname)
         return full_path
 
-
-
-class ZiptreeResolver(IdResolver):
+class StubbyTarResolver(IdResolver):
     """
-    This class includes methods for populating a ziptree from a pairtree.
+    Stubbytree format, but with the final directory bundled into a tar file.
 
-    A 'ziptree' is a set of zipfiles.
+    Read-only (no support for creation.)
+
+    Useful in situations where inode capacity, not disk storage, limits
+    access.
     """
-    def __init__(self, dir, format, pairtree_root = None, mode = 'rb', hash_chars = 3, **kwargs):
-        self.pairtree_root = pairtree_root
-        self.hash_chars = hash_chars
+    def __init__(self, dir, format, compression, mode = 'r', **kwargs):
+        self.stubbytree_root = dir
         if not os.path.exists(dir) and not mode.startswith('r'):
             os.makedirs(dir)
-        super().__init__(dir = dir, format = format, **kwargs)
+        super().__init__(dir = dir, format = format, mode = mode, compression = compression, **kwargs)
 
-    def which_zipfile(self, id):
-        digits = self.hash_chars
-        # Use the sha1 hash of the id; and take only the first three digits.
-        code = hashlib.sha1(bytes(id, 'utf-8')).hexdigest()[:digits]
-        if digits == 0:
-            return os.path.join(self.dir, "features.zip")
-            return None
-        return os.path.join(self.dir, code + ".zip")
+    def which_tarfile(self, id: str, compression = None) -> Path:
+        if compression is None:
+            compression = self.compression
+        stubbypath = id_to_stubbytree(id, format=self.format, compression=compression)
+        return self.dir / Path(stubbypath).parents[0].with_suffix(".tar")
 
-    def _open(self, id, mode = 'rb', format=None, compression='default', suffix=None, force=False, **kwargs):
+    def _open(self, id, mode = 'r', format=None, compression='default', suffix=None, force=False, **kwargs):
         """
         Force: overwrite existing files where found. (not implemented).
         """
@@ -311,36 +308,22 @@ class ZiptreeResolver(IdResolver):
             format = self.format
         if compression == 'default':
             compression = self.compression
+        if mode != 'rb':
+            raise NotImplementedError("Tarfile formats are read-only.")
 
         filename = self.fname(id, format = format, suffix = suffix, compression = compression)
+        fin = self.which_tarfile(id)
+        foldername = Path(fin.parts[-1]).with_suffix("")
 
-        fin = self.which_zipfile(id)
-
-        zip_mode = 'r'
-        if mode.startswith('w'):
-            # To write, we append to the zipfile.
-            zip_mode = 'a'
-
-        if mode.startswith('w') and MINOR_VERSION <= 5:
-            raise NotImplementedError("Writing to zipfiles with this module requires python 3.6")
-
-        zipcontainer = zipfile.ZipFile(fin, mode = zip_mode)
+        container = tarfile.open(fin, mode = 'r')
 
         # Prepare it to be closed.
-        self.active_buffers.append(zipcontainer)
+        self.active_buffers.append(container)
 
-        if mode.startswith('w') and filename in zipcontainer.namelist():
-            logging.warning("Id '{}' already in zipfile. Refusing to overwrite".format(id))
-            # zipcontainer.close()
-            # Switching away from error.
-            raise KeyError("Id '{}' already in zipfile. Refusing to overwrite".format(id))
         try:
-            fout = zipcontainer.open(filename, mode.rstrip('b'))
+            fout = container.extractfile(str(foldername / filename))
         except KeyError:
-            raise FileNotFoundError("{} not found in {}".format(filename, zipcontainer))
-        if zip_mode == 'r':
-            import io
-            fout = io.BytesIO(fout.read())
+            raise FileNotFoundError("{} not found in {}".format(str(foldername / filename), container))
         return fout
 
 
@@ -378,6 +361,7 @@ class resolver_dict(dict):
 resolver_nicknames = resolver_dict({
     "path": PathResolver,
     "stubbytree": StubbytreeResolver,
+    "stubbytar": StubbyTarResolver,
     "pairtree": PairtreeResolver,
     "local": LocalResolver,
     "http": HttpResolver

@@ -4,15 +4,15 @@ import logging
 import pandas as pd
 import numpy as np
 import pymarc
-from six import iteritems, StringIO, BytesIO
+from io import StringIO, BytesIO
 import codecs
 import os
 import warnings
 import tempfile
 import json
-from functools import lru_cache
 import pyarrow as pa
 from pyarrow import parquet
+from pyarrow import compute as pc
 
 from htrc_features import utils
 from htrc_features.utils import gz_to_obj, obj_to_gz
@@ -393,6 +393,7 @@ class Volume(object):
         just need a nice view into the metadata, or hope for quicker access
         specifically to tokencounts.
         '''
+        self._arrowcounts: pa.DataFrame = None
         self._tokencounts = pd.DataFrame()
         self._line_chars = pd.DataFrame()
         self._page_features = pd.DataFrame()
@@ -466,8 +467,8 @@ class Volume(object):
             if id_resolver.format != format:
                 raise TypeError("You have passed an id resolver for {} files,"
                                 "but requested {} files".format(id_resolver.format, format))
-
-        self.parser = retrieve_parser(id, format, id_resolver, compression, dir,
+        self.parser = retrieve_parser(id = id, format = format,
+        id_resolver = id_resolver, compression = compression, dir = dir,
                                       file_handler=file_handler, **kwargs)
 
         self.args = kwargs
@@ -606,6 +607,7 @@ class Volume(object):
 
         # If we get this far, we're going to have to work
         # with pandas types.
+        
         types = {
             'id': pa.utf8(), # hedging against possibility of multi-element frames.
             'chunk': pa.uint16(),
@@ -619,9 +621,10 @@ class Volume(object):
 
         # Gotta get it from the tokens.
         if len(kwargs) > 0:
-            df = self.tokenlist(**kwargs).reset_index()
+        
+            adf = self.tokenlist(**{**kwargs, arrow: True})
         else:
-            df = self.parser._make_tokencount_df(indexed = False)
+            adf = self.parser._make_tokencount_df(arrow = True)
         if include_metadata:
             metadata_h = json.dumps(self.parser.meta).encode('utf-8')
             try:
@@ -698,6 +701,24 @@ class Volume(object):
     def sentence_counts(self, **kwargs):
         ''' Return a list of sentence counts, per page '''
         return self.section_features(feature='sentenceCount', **kwargs)
+
+    def _aframe(self, columns, section, overflow_strategy="ends", chunk_target = 10000):
+        '''
+        A frame with the token counts summed across 'columns'.
+        '''
+        permitted_fields = ['token', 'lowercase', 'pos', 'page', 'chunk', 'count', 'section']
+        assert all([f in permitted_fields for f in columns])
+        tb = self.parser._make_tokencount_df(format = "arrow")
+        if 'lowercase' in columns and not 'lowercase' in tb.column_names:
+            tb = tb.append_column('lowercase', pc.utf8_lower(tb['token']))
+
+        folded = tb.group_by(columns).aggregate([('count', 'sum')])
+
+        names = folded.column_names
+        names[names.index('count_sum')] = 'count'
+        folded = folded.rename_columns(names)
+        return folded
+
 
     def tokenlist(self, pages=True, section='default', case=True, pos=True,
                   page_freq=False, page_select=False, drop_section=False,

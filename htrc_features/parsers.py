@@ -5,11 +5,12 @@ import logging
 import pandas as pd
 import numpy as np
 import pymarc
-from six import iteritems, StringIO, BytesIO
+from io import StringIO, BytesIO
 import codecs
 import os
 import types
 import bz2
+from collections import defaultdict
 
 try:
     import rapidjson as json
@@ -18,6 +19,7 @@ except ImportError:
 
 import pyarrow as pa
 from pyarrow import parquet
+from pyarrow import compute as pc
 
 import requests
 
@@ -28,6 +30,12 @@ SECREF = ['header', 'body', 'footer']
 
 class MissingDataError(Exception):
     pass
+
+def list_pack(tb):
+  # Turns a table into a one-element list array
+  batched = tb.combine_chunks().to_batches()[0]
+  as_struct = pa.StructArray.from_arrays(batched, tb.column_names)
+  return pa.ListArray.from_arrays(pa.array([0, len(as_struct)]), as_struct)
 
 class BaseFileHandler(object):
 
@@ -278,8 +286,17 @@ class JsonFileHandler(BaseFileHandler):
                 rawjson = rawjson.decode()
             return json.loads(rawjson)
 
-    def _parse_meta(self):
-        pass
+    def _make_page_feature_table(self):
+      tb = pa.table(
+        {key: 
+          [page[key] if key in page else None for page in self._pages]
+          for key in self.PAGE_FIELDS }).cast(pa.schema({
+            'seq': pa.int32(),
+            'languages': pa.string(),
+            'calculatedLanguage': pa.string(),
+            'version': pa.string(),
+          }))
+      return tb
 
     def _make_page_feature_df(self):
         # Parse basic page features
@@ -291,6 +308,23 @@ class JsonFileHandler(BaseFileHandler):
         page_features['seq'] = pd.to_numeric(page_features['seq'])
         page_features = page_features.rename(columns={'seq':'page'})
         return page_features.set_index('page')
+    
+    def _make_section_feature_table(self):
+        rows = {k: [] for k in ["seq", "section", *self.SECTION_FIELDS,]}
+        for page in self._pages:
+            seq = int(page['seq'])
+            for sec in SECREF:
+                section = page[sec]
+                if section is None:
+                    continue
+                rows['seq'].append(seq)
+                rows["section"].append(sec)
+                for field in self.SECTION_FIELDS:
+                    try:
+                        rows[field].append(section[field])
+                    except KeyError:
+                        rows[field].append(None)
+        return pa.table(rows)
 
     def _make_section_feature_df(self):
         # Parse non-token section-specific features
@@ -319,6 +353,20 @@ class JsonFileHandler(BaseFileHandler):
             self._token_freqs = pd.DataFrame(d).set_index(['page', 'section']).sort_index()
         return self._token_freqs
 
+    def _make_tokencount_table(self):
+        tb = self._make_tokencount_df(format = "arrow")
+        sorted = pc.sort_indices(tb, [
+            ('pos', 'ascending'),
+            ('token', 'ascending'),
+            ('page', 'ascending'),
+            ('section', 'ascending'),
+            ('count', 'descending'),
+        ])
+        return tb.take(sorted)
+
+    def _make_unigram_table(self):
+        return self._make_tokencount_table().group_by(['token']).aggregate([('count', 'sum')]).rename_columns(["count", "token"])
+
     def _make_tokencount_df(self, pages=False, indexed = True, format = "pandas"):
         '''
         Returns a Pandas dataframe of:
@@ -328,6 +376,8 @@ class JsonFileHandler(BaseFileHandler):
 
         Indexed: whether to apply pandas indexes before returning.
                  May be faster to skip in some cases.
+
+        format: "pandas" or "arrow". "arrow" is faster, "pandas" is default.
         '''
         if not pages:
             pages = self._pages
@@ -374,6 +424,42 @@ class JsonFileHandler(BaseFileHandler):
             df.sort_index(inplace=True, level=0, sort_remaining=True)
 
         return df
+
+    def _make_row_table(self):
+        ds = {
+            "nc:line_chars": self._make_line_char_table(),
+            "nc:tokencounts": self._make_tokencount_table(),
+            "nc:pages": self._make_page_feature_table(),
+            "nc:sectioninfo": self._make_section_feature_table(),
+            "nc:unigrams": self._make_unigram_table()
+        }
+
+        for k, v in ds.items():
+            ds[k] = list_pack(v)
+        return pa.table(ds)
+
+    def _make_line_char_table(self):
+        pages = defaultdict(list)
+
+        for page in self._pages:
+            pname = page['seq']
+            for sec in ['header', 'body', 'footer']:
+                section = page[sec]
+                if section is None:
+                    continue
+                for pos, pos_name in [('beginCharCount', 'start'), ('endCharCount', 'end')]:
+                    batch = section[pos]
+                    if batch is None:
+                        continue
+                    for character, count in batch.items():
+                        pages['seq'].append(int(pname))
+                        pages['section'].append(sec)
+                        pages['line_position'].append(pos_name)
+                        pages['character'].append(character)
+                        pages['count'].append(count)
+        tb = pa.table(pages)
+        tb = tb.take(pc.sort_indices(tb, [('seq', 'ascending'), ('section', 'ascending'), ('line_position', 'ascending'), ('character', 'ascending')]))
+        return tb
 
     def _make_line_char_df(self, pages=False):
         '''
@@ -596,7 +682,7 @@ class ParquetFileHandler(BaseFileHandler):
                     with resolver.open(id = self.id, suffix = 'chars', mode=mode, **kwargs) as fout:
                         feats.to_parquet(fout, compression=compression, index = True)
 
-    def _make_tokencount_df(self):
+    def _make_tokencount_df(self, pages=False, indexed = True, format = "pandas"):
         try:
             names = self.pq.schema.names
             keep_set = set(['page', 'chunk', 'section', 'token', 'lowercase', 'pos', 'count'])
@@ -604,12 +690,14 @@ class ParquetFileHandler(BaseFileHandler):
         except IOError:
             raise MissingDataError("No token information available")
 
+        if format == "arrow":
+            return arrow
 
         df = arrow.to_pandas()
 
         indcols = [col for col in ['page', 'chunk', 'section', 'token', 'lowercase', 'pos'] if col in df.columns]
 
-        if len(indcols):
+        if len(indcols) > 0 and indexed:
             df = df.set_index(indcols)
 
         return df
