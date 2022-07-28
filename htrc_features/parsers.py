@@ -33,7 +33,10 @@ class MissingDataError(Exception):
 
 def list_pack(tb):
   # Turns a table into a one-element list array
-  batched = tb.combine_chunks().to_batches()[0]
+  try:
+    batched = tb.combine_chunks().to_batches()[0]
+  except IndexError:
+    return pa.array([])
   as_struct = pa.StructArray.from_arrays(batched, tb.column_names)
   return pa.ListArray.from_arrays(pa.array([0, len(as_struct)]), as_struct)
 
@@ -130,35 +133,37 @@ class JsonFileHandler(BaseFileHandler):
     ''' List of metadata fields, with their pythonic name mapping. Intent is to be explicit here,
     for safety because metadata gets mapped to attributes in the Volume.
     '''
-    METADATA_FIELDS = [('schemaVersion', 'metadata_schema_version'),
-                       ("enumerationChronology", "enumeration_chronology"),
-                       ('typeOfResource', 'type_of_resource'), ('title', 'title'),
-                       ('dateCreated', 'date_created'), ('pubDate', 'pub_date'),
-                       ('language', 'language'), ("accessProfile", "access_profile"),
-                       ("isbn", "isbn"), ("issn", "issn"), ("lccn", "lccn"), ('oclc', 'oclc'),
-                       ('features.pageCount', 'page_count'), ("features.schemaVersion", "feature_schema_version")
+
+    METADATA_FIELDS = [('schemaVersion', 'metadata_schema_version', 'string'),
+                       ("enumerationChronology", "enumeration_chronology", 'string'),
+                       ('typeOfResource', 'type_of_resource', 'string'), ('title', 'title', 'string[]'),
+                       ('dateCreated', 'date_created', 'date'), ('pubDate', 'pub_date', 'string'),
+                       ('language', 'language', 'string[]'), ("accessProfile", "access_profile", 'string'),
+                       ("isbn", "isbn", "string[]"), ("issn", "issn", 'string[]'), ("lccn", "lccn", "string[]"), ('oclc', 'oclc', "string[]"),
+                       ('features.pageCount', 'page_count', "int"), ("features.schemaVersion", "feature_schema_version", "string")
                       ]
 
-    METADATA_FIELDS_1_3 = [('htBibUrl', 'ht_bib_url'), ('genre', 'genre'), ('handleUrl', 'handle_url'),
-                          ('imprint', 'imprint'), ('names', 'names'), ('.id', 'id'),
-                          ("sourceInstitution", "source_institution"),
-                          ('classification', 'classification'), ('issuance', 'issuance'),
-                          ("bibliographicFormat", "bibliographic_format"),
-                          ("governmentDocument", "government_document"),
+    METADATA_FIELDS_1_3 = [('htBibUrl', 'ht_bib_url', None), ('genre', 'genre', None), ('handleUrl', 'handle_url', None),
+                          ('imprint', 'imprint', None), ('names', 'names'), ('.id', 'id', None),
+                          ("sourceInstitution", "source_institution", None),
+                          ('classification', 'classification', None), ('issuance', 'issuance', None),
+                          ("bibliographicFormat", "bibliographic_format", None),
+                          ("governmentDocument", "government_document", None),
                           ("hathitrustRecordNumber", "hathitrust_record_number"),
-                          ("rightsAttributes", "rights_attributes"), ("pubPlace", "pub_place"),
-                          ("volumeIdentifier", "volume_identifier"),
-                          ("sourceInstitutionRecordNumber", "source_institution_record_number"),
-                          ("lastUpdateDate", "last_update_date")
+                          ("rightsAttributes", "rights_attributes", None), ("pubPlace", "pub_place", None),
+                          ("volumeIdentifier", "volume_identifier", None),
+                          ("sourceInstitutionRecordNumber", "source_institution_record_number", None),
+                          ("lastUpdateDate", "last_update_date", None)
                          ]
 
-    METADATA_FIELDS_3_0 = [('accessRights', 'access_rights'), ('alternateTitle','alternate_title'),
-                           ('category','category'), ('genre', 'genre_ld'), ('contributor','contributor_ld'), ('.htid', 'id'),
-                           ('id','handle_url'), ("sourceInstitution", "source_institution_ld"),
-                           ('lcc','lcc'), ('type', 'type'), ('isPartOf','is_part_of'),
-                           ('lastRightsUpdateDate','last_rights_update_date'),
-                           ("pubPlace", "pub_place_ld"),
-                           ('mainEntityOfPage','main_entity_of_page'), ('publisher','publisher_ld')
+    METADATA_FIELDS_3_0 = [('accessRights', 'access_rights', 'string'), ('alternateTitle','alternate_title', 'string[]'),
+                           ('category[','category', 'string[]'),
+                            ('genre', 'genre_ld', 'string[]'), ('contributor','contributor_ld', 'ld[]'), ('.htid', 'id', "string"),
+                           ('id','handle_url', 'string'), ("sourceInstitution", "source_institution_ld", 'ld[]'),
+                           ('lcc','lcc', 'string[]'), ('type', 'type', 'string[]'), ('isPartOf','is_part_of', 'ld[]'),
+                           ('lastRightsUpdateDate','last_rights_update_date', 'date'),
+                           ("pubPlace", "pub_place_ld", 'ld[]'),
+                           ('mainEntityOfPage','main_entity_of_page', 'string[]'), ('publisher','publisher_ld', 'ld[]')
                      ]
 
     PAGE_FIELDS =  ['seq', 'languages', 'calculatedLanguage', 'version']
@@ -199,7 +204,7 @@ class JsonFileHandler(BaseFileHandler):
             fields += self.METADATA_FIELDS_3_0
 
         # Expand basic values to properties
-        for key, pythonkey in fields:
+        for key, pythonkey, dtype in fields:
             if '.' not in key:
                 key = 'metadata.' + key
 
@@ -236,6 +241,48 @@ class JsonFileHandler(BaseFileHandler):
             if (self._schema in ['2.0', '3.0']) and (self.meta['language'] in ['jpn', 'chi']):
                 logging.warning("This version of the EF dataset has a tokenization bug "
                             "for Chinese and Japanese. Use newer EF files.")
+    def arrow_meta(self):
+        out = {}
+        for k, pykey, dtype in [*self.METADATA_FIELDS_3_0, *self.METADATA_FIELDS]:
+            name = k.strip('.')
+            val = self.meta[pykey]
+            islist = dtype.endswith("[]")
+            if islist and type(val) is not list:
+                if val is None:
+                    val = []
+                else:
+                    val = [val]
+            if not islist and type(val) is list:
+                raise TypeError(f"Expected scalar value, got list for {k} of {val}")
+            dtype = dtype.strip("[]")
+            if dtype == 'string':
+                ptype = pa.string()
+            if dtype == 'int':
+                ptype = pa.int32()
+            if dtype == 'ld':
+                ptype = pa.struct([
+                    pa.field("id", pa.string()),
+                    pa.field("type", pa.string()),
+                    pa.field("name", pa.string())
+                ])
+                val = [
+                    {
+                      k: f[k] if k in f else None for k in ['id', 'type', 'name']
+                    }
+                    for f in val
+                    ]
+            if dtype == 'date':
+                ptype = pa.int32()
+            if islist:
+                ptype = pa.list_(ptype)
+            if dtype == 'string':
+                if islist:
+                    val = [str(v) for v in val]
+                else:
+                    val = str(val)
+            out[k] = pa.array([val], ptype)
+        return out
+            
 
     def write(self, outside_volume, compression='default', mode='wb', **kwargs):
 
@@ -364,8 +411,14 @@ class JsonFileHandler(BaseFileHandler):
         ])
         return tb.take(sorted)
 
-    def _make_unigram_table(self):
-        return self._make_tokencount_table().group_by(['token']).aggregate([('count', 'sum')]).rename_columns(["count", "token"])
+    def _make_unigram_table(self, columns = ["body"]):
+        tb = self._make_tokencount_table()
+        tb = tb.filter(pc.is_in(tb['section'], pa.array(columns)))\
+            .group_by(['token'])\
+            .aggregate([('count', 'sum')])\
+            .rename_columns(["count", "token"])
+        tb = tb.take(pc.sort_indices(tb, [('count', 'descending'), ('token', 'ascending')]))
+        return tb
 
     def _make_tokencount_df(self, pages=False, indexed = True, format = "pandas"):
         '''
@@ -425,17 +478,23 @@ class JsonFileHandler(BaseFileHandler):
 
         return df
 
-    def _make_row_table(self):
-        ds = {
-            "nc:line_chars": self._make_line_char_table(),
-            "nc:tokencounts": self._make_tokencount_table(),
-            "nc:pages": self._make_page_feature_table(),
-            "nc:sectioninfo": self._make_section_feature_table(),
-            "nc:unigrams": self._make_unigram_table()
-        }
-
-        for k, v in ds.items():
-            ds[k] = list_pack(v)
+    def _make_row_table(self, ks = ['nc:line_chars', 'nc:tokencounts', 'nc:pages', 'nc:sectioninfo', 'nc:unigrams']):
+        ds = {}
+        if 'nc:line_chars' in ks:
+            ds['nc:line_chars'] = self._make_line_char_table()
+        if 'nc:tokencounts' in ks:
+            ds['nc:tokencounts'] = self._make_tokencount_table()
+        if 'nc:pages' in ks:
+            ds['nc:pages'] = self._make_page_feature_table()
+        if 'nc:sectioninfo' in ks:
+            ds['nc:sectioninfo'] = self._make_section_feature_table()
+        if 'nc:unigrams' in ks:
+            ds['nc:unigrams'] = self._make_unigram_table()
+        packed = {}
+        for k, tb in ds.items():
+            packed[k] = list_pack(tb)
+        ds = {**packed, **self.arrow_meta()}
+        
         return pa.table(ds)
 
     def _make_line_char_table(self):

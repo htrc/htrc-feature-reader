@@ -9,7 +9,6 @@ import codecs
 import os
 import warnings
 import tempfile
-import json
 import pyarrow as pa
 from pyarrow import parquet
 from pyarrow import compute as pc
@@ -184,6 +183,7 @@ def group_linechars(df, section='all', place='all'):
         return df
     else:
         return df.groupby(groups).sum()[['count']]
+
 
 # CLASSES
 class FeatureReader(object):
@@ -621,8 +621,7 @@ class Volume(object):
 
         # Gotta get it from the tokens.
         if len(kwargs) > 0:
-        
-            adf = self.tokenlist(**{**kwargs, arrow: True})
+            adf = self.tokenlist(**{**kwargs, "arrow": True})
         else:
             adf = self.parser._make_tokencount_df(arrow = True)
         if include_metadata:
