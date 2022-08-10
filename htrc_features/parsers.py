@@ -33,10 +33,13 @@ class MissingDataError(Exception):
 
 def list_pack(tb):
   # Turns a table into a one-element list array
-  try:
-    batched = tb.combine_chunks().to_batches()[0]
-  except IndexError:
-    return pa.array([])
+  batches = tb.combine_chunks().to_batches()
+  if len(batches) > 0:
+    batched = batches[0]
+  else:
+    return pa.array([None], type = pa.list_(pa.struct([
+        t for t in tb.schema
+    ])))
   as_struct = pa.StructArray.from_arrays(batched, tb.column_names)
   return pa.ListArray.from_arrays(pa.array([0, len(as_struct)]), as_struct)
 
