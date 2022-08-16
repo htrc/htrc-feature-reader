@@ -465,8 +465,8 @@ class JsonFileHandler(BaseFileHandler):
                 {
                   'page': pa.array(pagenums[:i], pa.uint64()),
                   'section': pa.array(sections[:i], pa.utf8()),
-                  'token': pa.array(tokens),
-                  'pos': pa.array(poses),
+                  'token': pa.array(tokens, pa.string()),
+                  'pos': pa.array(poses, pa.string()),
                   'count': pa.array(counts, pa.uint32())
                 })
         if format=="arrow":
