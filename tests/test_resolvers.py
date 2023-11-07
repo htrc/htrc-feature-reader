@@ -3,6 +3,7 @@ from htrc_features.resolvers import IdResolver
 import htrc_features.resolvers as resolvers
 from htrc_features.caching import copy_between_resolvers
 from htrc_features import Volume
+import htrc_features.resolvers
 import htrc_features
 import os
 import pandas as pd
@@ -20,7 +21,7 @@ class TestParsing():
         # Don't use compression in the name
         testname = resolver2.fname("mdp.12345", format = "parquet", compression = "snappy", suffix = "tokens")
         assert(testname == "mdp.12345.tokens.parquet")
-        
+
         testname = resolver2.fname("mdp.12345", format = "json", suffix = None, compression = 'gz')
         assert(testname == "mdp.12345.json.gz")
 
@@ -47,13 +48,13 @@ class TestParsing():
 
                 # Our test assertion ensures that the data has made it all the way through.
                 assert(Volume("aeu.ark:/13960/t1rf63t52", id_resolver = resolver3).tokenlist()['count'].sum() == 97691)
-                
+
     def test_parquet_snappy_resolvers_PairtreeResolver_resolution(self):
         self.combo_test("parquet", resolvers.PairtreeResolver, "snappy")
 
     def test_parquet_snappy_resolvers_ZiptreeResolver_resolution(self):
         self.combo_test("parquet", resolvers.ZiptreeResolver, "snappy")
- 
+
     def test_parquet_snappy_resolvers_LocalResolver_resolution(self):
         self.combo_test("parquet", resolvers.LocalResolver, "snappy")
 
@@ -65,41 +66,41 @@ class TestParsing():
     # Hmmm.
 #    def test_parquet_gz_resolvers_PairtreeResolver_resolution(self):
 #        with pytest.raises(pyarrow.lib.ArrowException):
-#            self.combo_test("parquet", resolvers.PairtreeResolver, "gz")        
- 
+#            self.combo_test("parquet", resolvers.PairtreeResolver, "gz")
+
     def test_parquet_gz_resolvers_ZiptreeResolver_resolution(self):
         self.combo_test("parquet", resolvers.ZiptreeResolver, "gzip")
- 
+
     def test_parquet_gz_resolvers_LocalResolver_resolution(self):
         self.combo_test("parquet", resolvers.LocalResolver, "gzip")
- 
+
     def test_json_gz_resolvers_PairtreeResolver_resolution(self):
         self.combo_test("json", resolvers.PairtreeResolver, "gz")
- 
+
     def test_json_gz_resolvers_ZiptreeResolver_resolution(self):
         self.combo_test("json", resolvers.ZiptreeResolver, "gz")
 
- 
+
     def test_json_gz_resolvers_LocalResolver_resolution(self):
         self.combo_test("json", resolvers.LocalResolver, "gz")
 
- 
+
     def test_json_bz2_resolvers_PairtreeResolver_resolution(self):
         self.combo_test("json", resolvers.PairtreeResolver, "bz2")
 
- 
+
     def test_json_bz2_resolvers_ZiptreeResolver_resolution(self):
         self.combo_test("json", resolvers.ZiptreeResolver, "bz2")
 
- 
+
     def test_json_bz2_resolvers_LocalResolver_resolution(self):
         self.combo_test("json", resolvers.LocalResolver, "bz2")
 
- 
+
     def test_json_None_resolvers_PairtreeResolver_resolution(self):
         self.combo_test("json", resolvers.PairtreeResolver, None)
 
- 
+
     def test_json_None_resolvers_ZiptreeResolver_resolution(self):
         self.combo_test("json", resolvers.ZiptreeResolver, None)
 
@@ -115,5 +116,5 @@ class TestParsing():
             copy_between_resolvers(id, basic_resolver, testing_resolver_write)
 
             # Test read on a freshly made resolver just in case there's entanglement
-            testing_resolver_read = resolver(dir = tempdir, format = format, compression = compression)            
+            testing_resolver_read = resolver(dir = tempdir, format = format, compression = compression)
             assert(Volume(id, id_resolver = testing_resolver_read).tokenlist()['count'].sum() == 97691)

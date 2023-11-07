@@ -14,10 +14,10 @@ class TestChunking():
         vol_in = Volume(id='aeu.ark:/13960/t1rf63t52', dir = str(dir), id_resolver = 'local')
         output = Volume(id='foo.123', format = 'parquet', mode = 'wb', id_resolver='local', dir = tmpdir )
         output.write(vol_in, token_kwargs = {"chunk": True,"drop_section": True, "pos":False})
+
         read = pd.read_parquet(Path(tmpdir, "foo.123.tokens.parquet")).reset_index()
-        print(read.columns)
         assert("chunk" in read.columns)
-    
+
     def test_write_to_chunked_parquet(self, tmpdir):
         dir = "tests/data"
         vol_in = Volume(id='aeu.ark:/13960/t1rf63t52', dir = str(dir), id_resolver = 'local')
@@ -25,7 +25,7 @@ class TestChunking():
         output.write(vol_in, token_kwargs = {"chunk": True})
         read = pd.read_parquet(Path(tmpdir, "foo.123.tokens.parquet")).reset_index()
         assert("chunk" in read.columns)
-            
+
     def test_even_chunking(self):
         # All methods should solve it when pages are only one thing long.
         for method in chunk_ends, chunk_even, chunk_last:
@@ -66,7 +66,7 @@ class TestChunking():
 
     def test_tiny_chunk_size(self):
         # What if the chunk size is much smaller than any page?
-        # The only reasonable response is 
+        # The only reasonable response is
         for method in chunk_ends, chunk_even, chunk_last:
             test_counts = np.array([500] * 10)
             target = 100
@@ -75,5 +75,3 @@ class TestChunking():
                 c[chunk] += count
 
             assert(np.max([*c.values()]) == 500)
-
-    

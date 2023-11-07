@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
     
 setup(name='htrc-feature-reader',
-      version='2.0.6',
+      version='2.0.7',
       description='Library for working with the HTRC Extracted Features dataset',
       long_description=long_description,
       long_description_content_type="text/markdown",
@@ -21,7 +21,7 @@ setup(name='htrc-feature-reader',
       author_email='organisciak@gmail.com',
       license='NCSA',
       packages=['htrc_features'],
-      install_requires=['six', 'pandas>=0.24', 'requests', 'python-rapidjson', 'pymarc'],
+      install_requires=['six', 'pandas>=0.24', 'requests', 'python-rapidjson', 'pymarc', 'pyarrow'],
       setup_requires=['pytest-runner'],
       tests_require=['pytest'],
       entry_points={

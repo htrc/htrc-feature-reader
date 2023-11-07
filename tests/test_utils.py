@@ -108,19 +108,29 @@ class TestUtils():
         # Assert error when grouping cmd args and file
         with pytest.raises(SystemExit):
             utils._htid2rsync_parse_args(parser, ["-f", idfile] + volume_ids)
-            
-    def test_rsync_single_file(self, tmpdir, volume_ids, pairtree_volume_paths):
+
+    def test_rsync_single_file(self, tmpdir, volume_ids, stubbytree_volume_paths):
+        expected_fname = os.path.split(stubbytree_volume_paths[0])[1]
+        utils.download_file(htids=volume_ids[0], outdir=tmpdir.dirname)
+        assert os.path.exists(os.path.join(tmpdir.dirname, expected_fname))
+        
+    def test_rsync_single_file_ef15(self, tmpdir, volume_ids, pairtree_volume_paths):
         expected_fname = os.path.split(pairtree_volume_paths[0])[1]
-        utils.download_file(htids=volume_ids[0], outdir=tmpdir.dirname, format='pairtree')
+        utils.download_file(htids=volume_ids[0], outdir=tmpdir.dirname, rsync_endpoint='ef-1.5', format='pairtree')
         assert os.path.exists(os.path.join(tmpdir.dirname, expected_fname))
         
     def test_rsync_multi_file(self, tmpdir, volume_ids, pairtree_volume_paths):
-        utils.download_file(htids=volume_ids, outdir=tmpdir.dirname, format='pairtree')
+        utils.download_file(htids=volume_ids, outdir=tmpdir.dirname)
         for path in pairtree_volume_paths:
             expected_fname = os.path.split(path)[1]
             assert os.path.exists(os.path.join(tmpdir.dirname, expected_fname))
+    
+    def test_recursive_rsync(self, tmpdir, volume_ids, stubbytree_volume_paths):
+        utils.download_file(htids=volume_ids, outdir=tmpdir.dirname, keep_dirs=True)
+        for path in stubbytree_volume_paths:
+            assert os.path.exists(os.path.join(tmpdir.dirname, path))
             
-    def test_recursive_rsync(self, tmpdir, volume_ids, pairtree_volume_paths):
-        utils.download_file(htids=volume_ids, outdir=tmpdir.dirname, keep_dirs=True, format='pairtree')
+    def test_recursive_rsync_ef15(self, tmpdir, volume_ids, pairtree_volume_paths):
+        utils.download_file(htids=volume_ids, outdir=tmpdir.dirname, keep_dirs=True, rsync_endpoint='ef-1.5', format='pairtree')
         for path in pairtree_volume_paths:
             assert os.path.exists(os.path.join(tmpdir.dirname, path))

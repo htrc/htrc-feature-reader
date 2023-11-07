@@ -41,22 +41,22 @@ class TestVolume():
             passed = time.time() - start
             tokenlist_times.append(passed)
         assert 2*tokenlist_times[0] > sum(tokenlist_times[1:])
-        
+
     def test_direct_loading(self, paths):
         import time
         # Load new volume specifically for this test
         vol = Volume(paths[0], compression=None)
         assert type(vol) == htrc_features.feature_reader.Volume
-        
+
     def test_fullparquet_saving(self, volume, tmp_path):
         volume.save(tmp_path, format = "parquet", files = ['meta', 'tokens', 'chars', 'section_features'])
         files = os.listdir(tmp_path)
         for ext in ['meta.json', 'tokens.parquet', 'section.parquet', 'chars.parquet']:
             assert '{}.{}'.format(utils.clean_htid(volume.id), ext) in files
-            
+
     def test_partial_parquet_saving(self, volume, tmp_path):
         clean_id = utils.clean_htid(volume.id)
-        
+
         # Save only meta
         volume.save(tmp_path, format = 'parquet', files = ['meta'])
         metapath = os.path.join(tmp_path, clean_id+'.meta.json')
@@ -65,12 +65,12 @@ class TestVolume():
             data = json.load(f)
             assert data['id'] == volume.id
         os.remove(metapath)
-        
+
         # Save only tokens
         volume.save(tmp_path, format = 'parquet', files = ['tokens'])
         assert os.listdir(tmp_path) == [clean_id+'.tokens.parquet']
         os.remove(os.path.join(tmp_path, clean_id+'.tokens.parquet'))
-        
+
     def test_partial_tokenlist_saving(self, volume, tmp_path):
         tkwargs = dict(case=False, pos=False, drop_section=True)
         volume.save(tmp_path, format='parquet', files = ['tokens'], token_kwargs = tkwargs)
@@ -159,12 +159,12 @@ class TestVolume():
         assert sum(volume.line_counts()) == 441
         assert sum(volume.empty_line_counts()) == 92
         assert sum(volume.sentence_counts()) == 191
-        
+
     def test_char_counts(self, volume):
         begin_characters = volume.begin_line_chars()
         assert(begin_characters.loc[(3, 'body', 'begin', '/'),].values[0] == 1)
         assert(begin_characters.groupby(level='char').sum().loc['a'].values[0] == 22)
-        
+
         end_characters = volume.end_line_chars()
         assert(end_characters.loc[(3, 'body', 'end', '3'), ].values[0] == 1)
         assert(end_characters.groupby(level='char').sum().loc['.'].values[0] == 46)
@@ -232,7 +232,7 @@ class TestVolume():
         vol.tokenlist(case=False)
         assert vol._tokencounts.index.names == ['page', 'section', 'token',
                                                 'pos']
-        
+
     def test_big_pages(self):
         ''' Test a document with *many* tokens per page. '''
         path = os.path.join('tests', 'data', 'aeu.ark+=13960=t1rf63t52.json.bz2')
@@ -240,9 +240,9 @@ class TestVolume():
         volume = feature_reader.first()
         tokenlist = volume.tokenlist()
         assert tokenlist.shape[0] == 56397
-        
+
     def test_chunking(self, fullvolume):
-        # This tests whether chunking works on a basic case, working from a full 
+        # This tests whether chunking works on a basic case, working from a full
         # JSON-based EF file
 
         longest_page = fullvolume.tokenlist().groupby('page').sum().max().iloc[0]
@@ -250,6 +250,6 @@ class TestVolume():
             chunked = (fullvolume.tokenlist(chunk=True, chunk_target=chunk_size)
                                  .groupby(level='chunk').sum()
                       )
-            assert abs(chunked.mean().iloc[0] - chunk_size) < chunk_size/3 
+            assert abs(chunked.mean().iloc[0] - chunk_size) < chunk_size/3
             assert abs(chunked.iloc[1:-1].max().iloc[0] - chunk_size) < longest_page*2 # Does it avoid huge chunks
             assert abs(chunked.iloc[1:-1].min().iloc[0] - chunk_size) < chunk_size/4 # Does it avoid tiny chunks
