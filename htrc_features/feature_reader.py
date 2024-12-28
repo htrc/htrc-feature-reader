@@ -2,17 +2,13 @@ from __future__ import unicode_literals
 
 import logging
 import pandas as pd
-import numpy as np
 import pymarc
-from six import iteritems, StringIO, BytesIO
-import codecs
-import os
+from six import StringIO
 import warnings
 import tempfile
 
-from htrc_features import utils
 from htrc_features import parsers, resolvers, transformations
-from htrc_features.parsers import JsonFileHandler, BaseFileHandler, ParquetFileHandler, MissingDataError, SECREF
+from htrc_features.parsers import MissingDataError, SECREF
 
 try:
     import rapidjson as json
@@ -21,11 +17,7 @@ except ImportError:
     
 import requests
 
-from urllib.request import urlopen as _urlopen
-from urllib.parse import urlparse as parse_url
-from urllib.error import HTTPError
 
-import bz2
 
 class MissingFieldError(Exception):
     pass
@@ -104,9 +96,9 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
         return df
     else:
         if not page_freq:
-            return df.reset_index().groupby(groups).sum()[['count']]
+            return df.reset_index().groupby(groups).sum(numeric_only=True)[['count']]
         elif page_freq and 'page' in groups:
-            df = df.reset_index().groupby(groups).sum()[['count']]
+            df = df.reset_index().groupby(groups).sum(numeric_only=True)[['count']]
             pd.options.mode.chained_assignment = None
             df['count'] = 1
             pd.options.mode.chained_assignment = 'warn'
@@ -117,7 +109,7 @@ def group_tokenlist(in_df, pages=True, section='all', case=True, pos=True,
                 x['count'] = 1
                 return x
             return df.reset_index().groupby([pagecolname]+groups).apply(set_to_one)\
-                     .groupby(groups).sum()[['count']]
+                     .groupby(groups).sum(numeric_only=True)[['count']]
 
 def fold_pages(page_list, chunkname):
     '''
@@ -178,7 +170,7 @@ def group_linechars(df, section='all', place='all'):
     if groups == ['page', 'section', 'place', 'character']:
         return df
     else:
-        return df.groupby(groups).sum()[['count']]
+        return df.groupby(groups).sum(numeric_only=True)[['count']]
 
 # CLASSES
 class FeatureReader(object):
@@ -243,9 +235,6 @@ class FeatureReader(object):
     
     def __len__(self):
         return len(self.ids)
-
-    def __str__(self):
-        return "HTRC Feature Reader with %d paths loaded" % (len(self.paths))
 
     def volumes(self):
         ''' Generator for returning Volume objects '''
@@ -399,7 +388,7 @@ class Volume(object):
             path = None
             
         if 'compressed' in kwargs:
-            warning.warn("Use 'compression' argument. `compressed` has been deprecated.")
+            warnings.warn("Use 'compression' argument. `compressed` has been deprecated.")
             if kwargs['compressed'] == False:
                 compression = None
             elif kwargs['compressed'] == True:
@@ -410,7 +399,7 @@ class Volume(object):
             if isinstance(id_resolver, resolvers.IdResolver):
                 format = id_resolver.format
                 if (dir is not None) and (dir != id_resolver.dir):
-                    warn.warning("You provided a dir argument ({}) and id_resolver instance with a "
+                    warnings.warn("You provided a dir argument ({}) and id_resolver instance with a "
                                  "different dir ({}).".format(dir, id_resolver.dir))
                 # Why accept the resolver's dir? Anyone know?
                 dir = id_resolver.dir
@@ -473,12 +462,6 @@ class Volume(object):
 
     def __iter__(self):
         return self.pages()
-
-    def __str__(self):
-        try:
-            return "<HTRC Volume: %s - %s (%s)>" % (self.id, self.title, self.year)
-        except:
-            return "<HTRC Volume: %s>" % self.id
 
     def _repr_html_(self):
         html_template = "<strong><a href='%s'>%s</a></strong> by <em>%s</em> (%s, %s pages) - <code>%s</code>"
