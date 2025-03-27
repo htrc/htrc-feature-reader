@@ -1,6 +1,6 @@
 from setuptools import setup
 
-with open("README.md", "r") as fh:
+with open("README.md", mode="r", encoding='utf-8') as fh:
     long_description = fh.read()
     
 setup(name='htrc-feature-reader',
