@@ -76,13 +76,31 @@ for htid in ["hvd.32044013656053", "hvd.32044013656061"]:
 
 This downloads the file temporarily, using the HTRC's web-based download link (e.g. https://data.analytics.hathitrust.org/features/get?download-id={{URL}}). One good pairing with this feature is the [HTRC Python SDK](https://github.com/htrc/HTRC-PythonSDK)'s functionality for downloading collections. 
 
-For example, I have a small collection of knitting-related books at https://babel.hathitrust.org/cgi/mb?a=listis&c=1174943610. To read the feature files for those books:
+For example, I have a small collection of knitting-related books at https://babel.hathitrust.org/cgi/mb?a=download&c=1174943610&format=text. To read the feature files for those books:
 
 
 ```python
-from htrc import workset
-volids = workset.load_hathitrust_collection('https://babel.hathitrust.org/cgi/mb?a=listis&c=1174943610')
-FeatureReader(ids=volids).first().title
+from htrc_features import utils
+from urllib.request import Request, urlopen
+import pandas as pd
+from io import BytesIO
+
+url = "https://babel.hathitrust.org/cgi/mb?a=download&c=1174943610&format=text"
+
+headers = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/114.0"
+}
+req = Request(url, headers=headers)
+with urlopen(req) as response:
+    tsv_data = response.read()
+
+df = pd.read_csv(BytesIO(tsv_data), sep='\t')
+#print(df)
+
+#to get the stubbytree url for rsync:
+htitem_ids = df['htitem_id']
+for id in htitem_ids:
+    print(utils.id_to_stubbytree(id))
 ```
 
 Remember that for large jobs, it is faster to download your dataset beforehand, using the `rsync` method.

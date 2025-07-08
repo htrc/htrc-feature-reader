@@ -56,3 +56,5 @@ docs/_build/
 README.rst
 .eggs
 tmp/
+venv
+test.py
